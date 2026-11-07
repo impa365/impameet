@@ -20,12 +20,13 @@ são bem-vindas.
    docker build --target test apps/platform   # ou apps/agent, apps/screen
    ```
 
-4. Abra o pull request descrevendo o que muda e como testar. A CI precisa passar.
+4. Abra o pull request descrevendo o que muda e como testar.
 
 ## Padrões do projeto
 
 - **Sem segredos no código**: nada de chaves, tokens, IPs ou domínios reais em arquivos,
-  testes ou exemplos. Use `example.com` e valores fictícios. A CI roda o gitleaks.
+  testes ou exemplos. Use `example.com` e valores fictícios. O projeto usa o gitleaks
+  (configuração em `.gitleaks.toml`) para conferir.
 - **Sem provedor, modelo ou voz padrão**: tudo o que o agente usa é escolhido no painel.
 - **Textos da interface em três idiomas**: toda mensagem nova entra em
   `apps/platform/src/i18n/messages` em português, inglês e espanhol.
@@ -35,6 +36,19 @@ são bem-vindas.
 - Python com `ruff`, `mypy` (strict) e `bandit`; TypeScript com `eslint`, `prettier` e `tsc`.
 - Commits curtos e no imperativo, de preferência no formato
   [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`...).
+
+## Publicar uma versão (mantenedores)
+
+As imagens são publicadas no Docker Hub a partir de uma máquina com o Docker logado na conta
+`impa365` (Docker Desktop, por exemplo):
+
+```bash
+bash deploy/scripts/release.sh 1.2.0          # testes, varredura e publicação de :1.2.0 e :latest
+git tag -a v1.2.0 -m "IMPA Meet 1.2.0" && git push origin v1.2.0
+```
+
+Nada é publicado se algum teste falhar ou se a varredura achar vulnerabilidade alta ou crítica
+com correção disponível. Use `PUSH=0` para rodar tudo sem publicar.
 
 ## Créditos
 

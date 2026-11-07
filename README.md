@@ -6,7 +6,6 @@
 Open source, auto-hospedada e pronta para Docker Swarm e Portainer.
 
 [![Licença Apache 2.0](https://img.shields.io/badge/licen%C3%A7a-Apache%202.0-1a73e8)](LICENSE)
-[![CI](https://github.com/impa365/impameet/actions/workflows/ci.yml/badge.svg)](https://github.com/impa365/impameet/actions/workflows/ci.yml)
 [![Docker Hub](https://img.shields.io/docker/v/impa365/impameet-platform?sort=semver&label=Docker%20Hub&logo=docker&logoColor=white)](https://hub.docker.com/r/impa365/impameet-platform)
 [![Pulls](https://img.shields.io/docker/pulls/impa365/impameet-platform?logo=docker&logoColor=white)](https://hub.docker.com/r/impa365/impameet-platform)
 ![LiveKit](https://img.shields.io/badge/WebRTC-LiveKit-ff6352)
@@ -187,8 +186,8 @@ flowchart LR
 As imagens prontas ficam no **Docker Hub**:
 [`impa365/impameet-platform`](https://hub.docker.com/r/impa365/impameet-platform),
 [`impa365/impameet-agent`](https://hub.docker.com/r/impa365/impameet-agent) e
-[`impa365/impameet-screen`](https://hub.docker.com/r/impa365/impameet-screen). A tag `latest`
-acompanha a branch `main`, e cada versão (`v1.2.3`) gera `1.2.3`, `1.2` e `1`.
+[`impa365/impameet-screen`](https://hub.docker.com/r/impa365/impameet-screen). Cada versão é publicada com o
+número dela (por exemplo `1.0.0`) e como `latest`.
 
 ## Desenvolvimento
 
@@ -207,8 +206,11 @@ uv run pytest               # cobertura mínima de 90%
 uv run ruff check src tests && uv run mypy && uv run bandit -q -r src
 ```
 
-Cada `Dockerfile` tem um estágio `test` que roda a bateria completa dentro da imagem, a mesma
-usada pela CI: `docker build --target test apps/<app>`.
+Cada `Dockerfile` tem um estágio `test` que roda a bateria completa dentro da imagem:
+`docker build --target test apps/<app>`.
+
+Para publicar uma versão no Docker Hub (com o Docker Desktop logado na conta), rode
+`bash deploy/scripts/release.sh 1.2.0`. O script testa, varre e só publica se tudo passar.
 
 Para contribuir, veja o [CONTRIBUTING.md](CONTRIBUTING.md). Para relatar uma falha de
 segurança, siga o [SECURITY.md](SECURITY.md); nunca use uma issue pública.

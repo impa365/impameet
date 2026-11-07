@@ -6,7 +6,6 @@
 Open source, self-hosted, ready for Docker Swarm and Portainer.
 
 [![License Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-1a73e8)](LICENSE)
-[![CI](https://github.com/impa365/impameet/actions/workflows/ci.yml/badge.svg)](https://github.com/impa365/impameet/actions/workflows/ci.yml)
 [![Docker Hub](https://img.shields.io/docker/v/impa365/impameet-platform?sort=semver&label=Docker%20Hub&logo=docker&logoColor=white)](https://hub.docker.com/r/impa365/impameet-platform)
 [![Pulls](https://img.shields.io/docker/pulls/impa365/impameet-platform?logo=docker&logoColor=white)](https://hub.docker.com/r/impa365/impameet-platform)
 ![LiveKit](https://img.shields.io/badge/WebRTC-LiveKit-ff6352)
@@ -96,16 +95,16 @@ updates, backups and troubleshooting.
 Ready-made images are on **Docker Hub**:
 [`impa365/impameet-platform`](https://hub.docker.com/r/impa365/impameet-platform),
 [`impa365/impameet-agent`](https://hub.docker.com/r/impa365/impameet-agent) and
-[`impa365/impameet-screen`](https://hub.docker.com/r/impa365/impameet-screen). The `latest` tag
-follows `main`, and release tags `v1.2.3` produce
-`1.2.3`, `1.2` and `1`.
+[`impa365/impameet-screen`](https://hub.docker.com/r/impa365/impameet-screen). Each release is published under its
+version number (for example `1.0.0`) and as `latest`.
 
 ## Development
 
 ```bash
 cd apps/platform && npm ci && npm run dev        # Node 22, http://localhost:3000
 cd apps/agent && uv sync && uv run pytest        # Python 3.12 (same for apps/screen)
-docker build --target test apps/<app>            # the full suite, exactly as CI runs it
+docker build --target test apps/<app>            # the full suite, inside the image
+bash deploy/scripts/release.sh 1.2.0             # test, scan and publish to Docker Hub
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately as described in

@@ -1,9 +1,7 @@
 name: CI
 
+# Manual only: releases are built, tested and published locally with deploy/scripts/release.sh.
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
