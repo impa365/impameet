@@ -161,6 +161,7 @@ async def test_live_screen_publishes_repeats_frames_and_expires(
 
     await screen.connect("wss://lk", "tok")
     assert room.published[0].source == rtc.TrackSource.SOURCE_SCREENSHARE
+    assert room.published[0].simulcast is False
     assert screen.expired(10**9)  # alone in the room for longer than the grace period
 
     room.remote_participants["guest"] = object()
