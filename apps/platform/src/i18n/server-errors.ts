@@ -124,7 +124,17 @@ const EN: Record<string, string> = {
   'Escolha o modelo de transcrição': 'Choose the transcription model',
   'Escolha o modelo de LLM': 'Choose the LLM model',
   'Escolha a integração de LLM': 'Choose the LLM integration',
-  'Escolha a integração do Fish Audio': 'Choose the Fish Audio integration',
+  'Escolha a integração de voz': 'Choose the voice integration',
+  'Escolha a integração de transcrição': 'Choose the transcription integration',
+  'Escolha uma integração de LLM': 'Choose an LLM integration',
+  'Escolha uma integração de voz (Fish Audio, Deepgram ou ElevenLabs)':
+    'Choose a voice integration (Fish Audio, Deepgram or ElevenLabs)',
+  'Escolha um modelo de voz do provedor de voz escolhido':
+    'Choose a voice model from the chosen voice provider',
+  'Escolha um modelo de transcrição do provedor de transcrição escolhido':
+    'Choose a transcription model from the chosen transcription provider',
+  'As vozes do Deepgram precisam ser do modelo escolhido (ex.: flux-bianca-pt)':
+    'Deepgram voices must belong to the chosen model (e.g. flux-bianca-pt)',
   'Para transcrever, a sala precisa de um assistente de IA configurado':
     'To transcribe, the room needs a fully configured AI assistant',
 };
@@ -251,7 +261,17 @@ const ES: Record<string, string> = {
   'Escolha o modelo de transcrição': 'Elige el modelo de transcripción',
   'Escolha o modelo de LLM': 'Elige el modelo de LLM',
   'Escolha a integração de LLM': 'Elige la integración de LLM',
-  'Escolha a integração do Fish Audio': 'Elige la integración de Fish Audio',
+  'Escolha a integração de voz': 'Elige la integración de voz',
+  'Escolha a integração de transcrição': 'Elige la integración de transcripción',
+  'Escolha uma integração de LLM': 'Elige una integración de LLM',
+  'Escolha uma integração de voz (Fish Audio, Deepgram ou ElevenLabs)':
+    'Elige una integración de voz (Fish Audio, Deepgram o ElevenLabs)',
+  'Escolha um modelo de voz do provedor de voz escolhido':
+    'Elige un modelo de voz del proveedor de voz elegido',
+  'Escolha um modelo de transcrição do provedor de transcrição escolhido':
+    'Elige un modelo de transcripción del proveedor de transcripción elegido',
+  'As vozes do Deepgram precisam ser do modelo escolhido (ex.: flux-bianca-pt)':
+    'Las voces de Deepgram deben ser del modelo elegido (ej.: flux-bianca-pt)',
   'Para transcrever, a sala precisa de um assistente de IA configurado':
     'Para transcribir, la sala necesita un asistente de IA configurado',
 };

@@ -51,7 +51,9 @@ empresas.
   Com mais de um na sala, cada assistente responde quando chamam o nome dele e passa a vez
   para o próximo.
 - **Qualquer LLM compatível com a API da OpenAI** (OpenAI, DeepSeek, OpenRouter, Groq,
-  modelos locais...) e **Fish Audio** para transcrição e voz.
+  modelos locais...) e, para ouvir e falar, **Fish Audio**, **Deepgram** ou **ElevenLabs**, todos em tempo
+  real por WebSocket. Voz e transcrição são escolhidas separadamente: dá para combinar, por
+  exemplo Deepgram ouvindo e ElevenLabs falando.
 - **Uma voz por idioma**: o assistente responde em português, inglês ou espanhol, conforme quem
   falou.
 - Ouve todos ou só quem o chamar, fica em silêncio quando pedem e **compartilha a tela** com
@@ -150,7 +152,7 @@ bash deploy/scripts/deploy.sh
 1. Abra `https://PLATFORM_HOST` e **crie a sua conta**: ela cria a organização e o primeiro
    administrador.
 2. Em **Admin → Integrações**, cadastre o seu LLM (URL e chave compatíveis com OpenAI) e a sua
-   chave do **Fish Audio**.
+   chave do **Fish Audio**, do **Deepgram** ou do **ElevenLabs** (pode cadastrar mais de um).
 3. Em **Admin → Agentes de IA**, escolha o modelo, a transcrição e pelo menos uma voz.
 4. Clique em **Nova sala** e marque os assistentes que vão participar.
 
@@ -169,7 +171,7 @@ flowchart LR
     platform -- API --> livekit
     agent["agent<br/>assistentes de IA (Python)"] -- WebRTC --> livekit
     agent -- perfis --> platform
-    agent -. "STT e TTS" .-> fish([Fish Audio])
+    agent -. "STT e TTS" .-> speech([Fish Audio / Deepgram / ElevenLabs])
     agent -. chat .-> llm([LLM compatível com OpenAI])
     agent --> screen["screen<br/>navegador da IA"]
     screen -- compartilhamento de tela --> livekit
@@ -179,7 +181,7 @@ flowchart LR
 | Serviço | Pasta | Tecnologia |
 |---|---|---|
 | `platform` | [`apps/platform`](apps/platform) | Next.js 15, React 18, LiveKit Components, PostgreSQL |
-| `agent` | [`apps/agent`](apps/agent) | Python 3.12, LiveKit Agents, Fish Audio, LLM compatível com OpenAI |
+| `agent` | [`apps/agent`](apps/agent) | Python 3.12, LiveKit Agents, Fish Audio / Deepgram / ElevenLabs, LLM compatível com OpenAI |
 | `screen` | [`apps/screen`](apps/screen) | Python 3.12, Playwright (Chromium headless), LiveKit RTC |
 | `livekit`, `egress`, `redis`, `postgres` | [`deploy/stack.yml`](deploy/stack.yml) | Imagens oficiais, versões fixadas |
 

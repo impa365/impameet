@@ -36,7 +36,7 @@ export async function startCaptions(
 ): Promise<void> {
   const actor = await assertModerator(sql, lk, room, user);
   if (await captionsOn(lk, room)) throw conflict('As legendas já estão ligadas');
-  // Transcription uses the Fish Audio account and model chosen for the room's agent: there is
+  // Transcription uses the STT provider, account and model chosen for the room's agent: there is
   // no server-wide fallback.
   const [agent] = await roomAgents(sql, room);
   if (!agent) throw badRequest('Para transcrever, a sala precisa de um assistente de IA configurado');

@@ -200,7 +200,7 @@ class Captioner:
 
 
 async def run_captions(ctx: JobContext, settings: Settings) -> None:
-    # The room's agent decides whose Fish Audio account and which model transcribe the meeting.
+    # The room's agent decides which provider, account and model transcribe the meeting.
     profile = await load_profile(settings, ctx.job.metadata)
     if profile is None:
         ctx.shutdown(reason="agent not fully configured")
@@ -208,7 +208,13 @@ async def run_captions(ctx: JobContext, settings: Settings) -> None:
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     await ctx.room.local_participant.set_attributes({MODE_ATTRIBUTE: "captions"})
     transcript = Transcript()
-    stt = build_stt(settings.fish, api_key=profile.fish_api_key or "", model=profile.stt_model)
+    stt = build_stt(
+        profile.stt_provider,
+        settings.fish,
+        api_key=profile.stt_api_key or "",
+        model=profile.stt_model,
+        languages=tuple(profile.voices),
+    )
     captioner = Captioner(ctx.room, stt, transcript)
     captioner.attach()
 

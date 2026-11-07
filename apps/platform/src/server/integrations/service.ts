@@ -7,9 +7,10 @@ import { badRequest, conflict, forbidden, notFound } from '../errors';
 import { type Resolver, assertPublicHttpsUrl, systemResolver } from '../security/public-url';
 import { openSecret, sealSecret, secretHint } from '../security/secrets';
 import type { integrationInput } from '../validation';
-import { type Fetch, type ProbeResult, probeFish, probeLlm } from './probe';
+import { type SpeechProvider, isSpeechProvider } from '@/lib/providers';
+import { type Fetch, type ProbeResult, probeDeepgram, probeElevenLabs, probeFish, probeLlm } from './probe';
 
-export type IntegrationKind = 'llm' | 'fish';
+export type IntegrationKind = 'llm' | SpeechProvider;
 export type IntegrationInput = z.infer<typeof integrationInput>;
 
 export interface Integration {
@@ -41,7 +42,8 @@ const COLUMNS = (sql: Sql) => sql`
   i.secret_hint as "secretHint", i.last_tested_at as "lastTestedAt", i.last_test_ok as "lastTestOk",
   i.last_test_error as "lastTestError", i.created_at as "createdAt", i.updated_at as "updatedAt",
   (select count(*)::int from agents a
-    where a.llm_integration_id = i.id or a.fish_integration_id = i.id) as "usedBy"`;
+    where a.llm_integration_id = i.id or a.tts_integration_id = i.id
+       or a.stt_integration_id = i.id) as "usedBy"`;
 
 /** Ties each ciphertext to its organization and record. */
 const aad = (tenantId: string, id: string) => `integration:${tenantId}:${id}`;
@@ -69,6 +71,7 @@ async function findIntegration(sql: Sql, tenantId: string, id: string): Promise<
 async function fields(deps: IntegrationDeps, input: IntegrationInput) {
   if (input.kind === 'fish')
     return { baseUrl: null, defaultModel: input.defaultModel, models: [] as string[] };
+  if (input.kind !== 'llm') return { baseUrl: null, defaultModel: null, models: [] as string[] };
   const baseUrl = await assertPublicHttpsUrl(input.baseUrl, deps.resolve ?? systemResolver);
   const models = [...new Set([input.defaultModel, ...input.models])];
   return { baseUrl, defaultModel: input.defaultModel, models };
@@ -143,7 +146,7 @@ export async function updateIntegration(
   return findIntegration(sql, actor.tenantId, id);
 }
 
-/** Agents using it fall back to the server's own credentials. */
+/** Agents using it become incomplete (and stay out of meetings) until another one is chosen. */
 export async function deleteIntegration(
   sql: Sql,
   actor: SessionUser,
@@ -197,6 +200,10 @@ export async function testIntegration(
   if (secret.kind === 'llm') {
     const baseUrl = await assertPublicHttpsUrl(secret.baseUrl ?? '', deps.resolve ?? systemResolver);
     result = await probeLlm(fetchImpl, baseUrl, secret.apiKey);
+  } else if (secret.kind === 'deepgram') {
+    result = await probeDeepgram(fetchImpl, secret.apiKey);
+  } else if (secret.kind === 'elevenlabs') {
+    result = await probeElevenLabs(fetchImpl, secret.apiKey);
   } else {
     result = await probeFish(fetchImpl, secret.apiKey);
   }
@@ -207,19 +214,28 @@ export async function testIntegration(
   return result;
 }
 
+async function integrationKind(sql: Sql, tenantId: string, id: string): Promise<string> {
+  const [row] = await sql<{ kind: string }[]>`
+    select kind from integrations where id = ${id} and tenant_id = ${tenantId}`;
+  if (!row) throw notFound('Integração não encontrada');
+  return row.kind;
+}
+
 /** An agent may only use this organization's integrations, of the right kind. */
 export async function assertTenantIntegration(
   sql: Sql,
   tenantId: string,
   id: string | null,
-  kind: IntegrationKind,
+  kind: 'llm',
 ): Promise<void> {
   if (!id) return;
-  const [row] = await sql<{ kind: string }[]>`
-    select kind from integrations where id = ${id} and tenant_id = ${tenantId}`;
-  if (!row) throw notFound('Integração não encontrada');
-  if (row.kind !== kind)
-    throw badRequest(
-      kind === 'llm' ? 'Escolha uma integração de LLM' : 'Escolha uma integração do Fish Audio',
-    );
+  if ((await integrationKind(sql, tenantId, id)) !== kind) throw badRequest('Escolha uma integração de LLM');
+}
+
+/** A speech provider of this organization (Fish Audio, Deepgram or ElevenLabs), for TTS or STT. */
+export async function speechIntegrationKind(sql: Sql, tenantId: string, id: string): Promise<SpeechProvider> {
+  const kind = await integrationKind(sql, tenantId, id);
+  if (!isSpeechProvider(kind))
+    throw badRequest('Escolha uma integração de voz (Fish Audio, Deepgram ou ElevenLabs)');
+  return kind;
 }

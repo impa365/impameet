@@ -3,13 +3,14 @@
 Worker que coloca os assistentes de IA nas salas LiveKit do IMPA Meet como participantes.
 
 ```
-participante ─► LiveKit ─► Fish Audio STT (transcribe-stream-1, WebSocket)
+participante ─► LiveKit ─► STT: Fish Audio, Deepgram Flux ou ElevenLabs Scribe (WebSocket)
                               └─► LLM compatível com OpenAI (qualquer modelo)
-                                    └─► Fish Audio TTS (WebSocket /v1/tts/live) ─► sala
+                                    └─► TTS: Fish Audio, Deepgram Flux/Aura ou ElevenLabs (WebSocket) ─► sala
 ```
 
 Nada de provedor, modelo ou voz padrão no servidor: cada agente é configurado no painel
-(Admin → Agentes de IA) com a sua integração de LLM, o seu modelo, a sua conta do Fish Audio,
+(Admin → Agentes de IA) com a sua integração de LLM e o seu modelo, o provedor de voz (TTS) e o
+de transcrição (STT), escolhidos separadamente entre Fish Audio, Deepgram e ElevenLabs,
 o modelo de transcrição e uma voz por idioma. Um agente incompleto não entra nas reuniões.
 
 ## Módulos (`src/meet_impar_agent/`)
@@ -18,7 +19,8 @@ o modelo de transcrição e uma voz por idioma. Um agente incompleto não entra 
 |---|---|
 | `config.py` | Configuração do worker (LiveKit, plataforma, ajustes finos); segredos de `<NOME>_FILE` |
 | `profile.py` | Carrega da plataforma o perfil de cada agente (persona, chaves, modelos, vozes) |
-| `languages.py` | Idioma de quem fala e voz do Fish Audio para cada idioma |
+| `languages.py` | Idioma de quem fala e a voz de cada idioma |
+| `providers.py` | Provedores de voz e transcrição e como cada um troca de voz |
 | `persona.py` | O agente na sala: quem está falando, silêncio, passagem de vez, troca de voz |
 | `pipeline.py` | Monta STT, LLM e TTS com as escolhas do agente |
 | `captions.py` | Legendas ao vivo da sala |

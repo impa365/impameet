@@ -257,7 +257,12 @@ async def test_run_captions_marks_itself_and_saves_on_shutdown(
     ctx.connect = AsyncMock()
     saved = AsyncMock(return_value=True)
     monkeypatch.setattr(captions, "save_transcript", saved)
-    agent = MagicMock(fish_api_key="fish-agent-0123456789", stt_model="transcribe-stream-1")
+    agent = MagicMock(
+        stt_provider="fish",
+        stt_api_key="fish-agent-0123456789",
+        stt_model="transcribe-stream-1",
+        voices={"pt": "voz-pt-1"},
+    )
     monkeypatch.setattr(captions, "load_profile", AsyncMock(return_value=agent))
 
     await captions.run_captions(ctx, settings)

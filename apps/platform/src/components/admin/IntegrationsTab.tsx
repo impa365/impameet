@@ -2,13 +2,22 @@
 
 import { type FormEvent, useState } from 'react';
 import { serverMessage, type T, useT } from '@/i18n/client';
-import { FISH_TTS_MODELS, LLM_PRESETS, type LlmPreset, presetFor } from '@/lib/providers';
+import {
+  FISH_TTS_MODELS,
+  LLM_PRESETS,
+  type LlmPreset,
+  SPEECH_CATALOG,
+  type SpeechProvider,
+  presetFor,
+} from '@/lib/providers';
 import { api } from '../api';
 import { messageOf, useLoad } from './useLoad';
 
+export type IntegrationKind = 'llm' | SpeechProvider;
+
 export interface Integration {
   id: string;
-  kind: 'llm' | 'fish';
+  kind: IntegrationKind;
   name: string;
   baseUrl: string | null;
   defaultModel: string | null;
@@ -21,7 +30,7 @@ export interface Integration {
 }
 
 interface Draft {
-  kind: 'llm' | 'fish';
+  kind: IntegrationKind;
   name: string;
   preset: string;
   baseUrl: string;
@@ -39,7 +48,20 @@ const NEW_LLM: Draft = {
   defaultModel: '',
   models: [],
 };
-const NEW_FISH: Draft = { ...NEW_LLM, kind: 'fish', preset: '', baseUrl: '', defaultModel: 's2.1-pro' };
+const newSpeech = (kind: SpeechProvider): Draft => ({
+  ...NEW_LLM,
+  kind,
+  preset: '',
+  baseUrl: '',
+  defaultModel: kind === 'fish' ? 's2.1-pro' : '',
+});
+
+const KIND_LABEL = {
+  llm: 'admin.integrations.kindLlm',
+  fish: 'admin.integrations.kindFish',
+  deepgram: 'admin.integrations.kindDeepgram',
+  elevenlabs: 'admin.integrations.kindElevenlabs',
+} as const;
 
 const presetName = (p: LlmPreset, t: T) => p.name || t('admin.integrations.customProvider');
 const presetExample = (p: LlmPreset, t: T) => p.example || t('admin.integrations.customModelExample');
@@ -73,7 +95,7 @@ export function IntegrationsTab() {
     setNotice('');
     if (!i) {
       setEditing('new');
-      setDraft(kind === 'llm' ? NEW_LLM : NEW_FISH);
+      setDraft(kind === 'llm' ? NEW_LLM : newSpeech(kind));
       return;
     }
     setEditing(i.id);
@@ -101,12 +123,14 @@ export function IntegrationsTab() {
             defaultModel: draft.defaultModel,
             models: draft.models,
           }
-        : {
-            kind: 'fish',
-            name: draft.name,
-            apiKey: draft.apiKey || undefined,
-            defaultModel: draft.defaultModel,
-          };
+        : draft.kind === 'fish'
+          ? {
+              kind: 'fish',
+              name: draft.name,
+              apiKey: draft.apiKey || undefined,
+              defaultModel: draft.defaultModel,
+            }
+          : { kind: draft.kind, name: draft.name, apiKey: draft.apiKey || undefined };
     try {
       if (editing === 'new') await api('/api/admin/integrations', { body });
       else await api(`/api/admin/integrations/${editing}`, { method: 'PUT', body });
@@ -180,7 +204,7 @@ export function IntegrationsTab() {
       <form onSubmit={save} className="card form" style={{ maxWidth: 720, margin: 0 }}>
         <strong>
           {editing === 'new' ? t('admin.integrations.newTitle') : t('admin.editNamed', { name: draft.name })}{' '}
-          · {draft.kind === 'llm' ? t('admin.integrations.kindLlm') : t('admin.integrations.kindFish')}
+          · {t(KIND_LABEL[draft.kind])}
         </strong>
         {draft.kind === 'llm' && (
           <div className="preset-grid" role="radiogroup" aria-label={t('admin.integrations.provider')}>
@@ -266,7 +290,7 @@ export function IntegrationsTab() {
             )}
             <span className="muted">{t('admin.integrations.testHint')}</span>
           </>
-        ) : (
+        ) : draft.kind !== 'fish' ? null : (
           <label>
             {t('admin.integrations.defaultVoiceModel')}
             <select value={draft.defaultModel} onChange={(e) => set('defaultModel', e.target.value)}>
@@ -298,6 +322,8 @@ export function IntegrationsTab() {
       hint: t('admin.integrations.llmHint'),
     },
     { kind: 'fish', title: 'Fish Audio', hint: t('admin.integrations.fishHint') },
+    { kind: 'deepgram', title: 'Deepgram', hint: t('admin.integrations.deepgramHint') },
+    { kind: 'elevenlabs', title: 'ElevenLabs', hint: t('admin.integrations.elevenlabsHint') },
   ];
 
   return (
@@ -332,11 +358,13 @@ export function IntegrationsTab() {
                   <article key={i.id} className="int-card">
                     <header>
                       <span className="int-icon" aria-hidden>
-                        {preset ? preset.icon : '🐟'}
+                        {preset ? preset.icon : i.kind !== 'llm' && SPEECH_CATALOG[i.kind].icon}
                       </span>
                       <div>
                         <strong>{i.name}</strong>
-                        <div className="muted">{preset ? presetName(preset, t) : 'Fish Audio'}</div>
+                        <div className="muted">
+                          {preset ? presetName(preset, t) : i.kind !== 'llm' && SPEECH_CATALOG[i.kind].name}
+                        </div>
                       </div>
                       <Status i={i} />
                     </header>
@@ -349,8 +377,12 @@ export function IntegrationsTab() {
                       )}
                       <dt>{t('admin.integrations.key')}</dt>
                       <dd>{i.secretHint}</dd>
-                      <dt>{t('admin.integrations.defaultModel')}</dt>
-                      <dd>{i.defaultModel ?? '—'}</dd>
+                      {i.defaultModel && (
+                        <>
+                          <dt>{t('admin.integrations.defaultModel')}</dt>
+                          <dd>{i.defaultModel}</dd>
+                        </>
+                      )}
                       {i.kind === 'llm' && (
                         <>
                           <dt>{t('admin.integrations.models')}</dt>

@@ -89,7 +89,8 @@ COMPLETE: dict[str, Any] = {
     "sttModel": "transcribe-stream-1",
     "voices": {"pt": "voz-ana"},
     "llm": {"baseUrl": "https://llm.example/v1", "apiKey": "sk-0123456789"},
-    "fish": {"apiKey": "fish-0123456789"},
+    "tts": {"provider": "fish", "apiKey": "fish-0123456789"},
+    "stt": {"provider": "fish", "apiKey": "fish-0123456789"},
 }
 
 

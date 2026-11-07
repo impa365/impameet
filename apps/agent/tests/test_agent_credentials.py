@@ -24,7 +24,8 @@ REMOTE: dict[str, Any] = {
         "apiKey": "sk-or-agent-0123456789",
         "model": "deepseek/deepseek-chat",
     },
-    "fish": {"apiKey": "fish-agent-0123456789"},
+    "tts": {"provider": "fish", "apiKey": "fish-agent-0123456789"},
+    "stt": {"provider": "deepgram", "apiKey": "dg-agent-0123456789"},
 }
 
 
@@ -33,7 +34,8 @@ def test_profile_carries_the_agent_choices_without_printing_keys() -> None:
     assert p is not None
     assert p.llm_base_url == "https://openrouter.ai/api/v1"
     assert p.llm_api_key == "sk-or-agent-0123456789"
-    assert p.fish_api_key == "fish-agent-0123456789"
+    assert (p.tts_provider, p.tts_api_key) == ("fish", "fish-agent-0123456789")
+    assert (p.stt_provider, p.stt_api_key) == ("deepgram", "dg-agent-0123456789")
     assert (p.llm_model, p.tts_model, p.stt_model) == (
         "deepseek/deepseek-chat",
         "s2.1-pro",
@@ -41,9 +43,14 @@ def test_profile_carries_the_agent_choices_without_printing_keys() -> None:
     )
     assert p.voice_id == "voz-ana-pt"
     assert p.voices == {"pt": "voz-ana-pt", "en": "voice-ana-en"}
-    assert p.secrets() == ["sk-or-agent-0123456789", "fish-agent-0123456789"]
+    assert p.secrets() == [
+        "sk-or-agent-0123456789",
+        "fish-agent-0123456789",
+        "dg-agent-0123456789",
+    ]
     assert "sk-or-agent" not in repr(p)
     assert "fish-agent" not in repr(p)
+    assert "dg-agent" not in repr(p)
 
 
 @pytest.mark.parametrize(
@@ -51,7 +58,10 @@ def test_profile_carries_the_agent_choices_without_printing_keys() -> None:
     [
         {"llm": None},
         {"llm": {"apiKey": "  ", "baseUrl": "https://x.example/v1"}},
-        {"fish": "x"},
+        {"tts": "x"},
+        {"stt": None},
+        {"tts": {"provider": "azure", "apiKey": "k-0123456789"}},
+        {"stt": {"provider": "deepgram", "apiKey": " "}},
         {"llmModel": ""},
         {"ttsModel": None},
         {"sttModel": None},
@@ -76,11 +86,13 @@ def test_builders_use_only_what_the_agent_chose(env: dict[str, str]) -> None:
     assert own._client.api_key == "sk-or-agent-0123456789"
 
     fish = settings.fish
-    tts = build_tts(fish, voice_id="voz-ana-pt", model="s2.1-pro", api_key="fish-agent-0123456789")
+    tts = build_tts(
+        "fish", fish, voice_id="voz-ana-pt", model="s2.1-pro", api_key="fish-agent-0123456789"
+    )
     assert tts._opts.api_key == "fish-agent-0123456789"
     assert tts._opts.voice_id == "voz-ana-pt"
     assert tts._opts.model == "s2.1-pro"
-    stt = build_stt(fish, api_key="fish-agent-0123456789", model="transcribe-stream-1")
+    stt = build_stt("fish", fish, api_key="fish-agent-0123456789", model="transcribe-stream-1")
     assert stt._api_key == "fish-agent-0123456789"
 
 
@@ -144,10 +156,10 @@ async def test_captions_transcribe_with_the_room_agent_account_and_model(
     settings = load_settings(env)
     agent = profile_from_platform(REMOTE)
     monkeypatch.setattr(captions, "load_profile", AsyncMock(return_value=agent))
-    built: list[tuple[str, str]] = []
+    built: list[tuple[str, str, str]] = []
 
-    def fake_stt(fish: object, *, api_key: str, model: str) -> object:
-        built.append((api_key, model))
+    def fake_stt(provider: str, fish: object, *, api_key: str, model: str, **_: object) -> object:
+        built.append((provider, api_key, model))
         return MagicMock()
 
     monkeypatch.setattr(captions, "build_stt", fake_stt)
@@ -159,7 +171,7 @@ async def test_captions_transcribe_with_the_room_agent_account_and_model(
     ctx.job.metadata = json.dumps({"mode": "captions", "agentId": "a1"})
 
     await captions.run_captions(ctx, settings)
-    assert built == [("fish-agent-0123456789", "transcribe-stream-1")]
+    assert built == [("deepgram", "dg-agent-0123456789", "transcribe-stream-1")]
     captions.load_profile.assert_awaited_once_with(settings, ctx.job.metadata)
 
 

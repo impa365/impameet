@@ -49,7 +49,10 @@ export default defineMessages(
       model: 'Modelo',
       modelPlaceholder: 'Escolha ou digite o modelo',
       sttModel: 'Modelo de transcrição',
-      voicesLegend: 'Vozes por idioma (ID da voz no Fish Audio)',
+      voicesLegend: 'Vozes por idioma (do provedor de voz escolhido)',
+      voicePlaceholder: 'ID da voz',
+      deepgramVoiceHint:
+        'No Deepgram, a voz é o nome do modelo, como flux-bianca-pt (português), flux-alexis-en (inglês) ou flux-valentina-es (espanhol).',
       voicesHint:
         'Preencha pelo menos um idioma. O agente responde no idioma de quem falou, com a voz desse idioma; em outros idiomas, usa o primeiro preenchido.',
       voicePt: 'Português',
@@ -59,7 +62,11 @@ export default defineMessages(
       incompleteHint:
         'Falta escolher integração, modelo, transcrição ou voz: o agente não entra nas reuniões até completar.',
       noLlm: 'Cadastre chaves de OpenAI, OpenRouter, DeepSeek… na aba Integrações.',
-      voiceLegend: 'Voz e transcrição (Fish Audio)',
+      voiceLegend: 'Voz (TTS): como o agente fala',
+      listenLegend: 'Transcrição (STT): como o agente ouve',
+      speechMixHint:
+        'Voz e transcrição são escolhidas separadamente: dá para combinar provedores, por exemplo Deepgram ouvindo e ElevenLabs falando.',
+      noSpeech: 'Cadastre Fish Audio, Deepgram ou ElevenLabs na aba Integrações.',
       voiceModel: 'Modelo de voz',
       saveAgent: 'Salvar agente',
       intro:
@@ -94,6 +101,8 @@ export default defineMessages(
       newTitle: 'Nova integração',
       kindLlm: 'Modelo de linguagem (LLM)',
       kindFish: 'Fish Audio (voz e transcrição)',
+      kindDeepgram: 'Deepgram (voz e transcrição)',
+      kindElevenlabs: 'ElevenLabs (voz e transcrição)',
       provider: 'Provedor',
       customProvider: 'Outro (compatível com OpenAI)',
       customModelExample: 'nome-do-modelo',
@@ -111,6 +120,9 @@ export default defineMessages(
       llmTitle: 'Modelos de linguagem (LLM)',
       llmHint: 'O “cérebro” dos agentes: OpenAI, OpenRouter, DeepSeek…',
       fishHint: 'Voz (TTS) e transcrição (STT) dos agentes e das legendas.',
+      deepgramHint:
+        'Transcrição Flux, que percebe sozinha quando a pessoa terminou de falar, e vozes Flux e Aura, tudo em tempo real.',
+      elevenlabsHint: 'Vozes ElevenLabs e transcrição Scribe em tempo real.',
       intro:
         'Salve aqui as chaves dos provedores. Cada agente escolhe qual integração e qual modelo usar; nada vem de configurações do servidor.',
       empty: 'Nenhuma integração ainda.',
@@ -276,7 +288,10 @@ export default defineMessages(
         model: 'Model',
         modelPlaceholder: 'Choose or type the model',
         sttModel: 'Transcription model',
-        voicesLegend: 'Voices per language (Fish Audio voice ID)',
+        voicesLegend: 'Voices per language (from the chosen voice provider)',
+        voicePlaceholder: 'Voice ID',
+        deepgramVoiceHint:
+          'On Deepgram the voice is the model name, such as flux-bianca-pt (Portuguese), flux-alexis-en (English) or flux-valentina-es (Spanish).',
         voicesHint:
           'Fill in at least one language. The agent answers in the speaker’s language with that language’s voice; for other languages it uses the first one filled in.',
         voicePt: 'Portuguese',
@@ -286,7 +301,11 @@ export default defineMessages(
         incompleteHint:
           'An integration, model, transcription model or voice is missing: the agent does not join meetings until it is complete.',
         noLlm: 'Add OpenAI, OpenRouter, DeepSeek… keys in the Integrations tab.',
-        voiceLegend: 'Voice and transcription (Fish Audio)',
+        voiceLegend: 'Voice (TTS): how the agent speaks',
+        listenLegend: 'Transcription (STT): how the agent listens',
+        speechMixHint:
+          'Voice and transcription are chosen separately, so providers can be combined, e.g. Deepgram listening and ElevenLabs speaking.',
+        noSpeech: 'Add Fish Audio, Deepgram or ElevenLabs in the Integrations tab.',
         voiceModel: 'Voice model',
         saveAgent: 'Save agent',
         intro:
@@ -321,6 +340,8 @@ export default defineMessages(
         newTitle: 'New integration',
         kindLlm: 'Language model (LLM)',
         kindFish: 'Fish Audio (voice and transcription)',
+        kindDeepgram: 'Deepgram (voice and transcription)',
+        kindElevenlabs: 'ElevenLabs (voice and transcription)',
         provider: 'Provider',
         customProvider: 'Other (OpenAI-compatible)',
         customModelExample: 'model-name',
@@ -338,6 +359,9 @@ export default defineMessages(
         llmTitle: 'Language models (LLM)',
         llmHint: 'The agents’ “brain”: OpenAI, OpenRouter, DeepSeek…',
         fishHint: 'Voice (TTS) and transcription (STT) for agents and captions.',
+        deepgramHint:
+          'Flux transcription, which notices on its own when the person has finished speaking, plus Flux and Aura voices, all in real time.',
+        elevenlabsHint: 'ElevenLabs voices and real-time Scribe transcription.',
         intro:
           'Save your provider keys here. Each agent picks which integration and model to use; nothing comes from server settings.',
         empty: 'No integrations yet.',
@@ -501,7 +525,10 @@ export default defineMessages(
         model: 'Modelo',
         modelPlaceholder: 'Elige o escribe el modelo',
         sttModel: 'Modelo de transcripción',
-        voicesLegend: 'Voces por idioma (ID de la voz en Fish Audio)',
+        voicesLegend: 'Voces por idioma (del proveedor de voz elegido)',
+        voicePlaceholder: 'ID de la voz',
+        deepgramVoiceHint:
+          'En Deepgram la voz es el nombre del modelo, como flux-bianca-pt (portugués), flux-alexis-en (inglés) o flux-valentina-es (español).',
         voicesHint:
           'Completa al menos un idioma. El agente responde en el idioma de quien habló, con la voz de ese idioma; en otros idiomas usa el primero completado.',
         voicePt: 'Portugués',
@@ -511,7 +538,11 @@ export default defineMessages(
         incompleteHint:
           'Falta elegir integración, modelo, transcripción o voz: el agente no entra en las reuniones hasta completarlo.',
         noLlm: 'Registra claves de OpenAI, OpenRouter, DeepSeek… en la pestaña Integraciones.',
-        voiceLegend: 'Voz y transcripción (Fish Audio)',
+        voiceLegend: 'Voz (TTS): cómo habla el agente',
+        listenLegend: 'Transcripción (STT): cómo escucha el agente',
+        speechMixHint:
+          'La voz y la transcripción se eligen por separado: se pueden combinar proveedores, por ejemplo Deepgram escuchando y ElevenLabs hablando.',
+        noSpeech: 'Registra Fish Audio, Deepgram o ElevenLabs en la pestaña Integraciones.',
         voiceModel: 'Modelo de voz',
         saveAgent: 'Guardar agente',
         intro:
@@ -546,6 +577,8 @@ export default defineMessages(
         newTitle: 'Nueva integración',
         kindLlm: 'Modelo de lenguaje (LLM)',
         kindFish: 'Fish Audio (voz y transcripción)',
+        kindDeepgram: 'Deepgram (voz y transcripción)',
+        kindElevenlabs: 'ElevenLabs (voz y transcripción)',
         provider: 'Proveedor',
         customProvider: 'Otro (compatible con OpenAI)',
         customModelExample: 'nombre-del-modelo',
@@ -564,6 +597,9 @@ export default defineMessages(
         llmTitle: 'Modelos de lenguaje (LLM)',
         llmHint: 'El “cerebro” de los agentes: OpenAI, OpenRouter, DeepSeek…',
         fishHint: 'Voz (TTS) y transcripción (STT) de los agentes y de los subtítulos.',
+        deepgramHint:
+          'Transcripción Flux, que detecta sola cuándo la persona terminó de hablar, y voces Flux y Aura, todo en tiempo real.',
+        elevenlabsHint: 'Voces de ElevenLabs y transcripción Scribe en tiempo real.',
         intro:
           'Guarda aquí las claves de los proveedores. Cada agente elige qué integración y qué modelo usar; nada viene de la configuración del servidor.',
         empty: 'Todavía no hay integraciones.',

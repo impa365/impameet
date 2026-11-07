@@ -190,7 +190,13 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.log_context_fields = {"room": ctx.room.name, "agent": profile.name}
 
     session: AgentSession[None] = AgentSession(
-        stt=build_stt(settings.fish, api_key=profile.fish_api_key or "", model=profile.stt_model),
+        stt=build_stt(
+            profile.stt_provider,
+            settings.fish,
+            api_key=profile.stt_api_key or "",
+            model=profile.stt_model,
+            languages=tuple(profile.voices),
+        ),
         llm=build_llm(
             settings.llm,
             model=profile.llm_model,
@@ -198,10 +204,11 @@ async def entrypoint(ctx: JobContext) -> None:
             api_key=profile.llm_api_key or "",
         ),
         tts=build_tts(
+            profile.tts_provider,
             settings.fish,
             voice_id=profile.voice_id or "",
             model=profile.tts_model,
-            api_key=profile.fish_api_key or "",
+            api_key=profile.tts_api_key or "",
         ),
         vad=ctx.proc.userdata["vad"],
         turn_handling=build_turn_handling(),

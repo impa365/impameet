@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import pytest
 from livekit.agents import BackgroundAudioPlayer, BuiltinAudioClip
-from livekit.plugins import fishaudio, openai
+from livekit.plugins import deepgram, elevenlabs, fishaudio, openai
 
 from meet_impar_agent.config import load_settings
 from meet_impar_agent.pipeline import (
+    ELEVENLABS_ENCODING,
     FISH_SAMPLE_RATE,
+    TTS_SAMPLE_RATE,
     build_conn_options,
     build_llm,
     build_stt,
@@ -14,12 +16,16 @@ from meet_impar_agent.pipeline import (
     build_tts,
     build_turn_handling,
 )
+from meet_impar_agent.providers import voice_options
 
 from .conftest import FISH_KEY, LLM_KEY
 
+DEEPGRAM_KEY = "dg-test-0123456789"
+ELEVEN_KEY = "el-test-0123456789"
+
 
 def test_stt_uses_fish_realtime_with_server_turn_detection(env: dict[str, str]) -> None:
-    stt = build_stt(load_settings(env).fish, api_key=FISH_KEY, model="transcribe-stream-1")
+    stt = build_stt("fish", load_settings(env).fish, api_key=FISH_KEY, model="transcribe-stream-1")
 
     assert isinstance(stt, fishaudio.STT)
     assert stt.model == "transcribe-stream-1"
@@ -32,7 +38,7 @@ def test_stt_uses_fish_realtime_with_server_turn_detection(env: dict[str, str]) 
 def test_tts_streams_pcm_with_the_chosen_voice(env: dict[str, str]) -> None:
     env |= {"FISH_SPEED": "1.2", "FISH_LATENCY_MODE": "low"}
     tts = build_tts(
-        load_settings(env).fish, voice_id="voice-123", model="drama-3", api_key=FISH_KEY
+        "fish", load_settings(env).fish, voice_id="voice-123", model="drama-3", api_key=FISH_KEY
     )
 
     assert isinstance(tts, fishaudio.TTS)
@@ -51,10 +57,94 @@ def test_custom_fish_endpoint_has_no_trailing_slash(env: dict[str, str]) -> None
     env["FISH_BASE_URL"] = "https://fish-proxy.example.com/"
     fish = load_settings(env).fish
 
-    tts = build_tts(fish, voice_id="voice-123", model="s2.1-pro", api_key=FISH_KEY)
+    tts = build_tts("fish", fish, voice_id="voice-123", model="s2.1-pro", api_key=FISH_KEY)
     assert tts._opts.base_url == "https://fish-proxy.example.com"
-    stt = build_stt(fish, api_key=FISH_KEY, model="transcribe-stream-1")
+    stt = build_stt("fish", fish, api_key=FISH_KEY, model="transcribe-stream-1")
     assert stt._opts.base_url == "https://fish-proxy.example.com"
+
+
+def test_deepgram_flux_listens_in_the_agent_languages(env: dict[str, str]) -> None:
+    fish = load_settings(env).fish
+    stt = build_stt(
+        "deepgram", fish, api_key=DEEPGRAM_KEY, model="flux-general-multi", languages=("pt", "es")
+    )
+
+    assert isinstance(stt, deepgram.STTv2)
+    assert stt.capabilities.streaming
+    assert stt._opts.model == "flux-general-multi"
+    assert stt._opts.language_hint == ["pt", "es"]
+    assert stt._opts.endpoint_url == "wss://api.deepgram.com/v2/listen"
+    assert stt._opts.eager_eot_threshold == pytest.approx(0.5)
+    assert stt._api_key == DEEPGRAM_KEY
+
+    english = build_stt(
+        "deepgram", fish, api_key=DEEPGRAM_KEY, model="flux-general-en", languages=("en",)
+    )
+    assert english._opts.language_hint == []  # only the multilingual model takes hints
+
+
+def test_deepgram_speaks_with_flux_or_aura(env: dict[str, str]) -> None:
+    fish = load_settings(env).fish
+    flux = build_tts(
+        "deepgram", fish, voice_id="flux-bianca-pt", model="flux", api_key=DEEPGRAM_KEY
+    )
+    assert isinstance(flux, deepgram.TTSv2)
+    assert flux.sample_rate == TTS_SAMPLE_RATE
+    assert flux._opts.model == "flux-bianca-pt"
+    assert flux._opts.api_key == DEEPGRAM_KEY
+
+    aura = build_tts(
+        "deepgram", fish, voice_id="aura-2-celeste-es", model="aura-2", api_key=DEEPGRAM_KEY
+    )
+    assert isinstance(aura, deepgram.TTS)
+    assert aura._opts.model == "aura-2-celeste-es"
+
+
+def test_elevenlabs_listens_in_realtime_and_speaks_pcm(env: dict[str, str]) -> None:
+    fish = load_settings(env).fish
+    stt = build_stt("elevenlabs", fish, api_key=ELEVEN_KEY, model="scribe_v2_realtime")
+    assert isinstance(stt, elevenlabs.STT)
+    assert stt.capabilities.streaming
+    assert stt._opts.api_key == ELEVEN_KEY
+
+    tts = build_tts(
+        "elevenlabs",
+        fish,
+        voice_id="EXAVITQu4vr4xnSDxMaL",
+        model="eleven_flash_v2_5",
+        api_key=ELEVEN_KEY,
+    )
+    assert isinstance(tts, elevenlabs.TTS)
+    assert tts._opts.voice_id == "EXAVITQu4vr4xnSDxMaL"
+    assert tts._opts.model == "eleven_flash_v2_5"
+    assert tts._opts.encoding == ELEVENLABS_ENCODING
+    assert tts._opts.api_key == ELEVEN_KEY
+
+
+def test_any_listening_provider_pairs_with_any_speaking_one(env: dict[str, str]) -> None:
+    fish = load_settings(env).fish
+    listening = build_stt("deepgram", fish, api_key=DEEPGRAM_KEY, model="flux-general-multi")
+    speaking = build_tts(
+        "elevenlabs",
+        fish,
+        voice_id="EXAVITQu4vr4xnSDxMaL",
+        model="eleven_flash_v2_5",
+        api_key=ELEVEN_KEY,
+    )
+    assert isinstance(listening, deepgram.STTv2)
+    assert isinstance(speaking, elevenlabs.TTS)
+
+
+@pytest.mark.parametrize(
+    ("provider", "expected"),
+    [
+        ("fish", {"voice_id": "v-pt"}),
+        ("deepgram", {"model": "v-pt"}),
+        ("elevenlabs", {"voice_id": "v-pt", "language": "pt"}),
+    ],
+)
+def test_each_provider_switches_voice_its_own_way(provider: str, expected: dict[str, str]) -> None:
+    assert voice_options(provider, "v-pt", "pt") == expected  # type: ignore[arg-type]
 
 
 def test_llm_targets_the_chosen_openai_compatible_endpoint(env: dict[str, str]) -> None:

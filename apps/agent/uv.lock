@@ -849,6 +849,38 @@ wheels = [
 ]
 
 [[package]]
+name = "livekit-plugins-deepgram"
+version = "1.8.10"
+source = { path = "vendor/livekit_plugins_deepgram-1.8.10-py3-none-any.whl" }
+dependencies = [
+    { name = "livekit-agents", extra = ["codecs"] },
+    { name = "numpy" },
+]
+wheels = [
+    { filename = "livekit_plugins_deepgram-1.8.10-py3-none-any.whl", hash = "sha256:6ba793472f0de0c9a1f3c2a0cb3d6c11c6eaa2f14b861236883add045b32f8f9" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "livekit-agents", extras = ["codecs"], specifier = ">=1.8.10" },
+    { name = "numpy", specifier = ">=1.26" },
+]
+
+[[package]]
+name = "livekit-plugins-elevenlabs"
+version = "1.8.10"
+source = { path = "vendor/livekit_plugins_elevenlabs-1.8.10-py3-none-any.whl" }
+dependencies = [
+    { name = "livekit-agents", extra = ["codecs"] },
+]
+wheels = [
+    { filename = "livekit_plugins_elevenlabs-1.8.10-py3-none-any.whl", hash = "sha256:c7b6a3f3d8d290ba8f249f2cd13ca2df76276cd7dea86ee0946bae4317be72c5" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "livekit-agents", extras = ["codecs"], specifier = ">=1.8.10" }]
+
+[[package]]
 name = "livekit-plugins-fishaudio"
 version = "1.8.10"
 source = { path = "vendor/livekit_plugins_fishaudio-1.8.10-py3-none-any.whl" }
@@ -949,6 +981,8 @@ source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "livekit-agents", extra = ["codecs", "openai", "silero"] },
+    { name = "livekit-plugins-deepgram" },
+    { name = "livekit-plugins-elevenlabs" },
     { name = "livekit-plugins-fishaudio" },
     { name = "livekit-plugins-openai" },
     { name = "livekit-plugins-silero" },
@@ -970,6 +1004,8 @@ dev = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "livekit-agents", extras = ["codecs", "openai", "silero"], path = "vendor/livekit_agents-1.8.10-py3-none-any.whl" },
+    { name = "livekit-plugins-deepgram", path = "vendor/livekit_plugins_deepgram-1.8.10-py3-none-any.whl" },
+    { name = "livekit-plugins-elevenlabs", path = "vendor/livekit_plugins_elevenlabs-1.8.10-py3-none-any.whl" },
     { name = "livekit-plugins-fishaudio", path = "vendor/livekit_plugins_fishaudio-1.8.10-py3-none-any.whl" },
     { name = "livekit-plugins-openai", path = "vendor/livekit_plugins_openai-1.8.10-py3-none-any.whl" },
     { name = "livekit-plugins-silero", path = "vendor/livekit_plugins_silero-1.8.10-py3-none-any.whl" },

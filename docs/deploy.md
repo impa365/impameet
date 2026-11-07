@@ -84,7 +84,7 @@ bash deploy/scripts/prepare.sh
 > `/var/lib/docker/swarm` nos backups do servidor. Sem ela, as chaves de provedores
 > cadastradas no painel não podem ser recuperadas e precisam ser digitadas de novo.
 
-As chaves do LLM e do Fish Audio **não** são segredos do servidor: cada organização as cadastra
+As chaves do LLM e dos provedores de voz (Fish Audio, Deepgram, ElevenLabs) **não** são segredos do servidor: cada organização as cadastra
 no painel (Admin → Integrações), e elas ficam criptografadas no banco.
 
 ## 3. Subir a stack
@@ -141,9 +141,11 @@ sozinha ao iniciar.
 2. Em **Admin → Integrações**, cadastre:
    - um **LLM compatível com OpenAI**: URL base (por exemplo `https://api.openai.com/v1`) e
      chave. O botão de teste confere a conexão e lista os modelos;
-   - o **Fish Audio**: chave da API em [fish.audio](https://fish.audio).
+   - um ou mais provedores de voz: **Fish Audio** ([fish.audio](https://fish.audio)), **Deepgram**
+     ([deepgram.com](https://deepgram.com)) ou **ElevenLabs** ([elevenlabs.io](https://elevenlabs.io)).
 3. Em **Admin → Agentes de IA**, configure o agente: persona, modelo do LLM, modelo de voz,
-   modelo de transcrição e **pelo menos uma voz** (o ID do modelo de voz no Fish Audio) para
+   o provedor e o modelo de **voz** e, separadamente, o provedor e o modelo de **transcrição**, além
+   de **pelo menos uma voz** (no Deepgram, o nome do modelo, como `flux-bianca-pt`) para
    cada idioma em que ele deve responder. Um agente incompleto não entra nas reuniões.
 4. Crie uma sala em **Nova sala** e marque os assistentes.
 
@@ -228,7 +230,7 @@ Guarde os backups fora do servidor e criptografados: eles contêm dados pessoais
 | A página não abre ou o certificado é inválido | Os registros DNS, as labels do Traefik (`TRAEFIK_*`) e o log do Traefik |
 | Entra na sala, mas sem áudio e vídeo | As portas `7881/tcp` e `7882/udp` no firewall e no provedor, `SERVER_PUBLIC_IP` e `DOCKER_BRIDGE_SUBNET` |
 | O assistente não entra | O agente precisa estar completo (selo "configuração incompleta" no painel) e marcado na sala; veja `docker service logs impameet_agent` |
-| O assistente entra, mas não fala | A chave do Fish Audio, o ID da voz e o crédito na conta; teste a integração no painel |
+| O assistente entra, mas não fala | A chave do provedor de voz, o ID da voz e o crédito na conta; teste a integração no painel |
 | "O plano atual não inclui assistente de IA" (ou gravação) | A organização foi criada no modo SaaS, no plano free. Para liberar tudo: `docker exec "$(docker ps -q -f name=impameet_postgres \| head -1)" psql -U impa -d impa_meet -c "update tenants set plan = 'enterprise'"` |
 | Erro ao criar a organização, ou redirecionamento para `nome.PLATFORM_HOST` | Modo SaaS sem DNS curinga. Use `DEFAULT_TENANT` com o nome da organização (veja acima) e atualize a stack |
 | A gravação não começa | `docker service logs impameet_egress` e a CPU livre (cerca de 1,5 núcleo por gravação) |

@@ -1,13 +1,15 @@
 [project]
 name = "meet-impar-agent"
 version = "0.1.0"
-description = "Meet ímpar voice agent: Fish Audio (STT/TTS) + any OpenAI-compatible LLM on LiveKit."
+description = "IMPA Meet voice agent: Fish Audio, Deepgram or ElevenLabs (STT/TTS) + any OpenAI-compatible LLM on LiveKit."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
 dependencies = [
     "livekit-agents[codecs,openai,silero]",
     "httpx>=0.27",
+    "livekit-plugins-deepgram",
+    "livekit-plugins-elevenlabs",
     "livekit-plugins-fishaudio",
     "livekit-plugins-openai",
     "livekit-plugins-silero",
@@ -20,6 +22,8 @@ dependencies = [
 # commit: livekit/agents@652eee4ea809ee524fb0ada2383d06eebc3d93a0. Swap back to PyPI pins
 # once a release ships fishaudio.STT. SHA-256 of each wheel is listed in vendor/SHA256SUMS.
 livekit-agents = { path = "vendor/livekit_agents-1.8.10-py3-none-any.whl" }
+livekit-plugins-deepgram = { path = "vendor/livekit_plugins_deepgram-1.8.10-py3-none-any.whl" }
+livekit-plugins-elevenlabs = { path = "vendor/livekit_plugins_elevenlabs-1.8.10-py3-none-any.whl" }
 livekit-plugins-fishaudio = { path = "vendor/livekit_plugins_fishaudio-1.8.10-py3-none-any.whl" }
 livekit-plugins-openai = { path = "vendor/livekit_plugins_openai-1.8.10-py3-none-any.whl" }
 livekit-plugins-silero = { path = "vendor/livekit_plugins_silero-1.8.10-py3-none-any.whl" }

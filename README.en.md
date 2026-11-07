@@ -39,7 +39,8 @@ e-mail invitations and calendar files.
 
 **AI assistants.** Up to 4 per room, each with its own persona, knowledge base and voice. They
 take turns and hand over by name. They work with any **OpenAI-compatible LLM** and use
-**Fish Audio** for speech-to-text and text-to-speech, with **one voice per language**
+**Fish Audio**, **Deepgram** or **ElevenLabs** for speech-to-text and text-to-speech (chosen separately
+for each direction, in any combination), with **one voice per language**
 (Portuguese, English, Spanish). An assistant can listen to everyone or only to whoever calls
 its name, goes quiet on request and shares a screen through its own browser with an animated
 cursor. The server has no default provider, model or voice: everything is chosen in the admin
@@ -77,7 +78,7 @@ bash deploy/scripts/deploy.sh
 three variables and name the stack `impameet`.
 
 Then open `https://PLATFORM_HOST` and sign up (this creates your organization and its first
-admin). Add your LLM and Fish Audio keys under **Admin → Integrations**, set up an agent under
+admin). Add your LLM and Fish Audio, Deepgram or ElevenLabs keys under **Admin → Integrations**, set up an agent under
 **Admin → AI agents**, and create a room.
 
 The full guide is in [docs/deploy.md](docs/deploy.md) (Portuguese): custom domains, e-mail,
@@ -88,7 +89,7 @@ updates, backups and troubleshooting.
 | Service | Folder | Stack |
 |---|---|---|
 | `platform` | [`apps/platform`](apps/platform) | Next.js 15, React 18, LiveKit Components, PostgreSQL |
-| `agent` | [`apps/agent`](apps/agent) | Python 3.12, LiveKit Agents, Fish Audio, OpenAI-compatible LLM |
+| `agent` | [`apps/agent`](apps/agent) | Python 3.12, LiveKit Agents, Fish Audio / Deepgram / ElevenLabs, OpenAI-compatible LLM |
 | `screen` | [`apps/screen`](apps/screen) | Python 3.12, Playwright (headless Chromium), LiveKit RTC |
 | `livekit`, `egress`, `redis`, `postgres` | [`deploy/stack.yml`](deploy/stack.yml) | Official images, pinned versions |
 

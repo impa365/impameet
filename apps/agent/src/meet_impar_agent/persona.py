@@ -13,6 +13,7 @@ from livekit.agents import Agent, ModelSettings, StopResponse, llm, stt
 from .languages import guess_language, languages_note, main_language, pick_language, words
 from .listening import is_addressed
 from .profile import AgentProfile, MutePolicy
+from .providers import voice_options
 from .screen import SCREEN_INSTRUCTIONS, ScreenClient, Snapshot, screen_tools
 
 ROLE_LABELS = {"moderator": "moderador", "guest": "convidado", "participant": "participante"}
@@ -204,14 +205,14 @@ class VoiceAgent(Agent):
     # -- staying quiet (no speech is synthesised, so nothing is billed) --------------------
 
     def _use_voice_for_language(self) -> None:
-        """Switches the Fish voice to the reply language (a no-op with a single voice)."""
+        """Switches to the reply language's voice (a no-op with a single voice)."""
         voice = self._voices.get(self.language)
         tts = getattr(self.session, "tts", None)
         if not voice or voice == self._current_voice or tts is None:
             return
         update = getattr(tts, "update_options", None)
         if update is not None:
-            update(voice_id=voice)
+            update(**voice_options(self._profile.tts_provider, voice, self.language))
             self._current_voice = voice
 
     async def _voice_for_reply(self, text: AsyncIterable[str]) -> AsyncIterable[str]:

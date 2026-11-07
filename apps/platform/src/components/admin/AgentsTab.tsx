@@ -3,7 +3,7 @@
 import { type FormEvent, useState } from 'react';
 import { useLocale, useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
-import { FISH_STT_MODELS, FISH_TTS_MODELS, VOICE_LANGUAGES, type VoiceLanguage } from '@/lib/providers';
+import { SPEECH_CATALOG, type SpeechProvider, VOICE_LANGUAGES, type VoiceLanguage } from '@/lib/providers';
 import { api } from '../api';
 import type { Integration } from './IntegrationsTab';
 import { messageOf, useLoad } from './useLoad';
@@ -23,7 +23,8 @@ interface Agent {
   respondMode: 'always' | 'when_named';
   mutePolicy: 'everyone' | 'moderators' | 'disabled';
   llmIntegrationId: string | null;
-  fishIntegrationId: string | null;
+  ttsIntegrationId: string | null;
+  sttIntegrationId: string | null;
   isDefault: boolean;
   ready: boolean;
 }
@@ -43,7 +44,8 @@ interface Draft {
   respondMode: Agent['respondMode'];
   mutePolicy: Agent['mutePolicy'];
   llmIntegrationId: string;
-  fishIntegrationId: string;
+  ttsIntegrationId: string;
+  sttIntegrationId: string;
 }
 
 const KNOWLEDGE_MAX = 100000;
@@ -62,7 +64,8 @@ const EMPTY: Draft = {
   respondMode: 'always',
   mutePolicy: 'everyone',
   llmIntegrationId: '',
-  fishIntegrationId: '',
+  ttsIntegrationId: '',
+  sttIntegrationId: '',
 };
 
 const VOICE_LABEL = {
@@ -91,8 +94,14 @@ export function AgentsTab() {
   const integrations =
     useLoad<{ integrations: Integration[] }>('/api/admin/integrations').data?.integrations ?? [];
   const llms = integrations.filter((i) => i.kind === 'llm');
-  const fishes = integrations.filter((i) => i.kind === 'fish');
+  const speech = integrations.filter((i) => i.kind !== 'llm');
   const nameOf = (id: string | null) => integrations.find((i) => i.id === id)?.name;
+  const speechKind = (id: string | null): SpeechProvider | undefined => {
+    const kind = integrations.find((i) => i.id === id)?.kind;
+    return kind && kind !== 'llm' ? kind : undefined;
+  };
+  const speechLabel = (i: Integration) =>
+    i.kind === 'llm' ? i.name : `${SPEECH_CATALOG[i.kind].icon} ${i.name} · ${SPEECH_CATALOG[i.kind].name}`;
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -117,7 +126,8 @@ export function AgentsTab() {
       respondMode: agent.respondMode,
       mutePolicy: agent.mutePolicy,
       llmIntegrationId: agent.llmIntegrationId ?? '',
-      fishIntegrationId: agent.fishIntegrationId ?? '',
+      ttsIntegrationId: agent.ttsIntegrationId ?? '',
+      sttIntegrationId: agent.sttIntegrationId ?? '',
     });
   }
 
@@ -166,6 +176,29 @@ export function AgentsTab() {
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft({ ...draft, [key]: value });
   const llmIntegration = llms.find((i) => i.id === draft.llmIntegrationId);
+  const ttsKind = speechKind(draft.ttsIntegrationId);
+  const sttKind = speechKind(draft.sttIntegrationId);
+  const ttsModels = ttsKind ? SPEECH_CATALOG[ttsKind].ttsModels : [];
+  const sttModels = sttKind ? SPEECH_CATALOG[sttKind].sttModels : [];
+  /** Switching provider keeps the model only if the new provider offers it. */
+  const chooseTts = (id: string) => {
+    const kind = speechKind(id);
+    const models: readonly string[] = kind ? SPEECH_CATALOG[kind].ttsModels : [];
+    setDraft({
+      ...draft,
+      ttsIntegrationId: id,
+      ttsModel: models.includes(draft.ttsModel) ? draft.ttsModel : '',
+    });
+  };
+  const chooseStt = (id: string) => {
+    const kind = speechKind(id);
+    const models: readonly string[] = kind ? SPEECH_CATALOG[kind].sttModels : [];
+    setDraft({
+      ...draft,
+      sttIntegrationId: id,
+      sttModel: models.includes(draft.sttModel) ? draft.sttModel : '',
+    });
+  };
 
   if (editing) {
     return (
@@ -299,44 +332,37 @@ export function AgentsTab() {
           </div>
           {llms.length === 0 && <span className="muted">{t('admin.agents.noLlm')}</span>}
         </fieldset>
+        <p className="muted" style={{ margin: 0 }}>
+          {t('admin.agents.speechMixHint')}
+        </p>
         <fieldset className="group">
           <legend>{t('admin.agents.voiceLegend')}</legend>
           <div className="row">
             <label style={{ flex: 1 }}>
               {t('admin.agents.integration')}
-              <select
-                required
-                value={draft.fishIntegrationId}
-                onChange={(e) => set('fishIntegrationId', e.target.value)}
-              >
+              <select required value={draft.ttsIntegrationId} onChange={(e) => chooseTts(e.target.value)}>
                 <option value="" disabled>
                   {t('admin.agents.choose')}
                 </option>
-                {fishes.map((i) => (
+                {speech.map((i) => (
                   <option key={i.id} value={i.id}>
-                    {i.name}
+                    {speechLabel(i)}
                   </option>
                 ))}
               </select>
             </label>
             <label style={{ flex: 1 }}>
               {t('admin.agents.voiceModel')}
-              <select required value={draft.ttsModel} onChange={(e) => set('ttsModel', e.target.value)}>
+              <select
+                required
+                disabled={!ttsKind}
+                value={draft.ttsModel}
+                onChange={(e) => set('ttsModel', e.target.value)}
+              >
                 <option value="" disabled>
                   {t('admin.agents.choose')}
                 </option>
-                {FISH_TTS_MODELS.map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </select>
-            </label>
-            <label style={{ flex: 1 }}>
-              {t('admin.agents.sttModel')}
-              <select required value={draft.sttModel} onChange={(e) => set('sttModel', e.target.value)}>
-                <option value="" disabled>
-                  {t('admin.agents.choose')}
-                </option>
-                {FISH_STT_MODELS.map((m) => (
+                {ttsModels.map((m) => (
                   <option key={m}>{m}</option>
                 ))}
               </select>
@@ -345,6 +371,9 @@ export function AgentsTab() {
           <fieldset className="group">
             <legend>{t('admin.agents.voicesLegend')}</legend>
             <p className="muted small-print">{t('admin.agents.voicesHint')}</p>
+            {ttsKind === 'deepgram' && (
+              <p className="muted small-print">{t('admin.agents.deepgramVoiceHint')}</p>
+            )}
             <div className="row">
               {VOICE_LANGUAGES.map((lang) => (
                 <label key={lang} style={{ flex: 1 }}>
@@ -353,12 +382,51 @@ export function AgentsTab() {
                     value={draft.voices[lang]}
                     maxLength={64}
                     pattern="[A-Za-z0-9_\-]{4,64}"
+                    placeholder={
+                      (ttsKind && SPEECH_CATALOG[ttsKind].voiceExample?.[lang]) ||
+                      t('admin.agents.voicePlaceholder')
+                    }
                     onChange={(e) => set('voices', { ...draft.voices, [lang]: e.target.value })}
                   />
                 </label>
               ))}
             </div>
           </fieldset>
+        </fieldset>
+        <fieldset className="group">
+          <legend>{t('admin.agents.listenLegend')}</legend>
+          <div className="row">
+            <label style={{ flex: 1 }}>
+              {t('admin.agents.integration')}
+              <select required value={draft.sttIntegrationId} onChange={(e) => chooseStt(e.target.value)}>
+                <option value="" disabled>
+                  {t('admin.agents.choose')}
+                </option>
+                {speech.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {speechLabel(i)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ flex: 1 }}>
+              {t('admin.agents.sttModel')}
+              <select
+                required
+                disabled={!sttKind}
+                value={draft.sttModel}
+                onChange={(e) => set('sttModel', e.target.value)}
+              >
+                <option value="" disabled>
+                  {t('admin.agents.choose')}
+                </option>
+                {sttModels.map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {speech.length === 0 && <span className="muted">{t('admin.agents.noSpeech')}</span>}
         </fieldset>{' '}
         <div className="row">
           <button className="btn" disabled={busy}>
@@ -404,13 +472,17 @@ export function AgentsTab() {
                 🧠 {nameOf(a.llmIntegrationId) ?? t('admin.agents.notChosen')}
                 {a.llmModel ? ` · ${a.llmModel}` : ''}
               </span>
-              <span className="badge">
-                🐟 {nameOf(a.fishIntegrationId) ?? t('admin.agents.notChosen')} ·{' '}
+              <span className="badge" title={t('admin.agents.voiceLegend')}>
+                🗣️ {nameOf(a.ttsIntegrationId) ?? t('admin.agents.notChosen')} ·{' '}
                 {a.ttsModel ?? t('admin.agents.notChosen')}
                 {' · '}
                 {VOICE_LANGUAGES.filter((l) => a.voices[l])
                   .map((l) => l.toUpperCase())
                   .join('/') || t('admin.agents.notChosen')}
+              </span>
+              <span className="badge" title={t('admin.agents.listenLegend')}>
+                👂 {nameOf(a.sttIntegrationId) ?? t('admin.agents.notChosen')} ·{' '}
+                {a.sttModel ?? t('admin.agents.notChosen')}
               </span>
               <span className="badge">
                 {t('admin.agents.listensBadge', { mode: t(LISTEN[a.listenMode]).toLowerCase() })}

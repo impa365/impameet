@@ -8,7 +8,7 @@ const KEY = randomBytes(32);
 
 /**
  * Everything an agent has to choose (there is no server provider, model or voice): an LLM and a
- * Fish Audio integration of the organization, the models and one voice.
+ * Fish Audio integration of the organization (speaking and listening), the models and one voice.
  */
 export async function agentChoices(sql: Sql, admin: SessionUser) {
   const deps = { sql, key: KEY, resolve: async () => ['93.184.215.14'] };
@@ -32,7 +32,8 @@ export async function agentChoices(sql: Sql, admin: SessionUser) {
   );
   return {
     llmIntegrationId: llm.id,
-    fishIntegrationId: fish.id,
+    ttsIntegrationId: fish.id,
+    sttIntegrationId: fish.id,
     llmModel: 'deepseek/deepseek-chat',
     ttsModel: 's2.1-pro',
     sttModel: 'transcribe-stream-1',

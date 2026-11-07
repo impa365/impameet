@@ -2,7 +2,7 @@
 
 Rooms on the IMPA Meet platform pick a configured agent; the dispatch metadata carries its
 id and the worker fetches the configuration from the platform's internal API. Without a
-platform (or when the lookup fails) the agent defined by this worker's environment is used.
+platform, or when the lookup fails or a choice is missing, the agent stays out of the meeting.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import aiohttp
 from . import redaction
 from .config import Settings
 from .languages import clean_voices
+from .providers import SpeechProvider, speech_provider
 
 logger = logging.getLogger("meet_impar_agent.profile")
 
@@ -45,16 +46,20 @@ class AgentProfile:
     listen_mode: ListenMode = "everyone"
     respond_mode: RespondMode = "always"
     mute_policy: MutePolicy = "everyone"
-    # The agent's own provider credentials (Integrações); None uses the worker's.
+    # The agent's own provider credentials (Integrações).
     llm_base_url: str | None = field(default=None, repr=False)
     llm_api_key: str | None = field(default=None, repr=False)
-    fish_api_key: str | None = field(default=None, repr=False)
+    # Speaking and listening are chosen separately: any provider for each.
+    tts_provider: SpeechProvider = "fish"
+    tts_api_key: str | None = field(default=None, repr=False)
+    stt_provider: SpeechProvider = "fish"
+    stt_api_key: str | None = field(default=None, repr=False)
     stt_model: str = ""
-    # Fish Audio voice per language ("pt", "en", "es"); empty uses `voice_id` for everything.
+    # The TTS provider's voice per language ("pt", "en", "es").
     voices: dict[str, str] = field(default_factory=dict)
 
     def secrets(self) -> list[str]:
-        return [s for s in (self.llm_api_key, self.fish_api_key) if s]
+        return [s for s in (self.llm_api_key, self.tts_api_key, self.stt_api_key) if s]
 
 
 def _metadata(metadata: str | None) -> dict[str, Any]:
@@ -121,11 +126,14 @@ def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
     """The agent exactly as configured on the platform, or None when a choice is missing.
 
     Nothing falls back to this worker's own provider, model or voice: an agent without its
-    LLM integration and model, its Fish Audio integration, voice, speech and transcription
-    models does not join a meeting.
+    LLM integration and model, its speech (TTS) and transcription (STT) integrations, voices
+    and models does not join a meeting.
     """
     llm = _section(remote, "llm")
-    fish = _section(remote, "fish")
+    speech = _section(remote, "tts")
+    listening = _section(remote, "stt")
+    tts_provider = speech_provider(speech.get("provider"))
+    stt_provider = speech_provider(listening.get("provider"))
     voices = clean_voices(remote.get("voices"))
     required = {
         "name": _text(remote.get("name")),
@@ -133,14 +141,19 @@ def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
         "llm_base_url": _text(llm.get("baseUrl")),
         "llm_api_key": _text(llm.get("apiKey")),
         "llm_model": _text(remote.get("llmModel")),
-        "fish_api_key": _text(fish.get("apiKey")),
+        "tts_api_key": _text(speech.get("apiKey")),
+        "stt_api_key": _text(listening.get("apiKey")),
         "tts_model": _text(remote.get("ttsModel")),
         "stt_model": _text(remote.get("sttModel")),
     }
     missing = [key for key, value in required.items() if value is None]
     if not voices:
         missing.append("voices")
-    if missing:
+    if tts_provider is None:
+        missing.append("tts_provider")
+    if stt_provider is None:
+        missing.append("stt_provider")
+    if missing or tts_provider is None or stt_provider is None:
         logger.error("agent is not fully configured", extra={"missing": missing})
         return None
     instructions = str(required["instructions"])
@@ -163,7 +176,10 @@ def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
         mute_policy=mute if mute in MUTE_POLICIES else "everyone",
         llm_base_url=required["llm_base_url"],
         llm_api_key=required["llm_api_key"],
-        fish_api_key=required["fish_api_key"],
+        tts_provider=tts_provider,
+        tts_api_key=required["tts_api_key"],
+        stt_provider=stt_provider,
+        stt_api_key=required["stt_api_key"],
         voices=voices,
     )
 

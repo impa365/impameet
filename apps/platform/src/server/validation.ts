@@ -182,8 +182,8 @@ export const agentInput = z.object({
     .default(''),
   greeting: z.string().trim().max(500).default(''),
   /**
-   * Fish Audio voice per language the agent answers in (pt, en, es). Nothing is inherited
-   * from the server: the provider, the models and at least one voice are always chosen here.
+   * The speaking provider's voice per language the agent answers in (pt, en, es). Nothing is
+   * inherited from the server: providers, models and at least one voice are always chosen here.
    */
   voices: z
     .object(
@@ -208,9 +208,11 @@ export const agentInput = z.object({
   mutePolicy: z.enum(['everyone', 'moderators', 'disabled']).default('everyone'),
   /** Saved provider credentials (Integrações): required, there is no server fallback. */
   llmIntegrationId: z.string({ error: 'Escolha a integração de LLM' }).uuid('Escolha a integração de LLM'),
-  fishIntegrationId: z
-    .string({ error: 'Escolha a integração do Fish Audio' })
-    .uuid('Escolha a integração do Fish Audio'),
+  /** Speaking (TTS) and listening (STT) are chosen separately: any provider for each. */
+  ttsIntegrationId: z.string({ error: 'Escolha a integração de voz' }).uuid('Escolha a integração de voz'),
+  sttIntegrationId: z
+    .string({ error: 'Escolha a integração de transcrição' })
+    .uuid('Escolha a integração de transcrição'),
 });
 
 const integrationName = z.string().trim().min(1, 'Dê um nome para a integração').max(60);
@@ -236,6 +238,8 @@ export const integrationInput = z.discriminatedUnion('kind', [
       .regex(/^[a-z0-9._-]{1,40}$/, 'Modelo de voz inválido')
       .default('s2.1-pro'),
   }),
+  z.object({ kind: z.literal('deepgram'), name: integrationName, apiKey }),
+  z.object({ kind: z.literal('elevenlabs'), name: integrationName, apiKey }),
 ]);
 
 export const meetingInput = z.object({

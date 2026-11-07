@@ -3,7 +3,8 @@ import { audit } from '../audit';
 import type { SessionUser } from '../auth/session';
 import type { Sql } from '../db';
 import { badRequest, conflict, forbidden, notFound } from '../errors';
-import { assertTenantIntegration, integrationSecret } from '../integrations/service';
+import { SPEECH_CATALOG, type SpeechProvider } from '@/lib/providers';
+import { assertTenantIntegration, integrationSecret, speechIntegrationKind } from '../integrations/service';
 import type { agentInput } from '../validation';
 
 export type AgentInput = z.infer<typeof agentInput>;
@@ -15,7 +16,7 @@ export const MAX_AGENT_BYTES = 512 * 1024;
 eady is false and it is not dispatched). */
 export interface AgentConfig extends Omit<
   AgentInput,
-  'llmModel' | 'sttModel' | 'ttsModel' | 'llmIntegrationId' | 'fishIntegrationId'
+  'llmModel' | 'sttModel' | 'ttsModel' | 'llmIntegrationId' | 'ttsIntegrationId' | 'sttIntegrationId'
 > {
   id: string;
   tenantId: string;
@@ -23,7 +24,8 @@ export interface AgentConfig extends Omit<
   sttModel: string | null;
   ttsModel: string | null;
   llmIntegrationId: string | null;
-  fishIntegrationId: string | null;
+  ttsIntegrationId: string | null;
+  sttIntegrationId: string | null;
   voiceId: string | null;
   ready: boolean;
   isDefault: boolean;
@@ -47,7 +49,8 @@ const AGENT_COLUMNS = (sql: Sql) => sql`
   id, tenant_id as "tenantId", name, description, instructions, knowledge, greeting, voice_id as "voiceId",
   voices, tts_model as "ttsModel", stt_model as "sttModel", llm_model as "llmModel", listen_mode as "listenMode",
   respond_mode as "respondMode", mute_policy as "mutePolicy",
-  llm_integration_id as "llmIntegrationId", fish_integration_id as "fishIntegrationId",
+  llm_integration_id as "llmIntegrationId", tts_integration_id as "ttsIntegrationId",
+  stt_integration_id as "sttIntegrationId",
   is_default as "isDefault", created_at as "createdAt", updated_at as "updatedAt",
   ${READY(sql)} as ready`;
 
@@ -60,7 +63,8 @@ function mainVoice(input: AgentInput): string | null {
 const READY = (sql: Sql, a = 'agents') =>
   sql.unsafe(`
   (${a}.llm_integration_id is not null and ${a}.llm_model is not null
-   and ${a}.fish_integration_id is not null and ${a}.tts_model is not null
+   and ${a}.tts_integration_id is not null and ${a}.stt_integration_id is not null
+   and ${a}.tts_model is not null
    and ${a}.stt_model is not null and ${a}.voices <> '{}'::jsonb)`);
 
 function assertAdmin(user: SessionUser): void {
@@ -71,9 +75,26 @@ function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string }).code === '23505';
 }
 
+/** The integrations belong to the organization, and each model and voice to its provider. */
 async function assertIntegrations(sql: Sql, tenantId: string, input: AgentInput): Promise<void> {
   await assertTenantIntegration(sql, tenantId, input.llmIntegrationId, 'llm');
-  await assertTenantIntegration(sql, tenantId, input.fishIntegrationId, 'fish');
+  const speaks = await speechIntegrationKind(sql, tenantId, input.ttsIntegrationId);
+  const listens = await speechIntegrationKind(sql, tenantId, input.sttIntegrationId);
+  assertSpeechChoices(speaks, listens, input);
+}
+
+export function assertSpeechChoices(
+  speaks: SpeechProvider,
+  listens: SpeechProvider,
+  input: AgentInput,
+): void {
+  if (!SPEECH_CATALOG[speaks].ttsModels.includes(input.ttsModel))
+    throw badRequest('Escolha um modelo de voz do provedor de voz escolhido');
+  if (!SPEECH_CATALOG[listens].sttModels.includes(input.sttModel))
+    throw badRequest('Escolha um modelo de transcrição do provedor de transcrição escolhido');
+  // Deepgram voices are model names of the chosen family, e.g. flux-bianca-pt.
+  if (speaks === 'deepgram' && Object.values(input.voices).some((v) => !v?.startsWith(`${input.ttsModel}-`)))
+    throw badRequest('As vozes do Deepgram precisam ser do modelo escolhido (ex.: flux-bianca-pt)');
 }
 
 /** Everyone in the organization may see which agents exist (to pick one for a room). */
@@ -101,10 +122,10 @@ export async function createAgent(sql: Sql, actor: SessionUser, input: AgentInpu
     const [agent] = await sql<AgentConfig[]>`
       insert into agents (tenant_id, name, description, instructions, knowledge, greeting, voice_id, voices, tts_model, stt_model,
                           llm_model, listen_mode, respond_mode, mute_policy,
-                          llm_integration_id, fish_integration_id)
+                          llm_integration_id, tts_integration_id, stt_integration_id)
       values (${actor.tenantId}, ${input.name}, ${input.description}, ${input.instructions}, ${input.knowledge}, ${input.greeting},
               ${mainVoice(input)}, ${sql.json(input.voices)}, ${input.ttsModel}, ${input.sttModel}, ${input.llmModel}, ${input.listenMode}, ${input.respondMode},
-              ${input.mutePolicy}, ${input.llmIntegrationId}, ${input.fishIntegrationId})
+              ${input.mutePolicy}, ${input.llmIntegrationId}, ${input.ttsIntegrationId}, ${input.sttIntegrationId})
       returning ${AGENT_COLUMNS(sql)}`;
     await audit(sql, {
       tenantId: actor.tenantId,
@@ -137,7 +158,8 @@ export async function updateAgent(
         voices = ${sql.json(input.voices)},
         tts_model = ${input.ttsModel}, stt_model = ${input.sttModel}, llm_model = ${input.llmModel}, listen_mode = ${input.listenMode},
         respond_mode = ${input.respondMode}, mute_policy = ${input.mutePolicy},
-        llm_integration_id = ${input.llmIntegrationId}, fish_integration_id = ${input.fishIntegrationId},
+        llm_integration_id = ${input.llmIntegrationId}, tts_integration_id = ${input.ttsIntegrationId},
+        stt_integration_id = ${input.sttIntegrationId},
         updated_at = now()
       where id = ${id} and tenant_id = ${actor.tenantId}
       returning ${AGENT_COLUMNS(sql)}`;
@@ -262,7 +284,19 @@ export interface WorkerAgent {
   mutePolicy: string;
   /** Present when the agent uses a saved LLM integration (decrypted, internal API only). */
   llm: { baseUrl: string; apiKey: string; model: string } | null;
-  fish: { apiKey: string } | null;
+  /** Speaking and listening providers, each with its own key (decrypted, internal API only). */
+  tts: { provider: SpeechProvider; apiKey: string } | null;
+  stt: { provider: SpeechProvider; apiKey: string } | null;
+}
+
+async function speechSecret(
+  sql: Sql,
+  key: Buffer,
+  tenantId: string,
+  id: string,
+): Promise<{ provider: SpeechProvider; apiKey: string } | null> {
+  const s = await integrationSecret(sql, key, tenantId, id);
+  return s.kind === 'llm' ? null : { provider: s.kind, apiKey: s.apiKey };
 }
 
 /** What the voice worker needs, looked up by id only (called with the internal token). */
@@ -273,15 +307,14 @@ export async function agentForWorker(sql: Sql, key: Buffer | null, id: string): 
   if (!row || row.tenantStatus !== 'active') return null;
 
   let llm: WorkerAgent['llm'] = null;
-  let fish: WorkerAgent['fish'] = null;
+  let tts: WorkerAgent['tts'] = null;
+  let stt: WorkerAgent['stt'] = null;
   if (key && row.llmIntegrationId) {
     const s = await integrationSecret(sql, key, row.tenantId, row.llmIntegrationId);
     llm = { baseUrl: s.baseUrl ?? '', apiKey: s.apiKey, model: row.llmModel ?? '' };
   }
-  if (key && row.fishIntegrationId) {
-    const s = await integrationSecret(sql, key, row.tenantId, row.fishIntegrationId);
-    fish = { apiKey: s.apiKey };
-  }
+  if (key && row.ttsIntegrationId) tts = await speechSecret(sql, key, row.tenantId, row.ttsIntegrationId);
+  if (key && row.sttIntegrationId) stt = await speechSecret(sql, key, row.tenantId, row.sttIntegrationId);
   return {
     id: row.id,
     name: row.name,
@@ -297,6 +330,7 @@ export async function agentForWorker(sql: Sql, key: Buffer | null, id: string): 
     respondMode: row.respondMode,
     mutePolicy: row.mutePolicy,
     llm,
-    fish,
+    tts,
+    stt,
   };
 }

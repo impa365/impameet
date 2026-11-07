@@ -1,4 +1,6 @@
 084155ddce00e5442a060a4d0fd5accf150402fa368dc0ce331d2337a3d06d17  livekit_agents-1.8.10-py3-none-any.whl
+6ba793472f0de0c9a1f3c2a0cb3d6c11c6eaa2f14b861236883add045b32f8f9  livekit_plugins_deepgram-1.8.10-py3-none-any.whl
+c7b6a3f3d8d290ba8f249f2cd13ca2df76276cd7dea86ee0946bae4317be72c5  livekit_plugins_elevenlabs-1.8.10-py3-none-any.whl
 aaed5bc1ab0da82fc51a816ef7bfcfdde9e63df292dfb7d4b7d82894d6c73356  livekit_plugins_fishaudio-1.8.10-py3-none-any.whl
 65552a908ee9e624545947df0330b6d60815f17fe206606a65cbb72ce4e62d5c  livekit_plugins_openai-1.8.10-py3-none-any.whl
 7c74ea967990da9b18066687145b466d08258d489b5740d1ee4d13008331af2a  livekit_plugins_silero-1.8.10-py3-none-any.whl

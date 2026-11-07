@@ -46,6 +46,10 @@ const LLM = (over: Record<string, unknown> = {}) =>
   });
 const FISH = (over: Record<string, unknown> = {}) =>
   integrationInput.parse({ kind: 'fish', name: 'Fish principal', apiKey: 'fish-0123456789abcdef', ...over });
+const DEEPGRAM = (over: Record<string, unknown> = {}) =>
+  integrationInput.parse({ kind: 'deepgram', name: 'Deepgram', apiKey: 'dg-0123456789abcdef', ...over });
+const ELEVEN = (over: Record<string, unknown> = {}) =>
+  integrationInput.parse({ kind: 'elevenlabs', name: 'ElevenLabs', apiKey: 'el-0123456789abcdef', ...over });
 /** Everything an agent must choose (nothing comes from the server). */
 const READY = {
   llmModel: 'deepseek/deepseek-chat',
@@ -56,11 +60,11 @@ const READY = {
 const A = (over: Record<string, unknown> = {}) =>
   agentInput.parse({ name: 'Ana', instructions: 'x', ...READY, ...over });
 
-/** A ready-to-use LLM and Fish Audio pair for an organization's agents. */
+/** A ready-to-use LLM and Fish Audio (speaking and listening) for an organization's agents. */
 async function providers(admin: SessionUser) {
   const llm = await createIntegration(deps(), admin, LLM({ name: 'LLM de teste' }), null);
   const fish = await createIntegration(deps(), admin, FISH({ name: 'Fish de teste' }), null);
-  return { llmIntegrationId: llm.id, fishIntegrationId: fish.id };
+  return { llmIntegrationId: llm.id, ttsIntegrationId: fish.id, sttIntegrationId: fish.id };
 }
 
 async function expectAppError(promise: Promise<unknown>, status: number) {
@@ -238,7 +242,12 @@ describe('integrations', () => {
     await expectAppError(deleteIntegration(db(), rival.admin, llm.id, null), 404);
     const rivalFish = await createIntegration(deps(), rival.admin, FISH(), null);
     await expectAppError(
-      createAgent(db(), rival.admin, A({ llmIntegrationId: llm.id, fishIntegrationId: rivalFish.id }), null),
+      createAgent(
+        db(),
+        rival.admin,
+        A({ llmIntegrationId: llm.id, ttsIntegrationId: rivalFish.id, sttIntegrationId: rivalFish.id }),
+        null,
+      ),
       404,
     );
 
@@ -255,18 +264,33 @@ describe('agents with their own provider keys', () => {
     const llm = await createIntegration(deps(), admin, LLM(), null);
     const fish = await createIntegration(deps(), admin, FISH(), null);
     await expectAppError(
-      createAgent(db(), admin, A({ llmIntegrationId: fish.id, fishIntegrationId: fish.id }), null),
+      createAgent(
+        db(),
+        admin,
+        A({ llmIntegrationId: fish.id, ttsIntegrationId: fish.id, sttIntegrationId: fish.id }),
+        null,
+      ),
       400,
     );
     await expectAppError(
-      createAgent(db(), admin, A({ llmIntegrationId: llm.id, fishIntegrationId: llm.id }), null),
+      createAgent(
+        db(),
+        admin,
+        A({ llmIntegrationId: llm.id, ttsIntegrationId: llm.id, sttIntegrationId: fish.id }),
+        null,
+      ),
       400,
     );
 
     const ana = await createAgent(
       db(),
       admin,
-      A({ llmIntegrationId: llm.id, fishIntegrationId: fish.id, ttsModel: 'drama-3' }),
+      A({
+        llmIntegrationId: llm.id,
+        ttsIntegrationId: fish.id,
+        sttIntegrationId: fish.id,
+        ttsModel: 'drama-3',
+      }),
       null,
     );
     expect(await agentForWorker(db(), KEY, ana.id)).toMatchObject({
@@ -277,7 +301,8 @@ describe('agents with their own provider keys', () => {
         apiKey: 'sk-or-0123456789abcdef',
         model: 'deepseek/deepseek-chat',
       },
-      fish: { apiKey: 'fish-0123456789abcdef' },
+      tts: { provider: 'fish', apiKey: 'fish-0123456789abcdef' },
+      stt: { provider: 'fish', apiKey: 'fish-0123456789abcdef' },
       ttsModel: 'drama-3',
     });
 
@@ -285,14 +310,92 @@ describe('agents with their own provider keys', () => {
       db(),
       admin,
       ana.id,
-      A({ llmIntegrationId: llm.id, fishIntegrationId: fish.id, llmModel: 'qwen/qwen3' }),
+      A({
+        llmIntegrationId: llm.id,
+        ttsIntegrationId: fish.id,
+        sttIntegrationId: fish.id,
+        llmModel: 'qwen/qwen3',
+      }),
       null,
     );
     expect((await agentForWorker(db(), KEY, ana.id))?.llm?.model).toBe('qwen/qwen3');
-    expect(await agentForWorker(db(), null, ana.id)).toMatchObject({ llm: null, fish: null });
+    expect(await agentForWorker(db(), null, ana.id)).toMatchObject({ llm: null, tts: null, stt: null });
 
     expect((await listIntegrations(db(), admin)).find((i) => i.id === llm.id)?.usedBy).toBe(1);
     await deleteIntegration(db(), admin, llm.id, null);
     expect(await agentForWorker(db(), KEY, ana.id)).toMatchObject({ llm: null, llmModel: 'qwen/qwen3' });
+  });
+
+  it('speak with one provider and listen with another, in any combination', async () => {
+    const { admin } = await org('acme');
+    const llm = await createIntegration(deps(), admin, LLM(), null);
+    const deepgram = await createIntegration(deps(), admin, DEEPGRAM(), null);
+    const eleven = await createIntegration(deps(), admin, ELEVEN(), null);
+    expect(deepgram).toMatchObject({ kind: 'deepgram', baseUrl: null, defaultModel: null });
+
+    const mixed = await createAgent(
+      db(),
+      admin,
+      A({
+        llmIntegrationId: llm.id,
+        ttsIntegrationId: eleven.id,
+        ttsModel: 'eleven_flash_v2_5',
+        voices: { pt: 'EXAVITQu4vr4xnSDxMaL' },
+        sttIntegrationId: deepgram.id,
+        sttModel: 'flux-general-multi',
+      }),
+      null,
+    );
+    expect(mixed.ready).toBe(true);
+    expect(await agentForWorker(db(), KEY, mixed.id)).toMatchObject({
+      tts: { provider: 'elevenlabs', apiKey: 'el-0123456789abcdef' },
+      stt: { provider: 'deepgram', apiKey: 'dg-0123456789abcdef' },
+      ttsModel: 'eleven_flash_v2_5',
+      sttModel: 'flux-general-multi',
+    });
+
+    const reversed = A({
+      name: 'Bia',
+      llmIntegrationId: llm.id,
+      ttsIntegrationId: deepgram.id,
+      ttsModel: 'flux',
+      voices: { pt: 'flux-bianca-pt', es: 'flux-valentina-es' },
+      sttIntegrationId: eleven.id,
+      sttModel: 'scribe_v2_realtime',
+    });
+    expect((await createAgent(db(), admin, reversed, null)).ready).toBe(true);
+
+    // Models and voices must belong to the provider chosen for each direction.
+    await expectAppError(
+      createAgent(db(), admin, A({ ...reversed, name: 'C', ttsModel: 's2.1-pro' }), null),
+      400,
+    );
+    await expectAppError(
+      createAgent(db(), admin, A({ ...reversed, name: 'C', sttModel: 'transcribe-stream-1' }), null),
+      400,
+    );
+    await expectAppError(
+      createAgent(db(), admin, A({ ...reversed, name: 'C', voices: { pt: 'aura-2-celeste-es' } }), null),
+      400,
+    );
+    expect((await listIntegrations(db(), admin)).find((i) => i.id === deepgram.id)?.usedBy).toBe(2);
+  });
+
+  it('tests Deepgram and ElevenLabs keys with each provider own auth header', async () => {
+    const { admin } = await org('acme');
+    const deepgram = await createIntegration(deps(), admin, DEEPGRAM(), null);
+    const eleven = await createIntegration(deps(), admin, ELEVEN(), null);
+    const seen: string[] = [];
+    const ok = (async (url: string, init: RequestInit) => {
+      const h = new Headers(init.headers);
+      seen.push(`${url} ${h.get('authorization') ?? ''}${h.get('xi-api-key') ?? ''}`);
+      return Response.json({});
+    }) as unknown as Fetch;
+    expect((await testIntegration(deps(ok), admin, deepgram.id)).ok).toBe(true);
+    expect((await testIntegration(deps(ok), admin, eleven.id)).ok).toBe(true);
+    expect(seen).toEqual([
+      'https://api.deepgram.com/v1/projects Token dg-0123456789abcdef',
+      'https://api.elevenlabs.io/v1/models el-0123456789abcdef',
+    ]);
   });
 });

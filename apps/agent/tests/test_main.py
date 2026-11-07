@@ -27,7 +27,8 @@ def profile(**overrides: Any) -> AgentProfile:
         "stt_model": "transcribe-stream-1",
         "llm_base_url": "https://llm.example.com/v1",
         "llm_api_key": "sk-test-0123456789",
-        "fish_api_key": "fish-test-0123456789",
+        "tts_api_key": "fish-test-0123456789",
+        "stt_api_key": "fish-test-0123456789",
         "voices": {"pt": "voz-kaiser"},
     }
     return AgentProfile(**(base | overrides))
