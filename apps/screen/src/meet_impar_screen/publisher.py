@@ -75,6 +75,8 @@ class LiveKitScreen:
         track = rtc.LocalVideoTrack.create_video_track("ai-screen", self._source)
         options = rtc.TrackPublishOptions(
             source=rtc.TrackSource.SOURCE_SCREENSHARE,
+            # Text on a page: viewers start on the lowest simulcast layer, which is blurry.
+            simulcast=False,
             video_encoding=rtc.VideoEncoding(max_bitrate=MAX_BITRATE, max_framerate=MAX_FPS),
         )
         await self._room.local_participant.publish_track(track, options)
