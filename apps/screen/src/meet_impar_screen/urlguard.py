@@ -39,15 +39,39 @@ def is_public_ip(value: str) -> bool:
     return addr.is_global and not addr.is_multicast
 
 
-class UrlGuard:
-    """Validates URLs, caching DNS answers briefly because a page fires many requests."""
+def _is_ip(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value.split("%", 1)[0])
+    except ValueError:
+        return False
+    return True
 
-    def __init__(self, resolve: Resolver = system_resolve, *, ttl_s: float = DNS_CACHE_TTL_S):
+
+class UrlGuard:
+    """Validates URLs, caching DNS answers briefly because a page fires many requests.
+
+    The answer that passed the check is also the one connections use
+    (:meth:`public_addresses`, read by the egress proxy), so a name cannot resolve to a public
+    address for the check and to a private one for the connection (DNS rebinding).
+    """
+
+    def __init__(
+        self,
+        resolve: Resolver = system_resolve,
+        *,
+        ttl_s: float = DNS_CACHE_TTL_S,
+        is_public: Callable[[str], bool] = is_public_ip,
+    ):
         self._resolve = resolve
         self._ttl_s = ttl_s
-        self._cache: dict[str, tuple[float, bool]] = {}
+        self._is_public = is_public
+        self._cache: dict[str, tuple[float, list[str]]] = {}
 
-    async def _host_is_public(self, host: str) -> bool:
+    async def public_addresses(self, host: str) -> list[str]:
+        """The host's addresses when every one is public; empty when any is not (or none)."""
+        literal = host.strip("[]")
+        if _is_ip(literal):
+            return [literal] if self._is_public(literal) else []
         now = time.monotonic()
         cached = self._cache.get(host)
         if cached and now - cached[0] < self._ttl_s:
@@ -56,7 +80,7 @@ class UrlGuard:
             addresses = await self._resolve(host)
         except OSError:
             addresses = []
-        public = bool(addresses) and all(is_public_ip(a) for a in addresses)
+        public = addresses if addresses and all(self._is_public(a) for a in addresses) else []
         self._cache[host] = (now, public)
         return public
 
@@ -74,10 +98,16 @@ class UrlGuard:
             raise BlockedURLError("só endereços http ou https")
         if parts.username or parts.password:
             raise BlockedURLError("URL com usuário ou senha")
-        literal = host.strip("[]")
-        if is_public_ip(literal) or await self._host_is_public(host):
+        if await self.public_addresses(host):
             return url.strip()
         raise BlockedURLError("endereço fora da internet pública")
+
+    async def allows_socket(self, url: str) -> bool:
+        """WebSockets follow the same rule: ws/wss are checked as http/https."""
+        for socket_scheme, http_scheme in (("wss://", "https://"), ("ws://", "http://")):
+            if url[: len(socket_scheme)].lower() == socket_scheme:
+                return await self.allows(http_scheme + url[len(socket_scheme) :])
+        return False
 
     async def allows(self, url: str) -> bool:
         try:

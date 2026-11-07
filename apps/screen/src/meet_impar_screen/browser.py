@@ -8,7 +8,7 @@ import contextlib
 import io
 import logging
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,11 +22,13 @@ from playwright.async_api import (
     Page,
     Playwright,
     Route,
+    WebSocketRoute,
     async_playwright,
 )
 from playwright.async_api import Error as PlaywrightError
 
 from . import cursor, marks
+from .egress import CONNECT_TIMEOUT_S, EgressProxy
 from .marks import Mark, parse_marks
 from .urlguard import UrlGuard
 
@@ -89,7 +91,27 @@ _CHROMIUM_ARGS = [
     "--disable-sync",
     "--mute-audio",
     "--no-first-run",
+    # Everything goes through the egress proxy, loopback included (Chromium bypasses the proxy
+    # for loopback by default), and nothing leaves over UDP: no QUIC, no direct WebRTC.
+    "--proxy-bypass-list=<-loopback>",
+    "--disable-quic",
+    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
 ]
+
+# Pages shown to a meeting never need peer-to-peer connections; without these constructors a
+# page cannot even try to reach internal addresses through WebRTC (ICE).
+_NO_WEBRTC = """
+(() => {
+  for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel',
+                      'RTCIceCandidate', 'RTCSessionDescription', 'RTCRtpSender',
+                      'RTCRtpReceiver', 'RTCRtpTransceiver']) {
+    try {
+      Object.defineProperty(globalThis, name, {value: undefined, writable: false,
+                                               configurable: false});
+    } catch (e) {}
+  }
+})();
+"""
 
 
 class BrowserPage:
@@ -308,16 +330,29 @@ class BrowserPage:
 class BrowserPool:
     """One Chromium process, one isolated context per room."""
 
-    def __init__(self, guard: UrlGuard, width: int, height: int) -> None:
+    def __init__(
+        self,
+        guard: UrlGuard,
+        width: int,
+        height: int,
+        *,
+        extra_args: Sequence[str] = (),
+        connect_timeout_s: float = CONNECT_TIMEOUT_S,
+    ) -> None:
         self._guard = guard
         self._width = width
         self._height = height
+        self._extra_args = list(extra_args)
+        self._egress = EgressProxy(guard.public_addresses, connect_timeout_s=connect_timeout_s)
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
 
     async def start(self) -> None:
+        proxy = await self._egress.start()
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(args=_CHROMIUM_ARGS)
+        self._browser = await self._playwright.chromium.launch(
+            args=[*_CHROMIUM_ARGS, f"--proxy-server={proxy}", *self._extra_args]
+        )
 
     async def _route(self, route: Route) -> None:
         url = route.request.url
@@ -325,6 +360,14 @@ class BrowserPool:
             await route.continue_()
         else:
             await route.abort("blockedbyclient")
+
+    async def _route_socket(self, socket: WebSocketRoute) -> None:
+        """`context.route` never sees WebSockets: they get the same address check here."""
+        if await self._guard.allows_socket(socket.url):
+            socket.connect_to_server()
+        else:
+            logger.info("blocked a WebSocket outside the public internet")
+            await socket.close(code=1008, reason="blocked")
 
     async def open_page(self, sink: FrameSink) -> BrowserPage:
         if self._browser is None:
@@ -336,7 +379,9 @@ class BrowserPool:
             service_workers="block",
         )
         try:
+            await context.add_init_script(_NO_WEBRTC)
             await context.route("**/*", self._route)
+            await context.route_web_socket("**/*", self._route_socket)
             page = await context.new_page()
             page.on("dialog", lambda dialog: asyncio.ensure_future(_dismiss(dialog)))
             context.on(
@@ -354,6 +399,7 @@ class BrowserPool:
             await self._browser.close()
         if self._playwright:
             await self._playwright.stop()
+        await self._egress.close()
 
 
 async def _dismiss(dialog: Dialog) -> None:
