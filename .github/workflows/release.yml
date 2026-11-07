@@ -51,13 +51,13 @@ jobs:
             org.opencontainers.image.licenses=Apache-2.0
             org.opencontainers.image.url=https://impa365.com
       - name: Tests (test stage) then runtime image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: apps/${{ matrix.app }}
           target: test
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,scope=${{ matrix.app }},mode=max
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: apps/${{ matrix.app }}
           target: runtime
