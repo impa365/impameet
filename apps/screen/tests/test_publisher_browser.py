@@ -4,6 +4,7 @@ import asyncio
 import base64
 import io
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -180,8 +181,14 @@ async def test_live_screen_publishes_repeats_frames_and_expires(
     assert room.disconnected
 
 
+# Playwright's browser folders: PLAYWRIGHT_BROWSERS_PATH, Linux, macOS, the image.
+_BROWSER_DIRS = [
+    Path(os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or "/nonexistent"),
+    Path.home() / ".cache/ms-playwright",
+    Path.home() / "Library/Caches/ms-playwright",
+]
 chromium = pytest.mark.skipif(
-    not (shutil.which("chromium") or any(Path.home().glob(".cache/ms-playwright/chromium*")))
+    not (shutil.which("chromium") or any(any(d.glob("chromium*")) for d in _BROWSER_DIRS))
     and not Path("/opt/ms-playwright").exists(),
     reason="Playwright Chromium is not installed",
 )
