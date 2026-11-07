@@ -2,7 +2,7 @@
   "name": "impa-meet-platform",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -24,8 +24,8 @@
     "@livekit/components-styles": "1.2.0",
     "@livekit/track-processors": "0.8.2",
     "livekit-client": "2.23.0",
-    "livekit-server-sdk": "2.19.1",
-    "next": "15.5.28",
+    "livekit-server-sdk": "2.19.2",
+    "next": "15.5.29",
     "nodemailer": "10.3.1",
     "postgres": "4.0.0",
     "react": "18.3.1",
