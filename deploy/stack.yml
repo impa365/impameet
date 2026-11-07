@@ -26,7 +26,7 @@ services:
   # Web platform: rooms, admin panel, integrations, recordings (Next.js)
   # ---------------------------------------------------------------------------
   platform:
-    image: ghcr.io/impa365/impameet-platform:${IMPAMEET_VERSION:-latest}
+    image: impa365/impameet-platform:${IMPAMEET_VERSION:-latest}
     environment:
       PLATFORM_DOMAIN: ${PLATFORM_HOST:?set PLATFORM_HOST}
       DEFAULT_TENANT: ${DEFAULT_TENANT:-}
@@ -82,7 +82,7 @@ services:
   # Providers, models and voices are chosen per agent in the admin panel.
   # ---------------------------------------------------------------------------
   agent:
-    image: ghcr.io/impa365/impameet-agent:${IMPAMEET_VERSION:-latest}
+    image: impa365/impameet-agent:${IMPAMEET_VERSION:-latest}
     environment:
       LIVEKIT_URL: ws://livekit:7880
       LIVEKIT_API_KEY_FILE: /run/secrets/meet_livekit_api_key
@@ -114,7 +114,7 @@ services:
   # Isolated network: no route to the database or the platform.
   # ---------------------------------------------------------------------------
   screen:
-    image: ghcr.io/impa365/impameet-screen:${IMPAMEET_VERSION:-latest}
+    image: impa365/impameet-screen:${IMPAMEET_VERSION:-latest}
     environment:
       LIVEKIT_URL: wss://${LIVEKIT_HOST}
       LIVEKIT_API_KEY_FILE: /run/secrets/meet_livekit_api_key

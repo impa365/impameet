@@ -7,7 +7,8 @@ Open source, auto-hospedada e pronta para Docker Swarm e Portainer.
 
 [![Licença Apache 2.0](https://img.shields.io/badge/licen%C3%A7a-Apache%202.0-1a73e8)](LICENSE)
 [![CI](https://github.com/impa365/impameet/actions/workflows/ci.yml/badge.svg)](https://github.com/impa365/impameet/actions/workflows/ci.yml)
-[![Imagens](https://github.com/impa365/impameet/actions/workflows/release.yml/badge.svg)](https://github.com/impa365/impameet/pkgs/container/impameet-platform)
+[![Docker Hub](https://img.shields.io/docker/v/impa365/impameet-platform?sort=semver&label=Docker%20Hub&logo=docker&logoColor=white)](https://hub.docker.com/r/impa365/impameet-platform)
+[![Pulls](https://img.shields.io/docker/pulls/impa365/impameet-platform?logo=docker&logoColor=white)](https://hub.docker.com/r/impa365/impameet-platform)
 ![LiveKit](https://img.shields.io/badge/WebRTC-LiveKit-ff6352)
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs)
 ![Python](https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white)
@@ -183,9 +184,11 @@ flowchart LR
 | `screen` | [`apps/screen`](apps/screen) | Python 3.12, Playwright (Chromium headless), LiveKit RTC |
 | `livekit`, `egress`, `redis`, `postgres` | [`deploy/stack.yml`](deploy/stack.yml) | Imagens oficiais, versões fixadas |
 
-As imagens ficam no GitHub Container Registry:
-`ghcr.io/impa365/impameet-platform`, `-agent` e `-screen`. A tag `latest` acompanha a branch
-`main`, e as versões (`v1.2.3`) geram `1.2.3`, `1.2` e `1`.
+As imagens prontas ficam no **Docker Hub**:
+[`impa365/impameet-platform`](https://hub.docker.com/r/impa365/impameet-platform),
+[`impa365/impameet-agent`](https://hub.docker.com/r/impa365/impameet-agent) e
+[`impa365/impameet-screen`](https://hub.docker.com/r/impa365/impameet-screen). A tag `latest`
+acompanha a branch `main`, e cada versão (`v1.2.3`) gera `1.2.3`, `1.2` e `1`.
 
 ## Desenvolvimento
 
