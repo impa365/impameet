@@ -97,12 +97,19 @@ no painel (Admin → Integrações), e elas ficam criptografadas no banco.
 | `LIVEKIT_HOST` | sim | `livekit.seudominio.com` | Endereço do servidor de mídia |
 | `SERVER_PUBLIC_IP` | sim | `203.0.113.10` | IP público anunciado aos navegadores |
 | `IMPAMEET_VERSION` | não | `1.0.0` | Versão das imagens (padrão `latest`) |
-| `DEFAULT_TENANT` | não | `minhaempresa` | Organização servida no domínio principal |
+| `DEFAULT_TENANT` | não | `main` | Modo de uma organização só (padrão). Veja [Uma organização ou várias](#uma-organização-ou-várias) |
 | `DOCKER_BRIDGE_SUBNET` | não | `172.18.0.0/16` | Sub-rede do `docker_gwbridge` |
 | `TRAEFIK_*` | não | | Veja a seção [Traefik](#traefik) |
 | `LOG_LEVEL` | não | `INFO` | Nível de log do agente |
 
 Para conferir a sub-rede do bridge: `docker network inspect docker_gwbridge -f '{{(index .IPAM.Config 0).Subnet}}'`.
+
+### Uma organização ou várias
+
+| Modo | Como ativar | Para quem |
+|---|---|---|
+| **Uma organização** (padrão) | `DEFAULT_TENANT=main` (ou outro nome curto) | Empresa usando no próprio servidor. A primeira conta criada vira a administradora, sem limites de plano: assistentes de IA, gravação e domínio próprio liberados |
+| **SaaS** (várias organizações) | `DEFAULT_TENANT=` (vazio) | Quem vende o serviço para clientes. Cada organização ganha `<nome>.PLATFORM_HOST` e começa no plano **free** (sem IA nem gravação); o super admin muda o plano no painel. Exige um DNS curinga `*.PLATFORM_HOST` e certificado curinga no Traefik |
 
 ### Pelo Portainer
 
@@ -222,6 +229,8 @@ Guarde os backups fora do servidor e criptografados: eles contêm dados pessoais
 | Entra na sala, mas sem áudio e vídeo | As portas `7881/tcp` e `7882/udp` no firewall e no provedor, `SERVER_PUBLIC_IP` e `DOCKER_BRIDGE_SUBNET` |
 | O assistente não entra | O agente precisa estar completo (selo "configuração incompleta" no painel) e marcado na sala; veja `docker service logs impameet_agent` |
 | O assistente entra, mas não fala | A chave do Fish Audio, o ID da voz e o crédito na conta; teste a integração no painel |
+| "O plano atual não inclui assistente de IA" (ou gravação) | A organização foi criada no modo SaaS, no plano free. Para liberar tudo: `docker exec "$(docker ps -q -f name=impameet_postgres \| head -1)" psql -U impa -d impa_meet -c "update tenants set plan = 'enterprise'"` |
+| Erro ao criar a organização, ou redirecionamento para `nome.PLATFORM_HOST` | Modo SaaS sem DNS curinga. Use `DEFAULT_TENANT` com o nome da organização (veja acima) e atualize a stack |
 | A gravação não começa | `docker service logs impameet_egress` e a CPU livre (cerca de 1,5 núcleo por gravação) |
 
 Logs de cada serviço: `docker service logs -f impameet_<serviço>`.
