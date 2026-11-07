@@ -1,0 +1,41 @@
+name: Relatar um problema
+description: Algo não funciona como deveria
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por ajudar! **Falhas de segurança não vão aqui**: veja o SECURITY.md.
+        Nunca cole chaves, senhas, tokens ou dados pessoais.
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu?
+      description: E o que você esperava que acontecesse.
+    validations: {required: true}
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. Abra a sala...
+        2. Clique em...
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes:
+      label: Versão
+      description: Tag da imagem (IMPAMEET_VERSION) ou commit
+    validations: {required: true}
+  - type: dropdown
+    id: area
+    attributes:
+      label: Parte do sistema
+      options: [Sala de reunião, Assistentes de IA, Painel de administração, Instalação / deploy, Outra]
+    validations: {required: true}
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "Saída de `docker service logs impameet_<serviço>` (revise antes de colar)"
+      render: text

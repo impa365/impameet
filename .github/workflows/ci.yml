@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  agent:
+    name: Agent (ruff, mypy, bandit, pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Test stage
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/agent
+          target: test
+          cache-from: type=gha,scope=agent
+          cache-to: type=gha,scope=agent,mode=max
+
+  platform:
+    name: Platform (prettier, eslint, tsc, vitest, integration)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: it
+          POSTGRES_DB: it
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d it"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Test stage (unit tests run during the build)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/platform
+          target: test
+          load: true
+          tags: impameet-platform:test
+          cache-from: type=gha,scope=platform
+          cache-to: type=gha,scope=platform,mode=max
+      - name: Integration tests against Postgres
+        run: >
+          docker run --rm --network host
+          -e TEST_DATABASE_URL=postgres://postgres:it@127.0.0.1:5432/it
+          impameet-platform:test
+          npx vitest run --config vitest.integration.config.ts
+
+  screen:
+    name: Screen (ruff, mypy, bandit, pytest + Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Test stage
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/screen
+          target: test
+          cache-from: type=gha,scope=screen
+          cache-to: type=gha,scope=screen,mode=max
+
+  deploy-files:
+    name: Stack and scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stack file is valid
+        env:
+          PLATFORM_HOST: meet.example.com
+          LIVEKIT_HOST: livekit.example.com
+          SERVER_PUBLIC_IP: 203.0.113.10
+        run: docker stack config -c deploy/stack.yml > /dev/null
+      - name: ShellCheck
+        run: shellcheck -S warning deploy/scripts/*.sh
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: >
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0
+          git /repo --config /repo/.gitleaks.toml --redact --no-banner

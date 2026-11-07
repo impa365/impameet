@@ -1,0 +1,82 @@
+[project]
+name = "meet-impar-agent"
+version = "0.1.0"
+description = "Meet ímpar voice agent: Fish Audio (STT/TTS) + any OpenAI-compatible LLM on LiveKit."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+dependencies = [
+    "livekit-agents[codecs,openai,silero]",
+    "httpx>=0.27",
+    "livekit-plugins-fishaudio",
+    "livekit-plugins-openai",
+    "livekit-plugins-silero",
+    "pydantic>=2.9,<3",
+]
+
+[tool.uv.sources]
+# Realtime STT (fishaudio.STT) landed upstream after the 1.8.10 release and needs core
+# changes from the same unreleased range, so core and plugins are wheels built from one
+# commit: livekit/agents@652eee4ea809ee524fb0ada2383d06eebc3d93a0. Swap back to PyPI pins
+# once a release ships fishaudio.STT. SHA-256 of each wheel is listed in vendor/SHA256SUMS.
+livekit-agents = { path = "vendor/livekit_agents-1.8.10-py3-none-any.whl" }
+livekit-plugins-fishaudio = { path = "vendor/livekit_plugins_fishaudio-1.8.10-py3-none-any.whl" }
+livekit-plugins-openai = { path = "vendor/livekit_plugins_openai-1.8.10-py3-none-any.whl" }
+livekit-plugins-silero = { path = "vendor/livekit_plugins_silero-1.8.10-py3-none-any.whl" }
+
+[project.scripts]
+meet-impar-agent = "meet_impar_agent.main:run"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "bandit>=1.8",
+    "pip-audit>=2.7",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meet_impar_agent"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "ASYNC", "PT", "N", "C4", "PL"]
+ignore = ["PLR0913"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "PLR2004"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["meet_impar_agent"]
+
+[[tool.mypy.overrides]]
+module = ["livekit.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-q --strict-markers --cov=meet_impar_agent --cov-report=term-missing --cov-fail-under=90"
+markers = ["e2e: needs a running LiveKit server (deselected by default)"]
+
+[tool.coverage.run]
+branch = true
+source = ["meet_impar_agent"]
+
+[tool.bandit]
+exclude_dirs = ["tests"]

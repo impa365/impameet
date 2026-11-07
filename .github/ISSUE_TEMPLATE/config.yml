@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Relatar uma vulnerabilidade (privado)
+    url: https://github.com/impa365/impameet/security/advisories/new
+    about: Falhas de segurança são tratadas em sigilo.
+  - name: Impa 365
+    url: https://impa365.com
+    about: Suporte comercial, implantação e personalização.

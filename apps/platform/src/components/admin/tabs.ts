@@ -1,0 +1,38 @@
+import type { MessageKey } from '@/i18n/keys';
+import type { IconName } from '../ui/Icon';
+
+export type AdminTab = 'agents' | 'integrations' | 'users' | 'live' | 'branding' | 'domains' | 'audit';
+
+export const ADMIN_TABS: Record<AdminTab, { label: MessageKey; icon: IconName }> = {
+  agents: { label: 'shell.nav.tabs.agents', icon: 'smart_toy' },
+  integrations: { label: 'shell.nav.tabs.integrations', icon: 'hub' },
+  users: { label: 'shell.nav.tabs.users', icon: 'group' },
+  live: { label: 'shell.nav.tabs.live', icon: 'sensors' },
+  branding: { label: 'shell.nav.tabs.branding', icon: 'palette' },
+  domains: { label: 'shell.nav.tabs.domains', icon: 'language' },
+  audit: { label: 'shell.nav.tabs.audit', icon: 'history' },
+};
+
+export function adminTabsFor(role: 'admin' | 'manager' | 'member'): AdminTab[] {
+  if (role === 'admin') return ['agents', 'integrations', 'users', 'live', 'branding', 'domains', 'audit'];
+  if (role === 'manager') return ['users', 'live'];
+  return [];
+}
+
+export function pickAdminTab(role: 'admin' | 'manager', requested: string | undefined): AdminTab {
+  const tabs = adminTabsFor(role);
+  return tabs.find((t) => t === requested) ?? tabs[0];
+}
+
+export type DashboardView = 'rooms' | 'meetings' | 'recordings' | 'transcripts';
+
+export const DASHBOARD_VIEWS: Record<DashboardView, { label: MessageKey; icon: IconName }> = {
+  rooms: { label: 'shell.nav.views.rooms', icon: 'video_call' },
+  meetings: { label: 'shell.nav.views.meetings', icon: 'calendar_month' },
+  recordings: { label: 'shell.nav.views.recordings', icon: 'video_library' },
+  transcripts: { label: 'shell.nav.views.transcripts', icon: 'description' },
+};
+
+export function pickDashboardView(requested: string | undefined): DashboardView {
+  return (Object.keys(DASHBOARD_VIEWS) as DashboardView[]).find((v) => v === requested) ?? 'rooms';
+}

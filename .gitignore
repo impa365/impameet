@@ -1,0 +1,95 @@
+# ---------------------------------------------------------------------------
+# Local-only material (never published)
+# ---------------------------------------------------------------------------
+# Upstream reference clones used for research
+/jitsi-meet/
+/livekit/
+/apps/web/
+# Private environments (server addresses, hostnames, firewall rules)
+/deploy/impa-teste/
+/deploy/local/
+# Internal planning notes
+/ROADMAP-*.md
+# Editor and agent tooling
+/.cursor/
+/.claude/
+
+# ---------------------------------------------------------------------------
+# Secrets: they live in Docker Swarm secrets, never in the repository
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.env
+!*.env.example
+*.secret
+*.secrets
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.csr
+id_rsa*
+id_ed25519*
+*.kdbx
+secrets/
+/deploy/secrets/
+credentials*.json
+service-account*.json
+*token*.txt
+
+# ---------------------------------------------------------------------------
+# Data that may contain personal information
+# ---------------------------------------------------------------------------
+/*.sql
+*.sql.gz
+*.dump
+*.backup
+/backups/
+/recordings/
+*.mp4
+*.webm
+*.log
+/logs/
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# ---------------------------------------------------------------------------
+# Node
+# ---------------------------------------------------------------------------
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+.npm/
+
+# ---------------------------------------------------------------------------
+# OS / editors
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*~

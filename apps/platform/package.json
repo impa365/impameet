@@ -1,0 +1,56 @@
+{
+  "name": "impa-meet-platform",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "migrate": "node scripts/migrate.mjs",
+    "lint": "next lint --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
+    "@livekit/components-react": "2.9.24",
+    "@livekit/components-styles": "1.2.0",
+    "@livekit/track-processors": "0.8.2",
+    "livekit-client": "2.23.0",
+    "livekit-server-sdk": "2.19.1",
+    "next": "15.5.28",
+    "nodemailer": "10.3.1",
+    "postgres": "4.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "server-only": "0.0.1",
+    "zod": "4.6.7"
+  },
+  "overrides": {
+    "postcss": "^8.5.18",
+    "lodash-es": "4.18.1",
+    "katex": "0.19.1",
+    "nanoid@3": "3.3.20",
+    "nanoid@4": "5.1.16"
+  },
+  "devDependencies": {
+    "@types/dom-mediacapture-transform": "0.1.11",
+    "@types/node": "24.12.4",
+    "@types/nodemailer": "8.0.2",
+    "@types/react": "18.3.28",
+    "@types/react-dom": "18.3.7",
+    "@vitest/coverage-v8": "5.1.0",
+    "eslint": "9.39.4",
+    "eslint-config-next": "15.5.18",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3",
+    "vitest": "5.1.0"
+  }
+}

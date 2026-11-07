@@ -1,0 +1,208 @@
+"""Which agent a room asked for, and how it should behave.
+
+Rooms on the IMPA Meet platform pick a configured agent; the dispatch metadata carries its
+id and the worker fetches the configuration from the platform's internal API. Without a
+platform (or when the lookup fails) the agent defined by this worker's environment is used.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Literal
+
+import aiohttp
+
+from . import redaction
+from .config import Settings
+from .languages import clean_voices
+
+logger = logging.getLogger("meet_impar_agent.profile")
+
+ListenMode = Literal["everyone", "moderators", "members"]
+RespondMode = Literal["always", "when_named"]
+# Who may tell the agent to stop talking (and to talk again); "disabled" turns the feature off.
+MutePolicy = Literal["everyone", "moderators", "disabled"]
+MUTE_POLICIES = ("everyone", "moderators", "disabled")
+
+KNOWLEDGE_HEADER = (
+    "\n\nBASE DE CONHECIMENTO (use estas informações para responder; se a resposta não estiver "
+    "aqui nem for conhecimento geral seguro, diga que não sabe):\n"
+)
+LOOKUP_TIMEOUT_S = 5.0
+MAX_AGENT_ID_LENGTH = 64
+
+
+@dataclass(frozen=True)
+class AgentProfile:
+    name: str
+    instructions: str
+    greeting: str
+    voice_id: str | None
+    tts_model: str
+    llm_model: str
+    listen_mode: ListenMode = "everyone"
+    respond_mode: RespondMode = "always"
+    mute_policy: MutePolicy = "everyone"
+    # The agent's own provider credentials (Integrações); None uses the worker's.
+    llm_base_url: str | None = field(default=None, repr=False)
+    llm_api_key: str | None = field(default=None, repr=False)
+    fish_api_key: str | None = field(default=None, repr=False)
+    stt_model: str = ""
+    # Fish Audio voice per language ("pt", "en", "es"); empty uses `voice_id` for everything.
+    voices: dict[str, str] = field(default_factory=dict)
+
+    def secrets(self) -> list[str]:
+        return [s for s in (self.llm_api_key, self.fish_api_key) if s]
+
+
+def _metadata(metadata: str | None) -> dict[str, Any]:
+    if not metadata or not isinstance(metadata, str):
+        return {}
+    try:
+        data = json.loads(metadata)
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def agent_id_from_metadata(metadata: str | None) -> str | None:
+    """The configured agent id in the dispatch metadata, if any."""
+    agent_id = _metadata(metadata).get("agentId")
+    valid = isinstance(agent_id, str) and 0 < len(agent_id) <= MAX_AGENT_ID_LENGTH
+    return agent_id if valid else None
+
+
+def job_mode(metadata: str | None) -> Literal["voice", "captions"]:
+    """The platform dispatches the same worker either as the voice agent or as live captions."""
+    return "captions" if _metadata(metadata).get("mode") == "captions" else "voice"
+
+
+MAX_DISPLAY_NAME_LENGTH = 60
+DEFAULT_DISPLAY_NAME = "Assistente de IA"
+CAPTIONS_DISPLAY_NAME = "Legendas"
+
+
+MAX_ABOUT_LENGTH = 160
+
+
+def _clean(text: str) -> str:
+    return " ".join("".join(ch for ch in text if ch.isprintable()).split())
+
+
+def agent_about(metadata: str | None) -> str:
+    """What the agent is for (optional), shown next to its name in the room."""
+    about = _metadata(metadata).get("agentDescription")
+    return _clean(about)[:MAX_ABOUT_LENGTH] if isinstance(about, str) else ""
+
+
+def join_attributes(metadata: str | None) -> dict[str, str]:
+    """Attributes the agent joins with: its mode, which agent it is and what it does."""
+    attributes: dict[str, str] = {"impa.mode": job_mode(metadata)}
+    if agent_id := agent_id_from_metadata(metadata):
+        attributes["impa.agent"] = agent_id
+    if about := agent_about(metadata):
+        attributes["impa.about"] = about
+    return attributes
+
+
+def display_name(metadata: str | None) -> str:
+    """The name people see on the agent's tile, sent by the platform with the dispatch."""
+    if job_mode(metadata) == "captions":
+        return CAPTIONS_DISPLAY_NAME
+    name = _metadata(metadata).get("agentName")
+    if not isinstance(name, str):
+        return DEFAULT_DISPLAY_NAME
+    return _clean(name)[:MAX_DISPLAY_NAME_LENGTH] or DEFAULT_DISPLAY_NAME
+
+
+def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
+    """The agent exactly as configured on the platform, or None when a choice is missing.
+
+    Nothing falls back to this worker's own provider, model or voice: an agent without its
+    LLM integration and model, its Fish Audio integration, voice, speech and transcription
+    models does not join a meeting.
+    """
+    llm = _section(remote, "llm")
+    fish = _section(remote, "fish")
+    voices = clean_voices(remote.get("voices"))
+    required = {
+        "name": _text(remote.get("name")),
+        "instructions": _text(remote.get("instructions")),
+        "llm_base_url": _text(llm.get("baseUrl")),
+        "llm_api_key": _text(llm.get("apiKey")),
+        "llm_model": _text(remote.get("llmModel")),
+        "fish_api_key": _text(fish.get("apiKey")),
+        "tts_model": _text(remote.get("ttsModel")),
+        "stt_model": _text(remote.get("sttModel")),
+    }
+    missing = [key for key, value in required.items() if value is None]
+    if not voices:
+        missing.append("voices")
+    if missing:
+        logger.error("agent is not fully configured", extra={"missing": missing})
+        return None
+    instructions = str(required["instructions"])
+    knowledge = str(remote.get("knowledge") or "").strip()
+    if knowledge:
+        instructions = f"{instructions}{KNOWLEDGE_HEADER}{knowledge}"
+    listen = remote.get("listenMode")
+    respond = remote.get("respondMode")
+    mute = remote.get("mutePolicy")
+    return AgentProfile(
+        name=str(required["name"]),
+        instructions=instructions,
+        greeting=str(remote.get("greeting") or ""),
+        voice_id=next(iter(voices.values())),
+        tts_model=str(required["tts_model"]),
+        stt_model=str(required["stt_model"]),
+        llm_model=str(required["llm_model"]),
+        listen_mode=listen if listen in ("everyone", "moderators", "members") else "everyone",
+        respond_mode=respond if respond in ("always", "when_named") else "always",
+        mute_policy=mute if mute in MUTE_POLICIES else "everyone",
+        llm_base_url=required["llm_base_url"],
+        llm_api_key=required["llm_api_key"],
+        fish_api_key=required["fish_api_key"],
+        voices=voices,
+    )
+
+
+def _section(remote: dict[str, Any], key: str) -> dict[str, Any]:
+    value = remote.get(key)
+    return value if isinstance(value, dict) else {}
+
+
+def _text(value: object) -> str | None:
+    return value.strip() or None if isinstance(value, str) else None
+
+
+async def load_profile(settings: Settings, metadata: str | None) -> AgentProfile | None:
+    """The room's agent from the platform; None (and the agent stays out) if it cannot be used."""
+    agent_id = agent_id_from_metadata(metadata)
+    platform = settings.platform
+    if not agent_id or platform is None:
+        logger.error("no configured agent to load", extra={"has_platform": platform is not None})
+        return None
+    url = f"{str(platform.url).rstrip('/')}/api/internal/agents/{agent_id}"
+    headers = {"x-internal-token": platform.token.get_secret_value()}
+    try:
+        timeout = aiohttp.ClientTimeout(total=LOOKUP_TIMEOUT_S)
+        async with (
+            aiohttp.ClientSession(timeout=timeout) as http,
+            http.get(url, headers=headers) as res,
+        ):
+            if res.status != 200:  # noqa: PLR2004
+                logger.warning("agent lookup failed", extra={"status": res.status})
+                return None
+            body = await res.json()
+    except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
+        logger.warning("agent lookup failed", extra={"error": type(exc).__name__})
+        return None
+    remote = body.get("agent") if isinstance(body, dict) else None
+    if not isinstance(remote, dict):
+        return None
+    profile = profile_from_platform(remote)
+    if profile is not None:
+        redaction.extend(profile.secrets())
+    return profile

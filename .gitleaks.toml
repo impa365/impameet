@@ -1,0 +1,12 @@
+title = "IMPA Meet secret scan"
+
+[extend]
+useDefault = true
+
+# The test suites use obviously fake credentials built from the sequence "0123456789"
+# (e.g. "sk-test-0123456789"). Only values containing it are allowed; any other key-looking
+# value fails the scan, in tests or anywhere else.
+[allowlist]
+description = "Fake credentials built from 0123456789"
+regexTarget = "secret"
+regexes = ['''0123456789''']

@@ -1,0 +1,36 @@
+IMPA Meet
+Copyright 2026 Impa 365 (https://impa365.com)
+
+This product was created and is maintained by Impa 365.
+Source code: https://github.com/impa365/impameet
+
+Licensed under the Apache License, Version 2.0 (see the LICENSE file).
+
+ATTRIBUTION REQUIRED
+--------------------
+Under section 4 of the Apache License 2.0, anyone who redistributes this software, modified
+or not, in source or binary form (including container images and hosted/SaaS deployments
+that ship it), must:
+
+  1. include a copy of the LICENSE file;
+  2. keep this NOTICE file, with the credit to Impa 365 above, in the distribution;
+  3. keep every copyright, patent, trademark and attribution notice in the source code;
+  4. state clearly in the changed files that they were modified.
+
+You may add your own notices next to this one, but you may not remove or alter it.
+The names "Impa 365", "IMPA365" and "IMPA Meet" and their logos are not licensed for use as
+the name of a derived product (section 6 of the License).
+
+THIRD-PARTY SOFTWARE
+--------------------
+IMPA Meet builds on open-source projects, each under its own license:
+
+  - LiveKit server, Egress, Agents, client and components (Apache-2.0) - https://livekit.io
+  - Next.js and React (MIT)
+  - Excalidraw (MIT) - collaborative whiteboard
+  - MediaPipe (Apache-2.0) - background blur and virtual backgrounds
+  - Material Symbols (Apache-2.0) - icons
+  - Playwright and Chromium (Apache-2.0 / BSD) - AI screen sharing
+  - postgres.js (Unlicense), Zod (MIT), Pydantic (MIT), Nodemailer (MIT-0)
+
+The full license text of each dependency ships with the package itself.

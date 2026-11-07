@@ -1,0 +1,315 @@
+# IMPA Meet — Docker Swarm / Portainer stack
+# https://github.com/impa365/impameet
+#
+# Before deploying:
+#   1. Create the secrets on a manager node:  bash deploy/scripts/prepare.sh
+#   2. Point two DNS records at the server:   PLATFORM_HOST and LIVEKIT_HOST
+#   3. Open the media ports on the firewall:  7881/tcp and 7882/udp
+#   4. Set the variables from deploy/.env.example (Portainer: "Environment variables")
+#
+# Deploy from the CLI:  bash deploy/scripts/deploy.sh
+# Deploy from Portainer: Stacks > Add stack > Repository (this file) or paste it in the editor.
+#
+# Expects an existing Traefik (v2 or v3) on an external overlay network with a Let's Encrypt
+# resolver, as in most Portainer setups. Names can be changed with the TRAEFIK_* variables.
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  volumes:
+    - type: tmpfs
+      target: /tmp
+      tmpfs: {size: 67108864}
+
+services:
+  # ---------------------------------------------------------------------------
+  # Web platform: rooms, admin panel, integrations, recordings (Next.js)
+  # ---------------------------------------------------------------------------
+  platform:
+    image: ghcr.io/impa365/impameet-platform:${IMPAMEET_VERSION:-latest}
+    environment:
+      PLATFORM_DOMAIN: ${PLATFORM_HOST:?set PLATFORM_HOST}
+      DEFAULT_TENANT: ${DEFAULT_TENANT:-}
+      LIVEKIT_URL: wss://${LIVEKIT_HOST:?set LIVEKIT_HOST}
+      LIVEKIT_API_URL: http://livekit:7880
+      DATABASE_URL_FILE: /run/secrets/meet_platform_database_url
+      LIVEKIT_API_KEY_FILE: /run/secrets/meet_livekit_api_key
+      LIVEKIT_API_SECRET_FILE: /run/secrets/meet_livekit_api_secret
+      INTERNAL_TOKEN_FILE: /run/secrets/meet_platform_internal_token
+      ENCRYPTION_KEY_FILE: /run/secrets/meet_platform_encryption_key
+      RECORDINGS_DIR: /recordings
+      EGRESS_OUTPUT_DIR: /out
+      # Custom domains per organization (optional, see docs/deploy.md)
+      TRAEFIK_SERVICE: impameet_platform@${TRAEFIK_PROVIDER:-swarm}
+      TRAEFIK_CERT_RESOLVER: ${TRAEFIK_CERT_RESOLVER:-letsencryptresolver}
+      TRAEFIK_ENTRYPOINT: ${TRAEFIK_ENTRYPOINT:-websecure}
+      # E-mail invitations (optional): create the secret meet_smtp_url
+      # (smtps://user:password@host:465), add it below and uncomment:
+      # SMTP_URL_FILE: /run/secrets/meet_smtp_url
+      # MAIL_FROM: IMPA Meet <meet@example.com>
+    secrets:
+      - {source: meet_platform_database_url, mode: 0400, uid: "10001"}
+      - {source: meet_livekit_api_key, mode: 0400, uid: "10001"}
+      - {source: meet_livekit_api_secret, mode: 0400, uid: "10001"}
+      - {source: meet_platform_internal_token, mode: 0400, uid: "10001"}
+      - {source: meet_platform_encryption_key, mode: 0400, uid: "10001"}
+    networks: [meet, traefik]
+    read_only: true
+    cap_drop: [ALL]
+    volumes:
+      - type: tmpfs
+        target: /tmp
+        tmpfs: {size: 67108864}
+      - type: volume
+        source: recordings
+        target: /recordings
+    deploy:
+      replicas: 1
+      restart_policy: {condition: any, delay: 5s}
+      update_config: {order: start-first, failure_action: rollback, monitor: 30s}
+      resources:
+        limits: {cpus: "1", memory: 768M}
+      labels:
+        traefik.enable: "true"
+        traefik.docker.network: ${TRAEFIK_NETWORK:-network_public}
+        traefik.http.routers.impameet_platform.rule: Host(`${PLATFORM_HOST}`)
+        traefik.http.routers.impameet_platform.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+        traefik.http.routers.impameet_platform.tls.certresolver: ${TRAEFIK_CERT_RESOLVER:-letsencryptresolver}
+        traefik.http.services.impameet_platform.loadbalancer.server.port: "3000"
+
+  # ---------------------------------------------------------------------------
+  # AI voice agents (LiveKit Agents + Fish Audio + any OpenAI-compatible LLM).
+  # Providers, models and voices are chosen per agent in the admin panel.
+  # ---------------------------------------------------------------------------
+  agent:
+    image: ghcr.io/impa365/impameet-agent:${IMPAMEET_VERSION:-latest}
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_API_KEY_FILE: /run/secrets/meet_livekit_api_key
+      LIVEKIT_API_SECRET_FILE: /run/secrets/meet_livekit_api_secret
+      PLATFORM_URL: http://platform:3000
+      PLATFORM_TOKEN_FILE: /run/secrets/meet_platform_internal_token
+      # AI screen sharing (remove these two lines and the screen service to disable it)
+      SCREEN_URL: http://screen:8090
+      SCREEN_TOKEN_FILE: /run/secrets/meet_screen_token
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    secrets:
+      - {source: meet_livekit_api_key, mode: 0400, uid: "10001"}
+      - {source: meet_livekit_api_secret, mode: 0400, uid: "10001"}
+      - {source: meet_platform_internal_token, mode: 0400, uid: "10001"}
+      - {source: meet_screen_token, mode: 0400, uid: "10001"}
+    networks: [meet, meet_screen]
+    <<: *hardening
+    stop_grace_period: 60s
+    deploy:
+      replicas: 1
+      restart_policy: {condition: any, delay: 5s}
+      update_config: {order: start-first, failure_action: rollback, monitor: 60s}
+      rollback_config: {order: stop-first}
+      resources:
+        limits: {cpus: "2", memory: 2G}
+
+  # ---------------------------------------------------------------------------
+  # Optional: a headless browser the AI uses to present pages as a screen share.
+  # Isolated network: no route to the database or the platform.
+  # ---------------------------------------------------------------------------
+  screen:
+    image: ghcr.io/impa365/impameet-screen:${IMPAMEET_VERSION:-latest}
+    environment:
+      LIVEKIT_URL: wss://${LIVEKIT_HOST}
+      LIVEKIT_API_KEY_FILE: /run/secrets/meet_livekit_api_key
+      LIVEKIT_API_SECRET_FILE: /run/secrets/meet_livekit_api_secret
+      SCREEN_TOKEN_FILE: /run/secrets/meet_screen_token
+    secrets:
+      - {source: meet_livekit_api_key, mode: 0400, uid: "10001"}
+      - {source: meet_livekit_api_secret, mode: 0400, uid: "10001"}
+      - {source: meet_screen_token, mode: 0400, uid: "10001"}
+    networks: [meet_screen]
+    read_only: true
+    cap_drop: [ALL]
+    volumes:
+      - type: tmpfs
+        target: /tmp
+        tmpfs: {size: 536870912}
+    stop_grace_period: 20s
+    deploy:
+      replicas: 1
+      restart_policy: {condition: any, delay: 5s}
+      update_config: {order: start-first, failure_action: rollback, monitor: 30s}
+      resources:
+        limits: {cpus: "2", memory: 1536M}
+
+  # ---------------------------------------------------------------------------
+  # LiveKit: WebRTC media server. Signalling goes through Traefik; media goes straight to
+  # the host on 7881/tcp and 7882/udp (one multiplexed UDP port, no port range).
+  # ---------------------------------------------------------------------------
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          tcp_port: 7881
+          udp_port: 7882
+          node_ip: ${SERVER_PUBLIC_IP:?set SERVER_PUBLIC_IP}
+          use_external_ip: false
+          # Only the host bridge (docker_gwbridge): clients arrive there and replies are
+          # NAT'ed back to node_ip. Overlay interfaces have no route to the internet.
+          ips:
+            includes:
+              - ${DOCKER_BRIDGE_SUBNET:-172.18.0.0/16}
+        key_file: /run/secrets/meet_livekit_keys
+        redis:
+          address: redis:6379
+        room:
+          empty_timeout: 300
+          departure_timeout: 20
+        logging:
+          level: info
+          json: true
+    secrets:
+      - {source: meet_livekit_keys, target: meet_livekit_keys, mode: 0400}
+    networks: [meet, meet_redis, traefik]
+    ports:
+      - {target: 7881, published: 7881, protocol: tcp, mode: host}
+      - {target: 7882, published: 7882, protocol: udp, mode: host}
+    <<: *hardening
+    deploy:
+      replicas: 1
+      restart_policy: {condition: any, delay: 5s}
+      update_config: {order: stop-first}
+      resources:
+        limits: {cpus: "1.5", memory: 1G}
+      labels:
+        traefik.enable: "true"
+        traefik.docker.network: ${TRAEFIK_NETWORK:-network_public}
+        traefik.http.routers.impameet_livekit.rule: Host(`${LIVEKIT_HOST}`)
+        traefik.http.routers.impameet_livekit.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+        traefik.http.routers.impameet_livekit.tls.certresolver: ${TRAEFIK_CERT_RESOLVER:-letsencryptresolver}
+        traefik.http.services.impameet_livekit.loadbalancer.server.port: "7880"
+
+  # ---------------------------------------------------------------------------
+  # Recording (LiveKit Egress): composes the room in a headless Chrome and writes MP4
+  # files to the recordings volume, which the platform serves to authorised users.
+  # The config is written to tmpfs from the secrets, so the API secret never appears in
+  # this file, the image or the process environment.
+  # ---------------------------------------------------------------------------
+  egress:
+    image: livekit/egress:v1.15.0
+    entrypoint:
+      - /tini
+      - --
+      - /bin/bash
+      - -c
+      - |
+        set -euo pipefail
+        umask 077
+        {
+          printf 'api_key: %s\n' "$$(cat /run/secrets/meet_livekit_api_key)"
+          printf 'api_secret: %s\n' "$$(cat /run/secrets/meet_livekit_api_secret)"
+          printf 'ws_url: ws://livekit:7880\nredis:\n  address: redis:6379\n'
+          printf 'health_port: 8080\nlog_level: info\n'
+          printf 'cpu_cost:\n  room_composite_cpu_cost: 1.5\n'
+        } > /tmp/egress.yaml
+        umask 022
+        export EGRESS_CONFIG_FILE=/tmp/egress.yaml
+        exec /entrypoint.sh
+    secrets:
+      - {source: meet_livekit_api_key, mode: 0400, uid: "1001"}
+      - {source: meet_livekit_api_secret, mode: 0400, uid: "1001"}
+    networks: [meet_redis]
+    volumes:
+      - type: volume
+        source: recordings
+        target: /out
+      - type: tmpfs
+        target: /tmp
+        tmpfs: {size: 1048576}
+    stop_grace_period: 60s
+    deploy:
+      replicas: 1
+      restart_policy: {condition: any, delay: 10s}
+      resources:
+        limits: {cpus: "2.5", memory: 3G}
+
+  # Gives the recordings volume the ownership Egress (uid 1001, writes) and the platform
+  # (gid 10001, reads and deletes) need, then exits.
+  recordings-init:
+    image: alpine:3.22
+    command: ["sh", "-c", "chown 1001:10001 /out && chmod 2770 /out"]
+    volumes:
+      - type: volume
+        source: recordings
+        target: /out
+    networks: [meet_redis]
+    deploy:
+      restart_policy: {condition: none}
+
+  # Message bus between LiveKit and Egress; reachable only on meet_redis, nothing persisted.
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb"]
+    networks: [meet_redis]
+    user: "999:1000"
+    read_only: true
+    cap_drop: [ALL]
+    volumes:
+      - type: tmpfs
+        target: /data
+        tmpfs: {size: 16777216}
+    deploy:
+      replicas: 1
+      restart_policy: {condition: any, delay: 5s}
+      resources:
+        limits: {cpus: "0.5", memory: 192M}
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: impa
+      POSTGRES_DB: impa_meet
+      POSTGRES_PASSWORD_FILE: /run/secrets/meet_pg_password
+    secrets: [meet_pg_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [meet]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U impa -d impa_meet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      replicas: 1
+      restart_policy: {condition: any, delay: 5s}
+      resources:
+        limits: {cpus: "1", memory: 1G}
+
+volumes:
+  pgdata: {}
+  recordings: {}
+
+networks:
+  meet:
+    driver: overlay
+    attachable: true
+    driver_opts: {encrypted: "true"}
+  meet_redis:
+    driver: overlay
+    driver_opts: {encrypted: "true"}
+  meet_screen:
+    driver: overlay
+    driver_opts: {encrypted: "true"}
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-network_public}
+
+# Created by deploy/scripts/prepare.sh (values generated on the server, never printed).
+secrets:
+  meet_livekit_keys: {external: true}
+  meet_livekit_api_key: {external: true}
+  meet_livekit_api_secret: {external: true}
+  meet_pg_password: {external: true}
+  meet_platform_database_url: {external: true}
+  meet_platform_internal_token: {external: true}
+  meet_platform_encryption_key: {external: true}
+  meet_screen_token: {external: true}
