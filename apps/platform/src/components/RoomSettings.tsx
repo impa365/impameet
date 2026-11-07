@@ -43,6 +43,7 @@ interface Settings {
   allowGuests: boolean;
   boardPolicy: CollabPolicy;
   pollsPolicy: CollabPolicy;
+  thinkingSound: boolean;
   invites: string[];
   agentsAllowed: boolean;
   agentIds: string[];
@@ -216,6 +217,26 @@ export function RoomSettingsEditor(props: {
             }
           />
           <p className="muted small-print">{t('dashboard.roomSettings.agentsNote')}</p>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.thinkingSound}
+              onChange={(e) =>
+                void patch(
+                  { thinkingSound: e.target.checked },
+                  t(
+                    e.target.checked
+                      ? 'dashboard.roomSettings.thinkingOn'
+                      : 'dashboard.roomSettings.thinkingOff',
+                  ),
+                )
+              }
+            />
+            <span>
+              {t('dashboard.roomSettings.thinkingSound')}
+              <small>{t('dashboard.roomSettings.thinkingHint')}</small>
+            </span>
+          </label>
         </fieldset>
       )}
       <div className="error" role="alert">

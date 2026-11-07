@@ -18,6 +18,7 @@ from .config import Settings, get_settings
 from .listening import Speaker, next_linked, same_name
 from .persona import Talker, VoiceAgent
 from .pipeline import (
+    ThinkingAudio,
     build_conn_options,
     build_llm,
     build_stt,
@@ -25,13 +26,22 @@ from .pipeline import (
     build_tts,
     build_turn_handling,
 )
-from .profile import AgentProfile, ListenMode, display_name, job_mode, join_attributes, load_profile
+from .profile import (
+    AgentProfile,
+    ListenMode,
+    display_name,
+    job_mode,
+    join_attributes,
+    load_profile,
+    thinking_sound,
+)
 from .screen import ScreenClient
 
 logger = logging.getLogger("meet_impar_agent")
 MUTED_ATTRIBUTE = "impa.muted"
 MAX_TOOL_STEPS = 10
 HANDOFF_TOPIC = "impa.handoff"
+AGENT_SETTINGS_TOPIC = "impa.agent"
 MAX_HANDOFF_CHARS = 500
 
 
@@ -84,7 +94,9 @@ def speaker_lookup(session: AgentSession[Any]) -> Callable[[], Talker | None]:
         if participant is None:
             return None
         role = (participant.attributes or {}).get("role", "participant")
-        return Talker(name=participant.name or participant.identity, role=role)
+        return Talker(
+            name=participant.name or participant.identity, role=role, identity=participant.identity
+        )
 
     return lookup
 
@@ -233,9 +245,28 @@ async def entrypoint(ctx: JobContext) -> None:
     follow_speakers(ctx.room, session, profile.listen_mode)
     follow_peers(ctx.room, agent)
 
-    if thinking_audio := build_thinking_audio(settings.agent):
+    if thinking_audio := build_thinking_audio(
+        settings.agent, enabled=thinking_sound(ctx.job.metadata)
+    ):
         await thinking_audio.start(room=ctx.room, agent_session=session)
         ctx.add_shutdown_callback(thinking_audio.aclose)
+        follow_room_settings(ctx.room, thinking_audio)
+
+
+def follow_room_settings(room: rtc.Room, thinking_audio: ThinkingAudio) -> None:
+    """Applies the room's agent settings changed during the meeting (the typing sound)."""
+
+    def on_data(packet: rtc.DataPacket) -> None:
+        if packet.topic != AGENT_SETTINGS_TOPIC or packet.participant is not None:
+            return  # only the server (no participant) sends room settings
+        try:
+            data = json.loads(packet.data)
+        except ValueError:
+            return
+        if isinstance(data, dict) and isinstance(data.get("thinkingSound"), bool):
+            thinking_audio.set_enabled(data["thinkingSound"])
+
+    room.on("data_received", on_data)
 
 
 async def on_request(request: JobRequest) -> None:

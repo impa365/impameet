@@ -86,7 +86,7 @@ async def test_entrypoint_wires_the_pipeline_into_the_room(
         main, "AgentSession", lambda **kw: sessions.append(FakeSession(**kw)) or sessions[-1]
     )
     thinking_audio = MagicMock(start=AsyncMock(), aclose=AsyncMock())
-    monkeypatch.setattr(main, "build_thinking_audio", lambda _agent: thinking_audio)
+    monkeypatch.setattr(main, "build_thinking_audio", lambda _agent, **_: thinking_audio)
     monkeypatch.setattr(
         main, "load_profile", AsyncMock(return_value=profile(voice_id="voz-kaiser"))
     )
@@ -117,6 +117,7 @@ async def test_entrypoint_wires_the_pipeline_into_the_room(
         "participant_connected",
         "participant_disconnected",
         "participant_attributes_changed",
+        "data_received",  # the room's typing-sound switch, applied live
     ]
     assert ctx.room.register_text_stream_handler.call_args.args[0] == main.HANDOFF_TOPIC
 
@@ -136,7 +137,7 @@ async def test_entrypoint_applies_the_room_agent_profile(
     monkeypatch.setattr(
         main, "AgentSession", lambda **kw: sessions.append(FakeSession(**kw)) or sessions[-1]
     )
-    monkeypatch.setattr(main, "build_thinking_audio", lambda _agent: None)
+    monkeypatch.setattr(main, "build_thinking_audio", lambda _agent, **_: None)
     chosen = profile(name="Ana", voice_id="voz-ana", tts_model="drama-3", llm_model="qwen")
     monkeypatch.setattr(main, "load_profile", AsyncMock(return_value=chosen))
     ctx = MagicMock()
@@ -248,11 +249,11 @@ class TestSpeakerLookup:
             identity="u-1", attributes={"role": "moderator"}
         )
         session.room_io.linked_participant.name = "Nil"
-        assert main.speaker_lookup(session)() == Talker("Nil", "moderator")
+        assert main.speaker_lookup(session)() == Talker("Nil", "moderator", identity="u-1")
 
         session.room_io.linked_participant = MagicMock(identity="g-7", attributes=None)
         session.room_io.linked_participant.name = ""
-        assert main.speaker_lookup(session)() == Talker("g-7", "participant")
+        assert main.speaker_lookup(session)() == Talker("g-7", "participant", identity="g-7")
 
     def test_nobody_before_start_or_when_unlinked(self) -> None:
         session = MagicMock()
@@ -276,7 +277,7 @@ async def test_greeting_is_spoken_on_enter() -> None:
     with mp.context():
         mp.setattr(VoiceAgent, "session", property(lambda _self: session))
         await agent.on_enter()
-    session.say.assert_called_once_with("Olá!", allow_interruptions=True)
+    session.say.assert_called_once_with("Olá!")
 
 
 async def test_no_greeting_means_silence_on_enter() -> None:

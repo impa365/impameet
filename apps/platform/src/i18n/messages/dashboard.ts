@@ -142,6 +142,11 @@ export default defineMessages(
       agentsNote:
         'Marque para o assistente entrar; desmarque para ele sair. Com mais de um, cada um responde quando chamam o seu nome. Para editar um agente, use Administração › Agentes de IA.',
       noAgents: 'Nenhum agente criado ainda.',
+      thinkingSound: 'Som de digitação enquanto a IA pensa',
+      thinkingHint:
+        'Um teclado baixinho toca enquanto o assistente prepara a resposta, para ninguém achar que ele travou.',
+      thinkingOn: 'Som de digitação ligado nesta sala.',
+      thinkingOff: 'Som de digitação desligado nesta sala.',
       defaultTag: '(padrão)',
       agentLimit: 'Limite de {max} assistentes por sala.',
       agentIncomplete: 'Configuração incompleta: complete em Administração › Agentes de IA.',
@@ -352,6 +357,11 @@ export default defineMessages(
         agentsNote:
           'Check an assistant to add it; uncheck it to remove it. With more than one, each replies when called by name. To edit an agent, go to Administration › AI agents.',
         noAgents: 'No agents created yet.',
+        thinkingSound: 'Typing sound while the AI thinks',
+        thinkingHint:
+          'A soft keyboard plays while the assistant prepares its answer, so nobody thinks it froze.',
+        thinkingOn: 'Typing sound turned on for this room.',
+        thinkingOff: 'Typing sound turned off for this room.',
         defaultTag: '(default)',
         agentLimit: 'Up to {max} assistants per room.',
         agentIncomplete: 'Incomplete setup: finish it in Administration › AI agents.',
@@ -561,6 +571,11 @@ export default defineMessages(
         agentsNote:
           'Marca un asistente para que entre; desmárcalo para que salga. Si hay más de uno, cada uno responde cuando lo llaman por su nombre. Para editar un agente, ve a Administración › Agentes de IA.',
         noAgents: 'Todavía no hay agentes creados.',
+        thinkingSound: 'Sonido de teclado mientras la IA piensa',
+        thinkingHint:
+          'Suena un teclado suave mientras el asistente prepara la respuesta, para que nadie piense que se colgó.',
+        thinkingOn: 'Sonido de teclado activado en esta sala.',
+        thinkingOff: 'Sonido de teclado desactivado en esta sala.',
         defaultTag: '(predeterminado)',
         agentLimit: 'Límite de {max} asistentes por sala.',
         agentIncomplete: 'Configuración incompleta: complétala en Administración › Agentes de IA.',

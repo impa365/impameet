@@ -42,6 +42,7 @@ export async function GET(
       allowGuests: room.allowGuests,
       boardPolicy: room.boardPolicy,
       pollsPolicy: room.pollsPolicy,
+      thinkingSound: room.thinkingSound,
       invites,
       agentsAllowed: plan.agents,
       agentIds: room.agentIds,

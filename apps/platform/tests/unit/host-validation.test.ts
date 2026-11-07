@@ -87,6 +87,7 @@ describe('validation', () => {
       access: 'trusted',
       boardPolicy: 'everyone',
       pollsPolicy: 'everyone',
+      thinkingSound: true,
       agentEnabled: false,
     });
     expect(createRoomInput.safeParse({ name: 'x', maxParticipants: 1 }).success).toBe(false);

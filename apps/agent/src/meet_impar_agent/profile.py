@@ -79,6 +79,11 @@ def agent_id_from_metadata(metadata: str | None) -> str | None:
     return agent_id if valid else None
 
 
+def thinking_sound(metadata: str | None) -> bool:
+    """The room's typing-sound switch, sent with the dispatch (on unless the room turned it off)."""
+    return _metadata(metadata).get("thinkingSound") is not False
+
+
 def job_mode(metadata: str | None) -> Literal["voice", "captions"]:
     """The platform dispatches the same worker either as the voice agent or as live captions."""
     return "captions" if _metadata(metadata).get("mode") == "captions" else "voice"

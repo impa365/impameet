@@ -128,11 +128,35 @@ def build_conn_options(llm: LLMSettings) -> SessionConnectOptions:
     )
 
 
-def build_thinking_audio(agent: AgentSettings) -> BackgroundAudioPlayer | None:
-    """Soft keyboard typing while the LLM works, so the wait never sounds like dead air."""
+class ThinkingAudio(BackgroundAudioPlayer):
+    """The typing sound, switched on or off per room, also while the meeting runs."""
+
+    def __init__(self, *, enabled: bool, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.enabled = enabled
+
+    def set_enabled(self, enabled: bool) -> None:
+        self.enabled = enabled
+        if not enabled and self._thinking_handle:
+            self._thinking_handle.stop()
+
+    def _agent_state_changed(self, ev: Any) -> None:
+        if self.enabled:
+            super()._agent_state_changed(ev)
+        elif self._thinking_handle:
+            self._thinking_handle.stop()
+
+
+def build_thinking_audio(agent: AgentSettings, *, enabled: bool = True) -> ThinkingAudio | None:
+    """Soft keyboard typing while the LLM works, so the wait never sounds like dead air.
+
+    The worker setting turns the feature off for every room; ``enabled`` is the room's own
+    switch, which can still change during the meeting (``ThinkingAudio.set_enabled``).
+    """
     if not agent.thinking_sound or agent.thinking_volume == 0:
         return None
-    return BackgroundAudioPlayer(
+    return ThinkingAudio(
+        enabled=enabled,
         thinking_sound=[
             AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=agent.thinking_volume),
             AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING2, volume=agent.thinking_volume),
@@ -141,10 +165,15 @@ def build_thinking_audio(agent: AgentSettings) -> BackgroundAudioPlayer | None:
 
 
 def build_turn_handling() -> TurnHandlingOptions:
-    """Fish decides end of turn; the LLM starts on Fish's eager end-of-turn signal."""
+    """The STT decides the end of each turn; the LLM starts on its eager end-of-turn signal.
+
+    The agent's speech is not interruptible by voice activity (see ``bargein``), but the
+    audio keeps flowing to the STT while it speaks, so a complete sentence can still stop it.
+    """
     return TurnHandlingOptions(
         turn_detection="stt",
         interruption={
+            "discard_audio_if_uninterruptible": False,
             "resume_false_interruption": True,
             "false_interruption_timeout": 1.0,
         },

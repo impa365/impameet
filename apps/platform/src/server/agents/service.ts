@@ -254,12 +254,13 @@ export async function roomAgents(sql: Sql, room: { id: string; tenantId: string 
 }
 
 /** Dispatch metadata the worker reads: which agent to load, what to call itself, what it is for. */
-export function agentDispatchMetadata(tenantId: string, agent: DispatchAgent): string {
+export function agentDispatchMetadata(tenantId: string, agent: DispatchAgent, thinkingSound = true): string {
   return JSON.stringify({
     agentId: agent.id,
     agentName: agent.name,
     agentDescription: agent.description || undefined,
     tenantId,
+    thinkingSound,
   });
 }
 export async function createDefaultAgent(sql: Sql, tenantId: string): Promise<void> {

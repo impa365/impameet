@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, Iterable
 from dataclasses import dataclass, replace
 from typing import Any
@@ -10,11 +11,14 @@ from typing import Any
 from livekit import rtc
 from livekit.agents import Agent, ModelSettings, StopResponse, llm, stt
 
+from .bargein import Engagement, should_interrupt
 from .languages import guess_language, languages_note, main_language, pick_language, words
 from .listening import is_addressed
 from .profile import AgentProfile, MutePolicy
 from .providers import voice_options
 from .screen import SCREEN_INSTRUCTIONS, ScreenClient, Snapshot, screen_tools
+
+logger = logging.getLogger("meet_impar_agent.persona")
 
 ROLE_LABELS = {"moderator": "moderador", "guest": "convidado", "participant": "participante"}
 SPEAKER_INSTRUCTIONS = (
@@ -61,6 +65,7 @@ _TEXT_EVENTS = (
 class Talker:
     name: str
     role: str
+    identity: str = ""
 
     def label(self) -> str:
         return f"{self.name} ({ROLE_LABELS.get(self.role, 'participante')})"
@@ -97,6 +102,7 @@ class VoiceAgent(Agent):
         self._main_language = main_language(self._voices)
         self.language = self._main_language
         self._current_voice: str | None = self._voices.get(self._main_language)
+        self._engagement = Engagement()
 
         tools: list[Any] = []
         if handoff is not None:
@@ -109,11 +115,14 @@ class VoiceAgent(Agent):
             tools += self._mute_tools()
             parts.append(MUTE_INSTRUCTIONS[profile.mute_policy])
         self._base_instructions = "\n\n".join(p for p in parts if p)
-        super().__init__(instructions=self._base_instructions, tools=tools)
+        # Voice activity alone never cuts the agent off; see `_maybe_barge_in`.
+        super().__init__(
+            instructions=self._base_instructions, tools=tools, allow_interruptions=False
+        )
 
     async def on_enter(self) -> None:
         if self._profile.greeting:
-            self.session.say(self._profile.greeting, allow_interruptions=True)
+            self.session.say(self._profile.greeting)
 
     # -- who is talking -------------------------------------------------------------------
 
@@ -124,6 +133,9 @@ class VoiceAgent(Agent):
         if not event.alternatives or not event.alternatives[0].text.strip():
             return event
         first = event.alternatives[0]
+        who = self._speaker()
+        if event.type == stt.SpeechEventType.FINAL_TRANSCRIPT:
+            self._maybe_barge_in(first.text, who)
         tag = ""
         if len(self._voices) > 1:
             if event.type != stt.SpeechEventType.INTERIM_TRANSCRIPT:
@@ -131,7 +143,6 @@ class VoiceAgent(Agent):
                     self.language, first.language, first.text, self._voices
                 )
             tag = f"[{self.language}] "
-        who = self._speaker()
         if who is None and not tag:
             return event
         prefix = f"{who.label()} {tag}".rstrip() if who else tag.rstrip()
@@ -159,6 +170,31 @@ class VoiceAgent(Agent):
         quiet = self.muted or self._profile.respond_mode == "when_named" or bool(self.peers)
         if quiet and not is_addressed(text, self._profile.name, self.peers):
             raise StopResponse()
+        if who := self._speaker():
+            self._engagement.touch(who.identity)
+
+    def _maybe_barge_in(self, text: str, who: Talker | None) -> bool:
+        """Stops the agent's current speech for a complete utterance from a participant."""
+        try:
+            session = self.session
+        except RuntimeError:
+            return False
+        speech = session.current_speech
+        if speech is None or speech.interrupted or speech.done() or who is None:
+            return False
+        if not should_interrupt(
+            text,
+            identity=who.identity,
+            role=who.role,
+            agent_name=self._profile.name,
+            engagement=self._engagement,
+            peers=self.peers,
+        ):
+            return False
+        speech.allow_interruptions = True
+        session.interrupt()
+        logger.info("stopped speaking: a participant took the floor")
+        return True
 
     # -- other assistants in the room -----------------------------------------------------
 

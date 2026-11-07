@@ -190,6 +190,7 @@ describe('rooms with a chosen agent', () => {
       agentId: agent.id,
       agentName: agent.name,
       tenantId: tenant.id,
+      thinkingSound: true,
     });
 
     const fallback = await defaultAgentId(db(), tenant.id);

@@ -30,6 +30,8 @@ export interface Room {
   access: RoomAccess;
   boardPolicy: CollabPolicy;
   pollsPolicy: CollabPolicy;
+  /** The AI plays a soft typing sound while it prepares an answer. */
+  thinkingSound: boolean;
   /** True when at least one agent is in `agentIds`. */
   agentEnabled: boolean;
   /** The first of `agentIds` (kept for single-agent callers). */
@@ -47,6 +49,7 @@ const ROOM_COLUMNS = (sql: Sql) => sql`
   id, tenant_id as "tenantId", owner_id as "ownerId", slug, name,
   password_hash is not null as "hasPassword", allow_guests as "allowGuests",
   access, board_policy as "boardPolicy", polls_policy as "pollsPolicy",
+  thinking_sound as "thinkingSound",
   array(select ra.agent_id::text from room_agents ra where ra.room_id = rooms.id
         order by ra.added_at, ra.agent_id) as "agentIds",
   max_participants as "maxParticipants", created_at as "createdAt"`;
@@ -150,10 +153,10 @@ export async function createRoom(
     try {
       const [created] = await sql<{ id: string }[]>`
         insert into rooms (tenant_id, owner_id, slug, name, password_hash, allow_guests,
-                           access, board_policy, polls_policy, max_participants)
+                           access, board_policy, polls_policy, thinking_sound, max_participants)
         values (${user.tenantId}, ${user.id}, ${slug}, ${input.name}, ${passwordHash},
                 ${input.allowGuests}, ${input.access}, ${input.boardPolicy}, ${input.pollsPolicy},
-                ${input.maxParticipants ?? null})
+                ${input.thinkingSound}, ${input.maxParticipants ?? null})
         returning id`;
       if (agentIds.length > 0)
         await writeRoomAgents(sql, { id: created.id, tenantId: user.tenantId }, agentIds);
@@ -220,6 +223,7 @@ export async function updateRoom(
       access = coalesce(${patch.access ?? null}::text, access),
       board_policy = coalesce(${patch.boardPolicy ?? null}::text, board_policy),
       polls_policy = coalesce(${patch.pollsPolicy ?? null}::text, polls_policy),
+      thinking_sound = coalesce(${patch.thinkingSound ?? null}::boolean, thinking_sound),
       max_participants = case when ${patch.maxParticipants !== undefined}::boolean
                               then ${patch.maxParticipants ?? null}::int else max_participants end,
       password_hash = case when ${passwordHash !== undefined}::boolean

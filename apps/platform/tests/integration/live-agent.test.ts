@@ -99,7 +99,7 @@ describe('turning the AI on and off in a running meeting', () => {
     expect(on.agentIds).toEqual([fallback]);
     expect(await syncLiveAgents(db(), lk, 'kaiser', on)).toEqual({ removed: 0, dispatched: 1 });
     expect(lk.calls).toEqual([
-      `dispatch kaiser {"agentId":"${fallback}","agentName":"Kaiser","tenantId":"${tenant.id}"}`,
+      `dispatch kaiser {"agentId":"${fallback}","agentName":"Kaiser","tenantId":"${tenant.id}","thinkingSound":true}`,
     ]);
 
     lk.participants.push(person('agent-AJ_1', { isAgent: true, mode: 'voice', agentId: fallback }));
@@ -128,7 +128,7 @@ describe('turning the AI on and off in a running meeting', () => {
     expect(both.agentIds).toEqual([kaiser, ana.id]);
     expect(await syncLiveAgents(db(), lk, 'kaiser', both)).toEqual({ removed: 0, dispatched: 1 });
     expect(lk.calls).toEqual([
-      `dispatch kaiser {"agentId":"${ana.id}","agentName":"Ana","agentDescription":"Vendas","tenantId":"${tenant.id}"}`,
+      `dispatch kaiser {"agentId":"${ana.id}","agentName":"Ana","agentDescription":"Vendas","tenantId":"${tenant.id}","thinkingSound":true}`,
     ]);
 
     lk.participants.push(person('agent-A', { isAgent: true, mode: 'voice', agentId: ana.id }));
@@ -157,7 +157,7 @@ describe('turning the AI on and off in a running meeting', () => {
     expect(await syncLiveAgents(db(), lk, 'kaiser', swapped)).toEqual({ removed: 1, dispatched: 1 });
     expect(lk.calls).toEqual([
       'remove agent-AJ_1',
-      `dispatch kaiser {"agentId":"${ana.id}","agentName":"Ana","tenantId":"${tenant.id}"}`,
+      `dispatch kaiser {"agentId":"${ana.id}","agentName":"Ana","tenantId":"${tenant.id}","thinkingSound":true}`,
     ]);
   });
 

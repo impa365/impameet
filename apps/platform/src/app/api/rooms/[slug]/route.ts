@@ -7,7 +7,7 @@ import { assertSameOrigin, clientIp, handle, json, readJson } from '@/server/htt
 import { limits } from '@/server/limits';
 import { currentUser } from '@/server/request';
 import { livekitRoomName } from '@/server/livekit';
-import { POLICY_TOPIC, roomPolicies } from '@/server/rooms/join';
+import { AGENT_SETTINGS_TOPIC, POLICY_TOPIC, roomPolicies } from '@/server/rooms/join';
 import { deleteRoom, updateRoom } from '@/server/rooms/service';
 import { roomSlug, updateRoomInput } from '@/server/validation';
 
@@ -38,6 +38,15 @@ export async function PATCH(
     if (patch.boardPolicy !== undefined || patch.pollsPolicy !== undefined) {
       void lk()
         .sendData(livekitRoomName(room.tenantId, room.slug), JSON.stringify(roomPolicies(room)), POLICY_TOPIC)
+        .catch(() => undefined);
+    }
+    if (patch.thinkingSound !== undefined) {
+      void lk()
+        .sendData(
+          livekitRoomName(room.tenantId, room.slug),
+          JSON.stringify({ thinkingSound: room.thinkingSound }),
+          AGENT_SETTINGS_TOPIC,
+        )
         .catch(() => undefined);
     }
     return json({ room, live });

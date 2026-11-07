@@ -24,9 +24,9 @@ import {
   updateIntegration,
 } from '@/server/integrations/service';
 import { grantJoin } from '@/server/rooms/join';
-import { createRoom } from '@/server/rooms/service';
+import { createRoom, updateRoom } from '@/server/rooms/service';
 import { hashPassword } from '@/server/security/password';
-import { agentInput, createRoomInput, integrationInput } from '@/server/validation';
+import { agentInput, createRoomInput, integrationInput, updateRoomInput } from '@/server/validation';
 import { TokenVerifier } from 'livekit-server-sdk';
 import { type TestSql, freshDatabase } from './db';
 
@@ -151,7 +151,22 @@ describe('the default agent', () => {
       agentId: await defaultAgentId(db(), tenant.id),
       agentName: 'Kaiser',
       tenantId: tenant.id,
+      thinkingSound: true,
     });
+
+    // The typing sound is a per-room switch the agent receives with the dispatch.
+    expect(room.thinkingSound).toBe(true);
+    const quiet = await updateRoom(
+      db(),
+      admin,
+      room.slug,
+      updateRoomInput.parse({ thinkingSound: false }),
+      null,
+    );
+    expect(quiet.thinkingSound).toBe(false);
+    const again = await grantJoin(db(), cfg, quiet, { identity: 'g-2', displayName: 'G', role: 'guest' });
+    const claims2 = await new TokenVerifier(cfg.livekitApiKey, cfg.livekitApiSecret).verify(again.token);
+    expect(JSON.parse(claims2.roomConfig?.agents?.[0]?.metadata ?? '{}').thinkingSound).toBe(false);
   });
 });
 
