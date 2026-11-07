@@ -21,20 +21,28 @@ export MSYS_NO_PATHCONV=1
 
 log() { printf '\n== %s\n' "$*"; }
 
-if [[ -n "$(git status --porcelain)" && "${ALLOW_DIRTY:-0}" != "1" ]]; then
+if [[ -n "$(git status --porcelain)" ]]; then
   echo "uncommitted changes: commit them first so the images match the code" >&2
   exit 3
 fi
 
+# Build from the commit itself, not the working tree: exactly the published code, with the
+# LF line endings .gitattributes guarantees (a Windows checkout may have CRLF).
+src="$(mktemp -d)"
+trap 'rm -rf "$src"' EXIT
+git archive HEAD apps | tar -x -C "$src"
+# Docker Desktop on Windows needs a Windows path for the build context.
+ctx="$(cygpath -m "$src" 2>/dev/null || echo "$src")"
+
 for app in $apps; do
   log "$app: tests inside the image"
-  docker build --target test -t "impameet-$app:test" "apps/$app"
+  docker build --target test -t "impameet-$app:test" "$ctx/apps/$app"
 
   if [[ "$app" == "platform" ]]; then
     log "platform: integration tests against a throwaway Postgres"
     net="impameet-it-$$"
     docker network create "$net" >/dev/null
-    trap 'docker rm -f "$net-pg" >/dev/null 2>&1 || true; docker network rm "$net" >/dev/null 2>&1 || true' EXIT
+    trap 'docker rm -f "$net-pg" >/dev/null 2>&1 || true; docker network rm "$net" >/dev/null 2>&1 || true; rm -rf "$src"' EXIT
     docker run -d --name "$net-pg" --network "$net" --network-alias pg -e POSTGRES_PASSWORD=it \
       -e POSTGRES_DB=it --tmpfs /var/lib/postgresql/data postgres:17-alpine >/dev/null
     for _ in $(seq 1 30); do
@@ -45,7 +53,7 @@ for app in $apps; do
       "impameet-platform:test" npx vitest run --config vitest.integration.config.ts
     docker rm -f "$net-pg" >/dev/null
     docker network rm "$net" >/dev/null
-    trap - EXIT
+    trap 'rm -rf "$src"' EXIT
   fi
 
   image="$namespace/impameet-$app"
@@ -56,7 +64,7 @@ for app in $apps; do
     --label "org.opencontainers.image.source=https://github.com/impa365/impameet" \
     --label "org.opencontainers.image.licenses=Apache-2.0" \
     --label "org.opencontainers.image.vendor=Impa 365" \
-    -t "$image:$version" -t "$image:latest" "apps/$app"
+    -t "$image:$version" -t "$image:latest" "$ctx/apps/$app"
 
   log "$app: vulnerability scan (HIGH/CRITICAL with a fix available stop the release)"
   docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v impameet-trivy-cache:/root/.cache \
