@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",
-    "@livekit/components-react": "2.9.24",
+    "@livekit/components-react": "2.9.25",
     "@livekit/components-styles": "1.2.0",
     "@livekit/track-processors": "0.8.2",
     "livekit-client": "2.23.0",
