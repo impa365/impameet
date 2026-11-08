@@ -3,10 +3,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
-import { A11Y_STORAGE_KEY, type A11yPrefs, DEFAULT_A11Y, SHORTCUTS, parseA11yPrefs } from '@/lib/a11y';
+import {
+  A11Y_STORAGE_KEY,
+  type A11yPrefs,
+  DEFAULT_A11Y,
+  PANEL_THEMES,
+  type PanelTheme,
+  SHORTCUTS,
+  parseA11yPrefs,
+} from '@/lib/a11y';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 
 export { DEFAULT_A11Y, SHORTCUTS, parseA11yPrefs, type A11yPrefs } from '@/lib/a11y';
+
+/** The system's light/dark preference, kept up to date; null until known (or unsupported). */
+export function useSystemDark(): boolean | null {
+  const [dark, setDark] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const sync = () => setDark(query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, []);
+  return dark;
+}
+
+const THEME_LABEL: Record<PanelTheme, MessageKey> = {
+  system: 'room.a11y.themeSystem',
+  light: 'room.a11y.themeLight',
+  dark: 'room.a11y.themeDark',
+};
 
 export function useA11yPrefs() {
   const [prefs, setPrefs] = useState<A11yPrefs>(DEFAULT_A11Y);
@@ -99,7 +127,7 @@ export function playCue(cue: Cue): void {
   }
 }
 
-export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
+export function ShortcutsDialog({ onClose, theme }: { onClose: () => void; theme: 'light' | 'dark' }) {
   const t = useT();
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -108,7 +136,7 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
     return () => dialog?.close();
   }, []);
   return (
-    <dialog ref={ref} className="dialog theme-light" aria-labelledby="shortcuts-title" onClose={onClose}>
+    <dialog ref={ref} className={`dialog theme-${theme}`} aria-labelledby="shortcuts-title" onClose={onClose}>
       <header className="dialog-head">
         <h2 id="shortcuts-title">{t('room.shortcuts.title')}</h2>
         <button className="btn text" onClick={onClose} autoFocus>
@@ -144,7 +172,7 @@ export function A11yView(props: {
 }) {
   const { prefs, onChange } = props;
   const t = useT();
-  const row = (key: keyof A11yPrefs, label: MessageKey, help: MessageKey) => (
+  const row = (key: Exclude<keyof A11yPrefs, 'panelTheme'>, label: MessageKey, help: MessageKey) => (
     <label className="switch a11y-row" key={key}>
       <input type="checkbox" checked={prefs[key]} onChange={(e) => onChange({ [key]: e.target.checked })} />
       <span>
@@ -166,6 +194,22 @@ export function A11yView(props: {
         </span>
         <LanguageSwitcher />
       </div>
+      <fieldset className="group theme-choice">
+        <legend>{t('room.a11y.theme')}</legend>
+        <small className="muted">{t('room.a11y.themeHelp')}</small>
+        {PANEL_THEMES.map((value) => (
+          <label key={value} className="radio-row">
+            <input
+              type="radio"
+              name="panel-theme"
+              value={value}
+              checked={prefs.panelTheme === value}
+              onChange={() => onChange({ panelTheme: value })}
+            />
+            <span>{t(THEME_LABEL[value])}</span>
+          </label>
+        ))}
+      </fieldset>
       <p className="muted">{t('room.a11y.intro')}</p>
       {row('announceJoins', 'room.a11y.joins', 'room.a11y.joinsHelp')}
       {row('announceChat', 'room.a11y.chat', 'room.a11y.chatHelp')}

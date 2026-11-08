@@ -1949,7 +1949,7 @@ code.record {
   cursor: pointer;
 }
 
-/* Side panel (white, as in Meet). */
+/* Side panel (light or dark, as the person chose in Accessibility). */
 
 .meet-panel {
   display: flex;
@@ -1960,9 +1960,6 @@ code.record {
   border-radius: 16px;
   background: var(--surface);
   color: var(--text);
-  --menu-bg: #ffffff;
-  --tip-bg: #303030;
-  --tip-text: #f2f2f2;
 }
 
 .meet-panel :focus-visible {

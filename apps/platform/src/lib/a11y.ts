@@ -1,12 +1,30 @@
 import type { MessageKey } from '@/i18n/keys';
 
-/** What the call says out loud to screen readers and which sounds it plays. */
+/** Theme of the call's side panels and dialogs; the call itself stays dark. */
+export const PANEL_THEMES = ['system', 'light', 'dark'] as const;
+export type PanelTheme = (typeof PANEL_THEMES)[number];
+
+/** What the call says out loud to screen readers, which sounds it plays and how it looks. */
 export interface A11yPrefs {
   announceJoins: boolean;
   announceChat: boolean;
   announceActivity: boolean;
   sounds: boolean;
   largeCaptions: boolean;
+  panelTheme: PanelTheme;
+}
+
+/** The call's own look, used when the system does not say which it prefers. */
+export const CALL_THEME = 'dark';
+
+/**
+ * Explicit choice first, then the system preference (prefers-color-scheme), then the call's
+ * dark look. systemDark is null when the browser does not tell.
+ */
+export function resolvePanelTheme(choice: PanelTheme, systemDark: boolean | null): 'light' | 'dark' {
+  if (choice !== 'system') return choice;
+  if (systemDark === null) return CALL_THEME;
+  return systemDark ? 'dark' : 'light';
 }
 
 export const DEFAULT_A11Y: A11yPrefs = {
@@ -15,6 +33,7 @@ export const DEFAULT_A11Y: A11yPrefs = {
   announceActivity: true,
   sounds: true,
   largeCaptions: false,
+  panelTheme: 'system',
 };
 
 export const A11Y_STORAGE_KEY = 'impa-a11y';
@@ -23,14 +42,18 @@ export function parseA11yPrefs(raw: string | null): A11yPrefs {
   if (!raw) return DEFAULT_A11Y;
   try {
     const data = JSON.parse(raw) as Record<string, unknown>;
-    const pick = (k: keyof A11yPrefs) =>
+    const pick = (k: Exclude<keyof A11yPrefs, 'panelTheme'>) =>
       typeof data[k] === 'boolean' ? (data[k] as boolean) : DEFAULT_A11Y[k];
+    const theme = (PANEL_THEMES as readonly unknown[]).includes(data.panelTheme)
+      ? (data.panelTheme as PanelTheme)
+      : DEFAULT_A11Y.panelTheme;
     return {
       announceJoins: pick('announceJoins'),
       announceChat: pick('announceChat'),
       announceActivity: pick('announceActivity'),
       sounds: pick('sounds'),
       largeCaptions: pick('largeCaptions'),
+      panelTheme: theme,
     };
   } catch {
     return DEFAULT_A11Y;

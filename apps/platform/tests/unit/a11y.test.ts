@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_A11Y, SHORTCUTS, displayName, parseA11yPrefs } from '@/lib/a11y';
+import {
+  CALL_THEME,
+  DEFAULT_A11Y,
+  SHORTCUTS,
+  displayName,
+  parseA11yPrefs,
+  resolvePanelTheme,
+} from '@/lib/a11y';
 
 describe('accessibility preferences', () => {
   it('falls back to the defaults on missing or broken data', () => {
@@ -9,6 +16,26 @@ describe('accessibility preferences', () => {
       ...DEFAULT_A11Y,
       sounds: false,
     });
+  });
+
+  it('keeps the panel theme choice and ignores unknown values', () => {
+    expect(DEFAULT_A11Y.panelTheme).toBe('system');
+    expect(parseA11yPrefs('{"panelTheme": "dark"}').panelTheme).toBe('dark');
+    expect(parseA11yPrefs('{"panelTheme": "light", "sounds": false}')).toEqual({
+      ...DEFAULT_A11Y,
+      panelTheme: 'light',
+      sounds: false,
+    });
+    expect(parseA11yPrefs('{"panelTheme": "neon"}').panelTheme).toBe('system');
+  });
+
+  it('resolves the panel theme: explicit choice, then the system, then the dark call', () => {
+    expect(resolvePanelTheme('light', true)).toBe('light');
+    expect(resolvePanelTheme('dark', false)).toBe('dark');
+    expect(resolvePanelTheme('system', true)).toBe('dark');
+    expect(resolvePanelTheme('system', false)).toBe('light');
+    expect(resolvePanelTheme('system', null)).toBe(CALL_THEME);
+    expect(CALL_THEME).toBe('dark');
   });
 
   it('documents every shortcut once', () => {

@@ -175,6 +175,12 @@ export default defineMessages(
       soundsHelp: 'Toca um som curto em entradas, mensagens, mãos e pedidos para participar.',
       largeCaptions: 'Legendas grandes',
       largeCaptionsHelp: 'Aumenta o texto das legendas ao vivo.',
+      theme: 'Tema dos painéis e janelas',
+      themeHelp:
+        'Vale para chat, pessoas, atividades, enquetes, configurações e as demais janelas da chamada. Fica salvo neste aparelho.',
+      themeSystem: 'Seguir o sistema',
+      themeLight: 'Tema claro',
+      themeDark: 'Tema escuro',
       always: 'Gravação, transcrição, quedas de conexão e pedidos para participar são sempre anunciados.',
       viewShortcuts: 'Ver os atalhos do teclado',
     },
@@ -452,6 +458,12 @@ export default defineMessages(
         soundsHelp: 'Plays a short sound for joins, messages, hands and requests to join.',
         largeCaptions: 'Large captions',
         largeCaptionsHelp: 'Makes the live caption text bigger.',
+        theme: 'Panel and window theme',
+        themeHelp:
+          'Applies to chat, people, activities, polls, settings and the other windows of the call. Saved on this device.',
+        themeSystem: 'Follow the system',
+        themeLight: 'Light theme',
+        themeDark: 'Dark theme',
         always: 'Recording, transcription, dropped connections and requests to join are always announced.',
         viewShortcuts: 'View keyboard shortcuts',
       },
@@ -728,6 +740,12 @@ export default defineMessages(
         soundsHelp: 'Reproduce un sonido corto en entradas, mensajes, manos y solicitudes para unirse.',
         largeCaptions: 'Subtítulos grandes',
         largeCaptionsHelp: 'Aumenta el texto de los subtítulos en vivo.',
+        theme: 'Tema de los paneles y ventanas',
+        themeHelp:
+          'Se aplica al chat, personas, actividades, encuestas, configuración y las demás ventanas de la llamada. Se guarda en este dispositivo.',
+        themeSystem: 'Seguir el sistema',
+        themeLight: 'Tema claro',
+        themeDark: 'Tema oscuro',
         always:
           'La grabación, la transcripción, las caídas de conexión y las solicitudes para unirse siempre se anuncian.',
         viewShortcuts: 'Ver las combinaciones de teclas',

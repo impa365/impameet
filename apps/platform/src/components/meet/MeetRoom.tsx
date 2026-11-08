@@ -11,6 +11,7 @@ import {
 import { type Participant, RoomEvent, Track } from 'livekit-client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type T, useT } from '@/i18n/client';
+import { resolvePanelTheme } from '@/lib/a11y';
 import { REACTION_TOPIC, type Reaction, parseReaction } from '@/lib/reactions';
 import { BackgroundPanel, useBackground } from '../BackgroundMenu';
 import { BreakoutsView, useBreakouts } from '../Breakouts';
@@ -28,6 +29,7 @@ import {
   ShortcutsDialog,
   playCue,
   useA11yPrefs,
+  useSystemDark,
   useAnnouncer,
 } from './a11y';
 import { ChatView } from './ChatView';
@@ -85,6 +87,7 @@ export function MeetRoom(props: {
   const participants = useParticipants();
   const { localParticipant } = useLocalParticipant();
   const { prefs, update: updatePrefs } = useA11yPrefs();
+  const surface = resolvePanelTheme(prefs.panelTheme, useSystemDark());
   const { polite, urgent, announce } = useAnnouncer();
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
@@ -577,7 +580,7 @@ export function MeetRoom(props: {
           </div>
         </main>
 
-        <SidePanel panel={panel} onPanel={openPanel}>
+        <SidePanel panel={panel} onPanel={openPanel} theme={surface}>
           <ChatView visible={panel === 'chat'} onCount={setChatCount} onIncoming={onIncomingChat} />
           {panel === 'info' && (
             <InfoView
@@ -672,7 +675,7 @@ export function MeetRoom(props: {
           {toast}
         </div>
       )}
-      {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
+      {shortcutsOpen && <ShortcutsDialog theme={surface} onClose={() => setShortcutsOpen(false)} />}
       <StartAudio label={t('room.stage.startAudio')} className="meet-start-audio" />
       <ConnectionStateToast />
       <RoomAudioRenderer />

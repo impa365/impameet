@@ -24,10 +24,11 @@ const TITLES: Record<PanelId, MessageKey> = {
 
 const SUBVIEWS: Partial<Record<PanelId, PanelId>> = { polls: 'activities' };
 
-/** Meet's white side panel: one at a time, beside the stage. */
+/** Meet's side panel: one at a time, beside the stage, in the theme the person chose. */
 export function SidePanel(props: {
   panel: PanelId | null;
   onPanel: (panel: PanelId | null) => void;
+  theme: 'light' | 'dark';
   children: ReactNode;
 }) {
   const t = useT();
@@ -39,7 +40,7 @@ export function SidePanel(props: {
   }, [panel]);
   const title = panel ? t(TITLES[panel]) : undefined;
   return (
-    <aside className="meet-panel theme-light" hidden={!panel} aria-label={title}>
+    <aside className={`meet-panel theme-${props.theme}`} hidden={!panel} aria-label={title}>
       <header className="meet-panel-head">
         {back && (
           <button className="icon-btn" aria-label={t('common.back')} onClick={() => props.onPanel(back)}>
