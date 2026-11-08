@@ -4,8 +4,6 @@ import asyncio
 import base64
 import io
 import logging
-import shutil
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -14,6 +12,7 @@ from livekit import api, rtc
 from PIL import Image
 from playwright.async_api import Error as PlaywrightError
 
+from browsers import chromium
 from meet_impar_screen import publisher
 from meet_impar_screen.browser import BrowserPage, BrowserPool, _adopt_popup, shrink_jpeg
 from meet_impar_screen.config import load_settings
@@ -179,13 +178,6 @@ async def test_live_screen_publishes_repeats_frames_and_expires(
     assert screen.expired(0)
     await screen.close()
     assert room.disconnected
-
-
-chromium = pytest.mark.skipif(
-    not (shutil.which("chromium") or any(Path.home().glob(".cache/ms-playwright/chromium*")))
-    and not Path("/opt/ms-playwright").exists(),
-    reason="Playwright Chromium is not installed",
-)
 
 
 @pytest.mark.browser

@@ -7,24 +7,17 @@ browser really tries to reach a server on loopback, and the server must never be
 from __future__ import annotations
 
 import asyncio
-import shutil
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
 from aiohttp import WSMsgType, web
 
+from browsers import chromium
 from meet_impar_screen.browser import BrowserPool
 from meet_impar_screen.egress import EgressProxy, _host_port
 from meet_impar_screen.urlguard import UrlGuard
 
 PUBLIC = "93.184.215.14"
-
-chromium = pytest.mark.skipif(
-    not (shutil.which("chromium") or any(Path.home().glob(".cache/ms-playwright/chromium*")))
-    and not Path("/opt/ms-playwright").exists(),
-    reason="Playwright Chromium is not installed",
-)
 
 
 class InternalService:
