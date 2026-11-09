@@ -1,7 +1,8 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { serverMessage, type T, useT } from '@/i18n/client';
+import { embeddingsFirst, modelCategory } from '@/lib/models';
 import {
   FISH_TTS_MODELS,
   LLM_PRESETS,
@@ -11,6 +12,7 @@ import {
   presetFor,
 } from '@/lib/providers';
 import { api } from '../api';
+import { ModelPicker } from './ModelPicker';
 import { messageOf, useLoad } from './useLoad';
 
 export type IntegrationKind = 'llm' | 'embedding' | SpeechProvider;
@@ -65,6 +67,63 @@ const KIND_LABEL = {
   elevenlabs: 'admin.integrations.kindElevenlabs',
 } as const;
 
+/** The live model list of the form, for the URL and key it was fetched with. */
+type Catalog = { key: string } & (
+  | { state: 'loading' }
+  | { state: 'ok'; models: string[] }
+  | { state: 'error'; error: unknown }
+);
+
+/**
+ * Lists the models of the URL and key being typed (or of the saved key, when editing), a moment
+ * after the admin stops typing, and again whenever they ask.
+ */
+function useModelCatalog(editing: string | null, draft: Draft) {
+  const integrationId = editing && editing !== 'new' ? editing : undefined;
+  const baseUrl = draft.baseUrl.trim();
+  const apiKey = draft.apiKey.trim();
+  const ready =
+    (draft.kind === 'llm' || draft.kind === 'embedding') &&
+    /^https:\/\/[^/\s]+/.test(baseUrl) &&
+    (apiKey.length >= 8 || Boolean(integrationId));
+  const key = ready ? JSON.stringify([draft.kind, baseUrl, apiKey, integrationId]) : '';
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [round, setRound] = useState(0);
+
+  useEffect(() => {
+    if (!key) return;
+    const [kind, url, typedKey, id] = JSON.parse(key) as [string, string, string, string | undefined];
+    let live = true;
+    const timer = setTimeout(async () => {
+      setCatalog({ key, state: 'loading' });
+      try {
+        const res = await api<{ ok: boolean; error?: string; models?: string[] }>(
+          '/api/admin/integrations/models',
+          { body: { kind, baseUrl: url, apiKey: typedKey || undefined, integrationId: id } },
+        );
+        if (!live) return;
+        setCatalog(
+          res.ok
+            ? { key, state: 'ok', models: res.models ?? [] }
+            : { key, state: 'error', error: res.error ?? '' },
+        );
+      } catch (err) {
+        if (live) setCatalog({ key, state: 'error', error: err });
+      }
+    }, 700);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [key, round]);
+
+  return {
+    ready,
+    catalog: catalog?.key === key && key ? catalog : null,
+    refresh: () => setRound((n) => n + 1),
+  };
+}
+
 const presetName = (p: LlmPreset, t: T) => p.name || t('admin.integrations.customProvider');
 const presetExample = (p: LlmPreset, t: T) => p.example || t('admin.integrations.customModelExample');
 
@@ -88,9 +147,10 @@ export function IntegrationsTab() {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(NEW_LLM);
   const [busy, setBusy] = useState(false);
-  const [found, setFound] = useState<{ id: string; models: string[] } | null>(null);
   const [notice, setNotice] = useState('');
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft({ ...draft, [k]: v });
+  const { ready, catalog, refresh } = useModelCatalog(editing, draft);
+  const found = catalog?.state === 'ok' ? catalog.models : [];
 
   function edit(i: Integration | null, kind: Draft['kind'] = 'llm') {
     setError('');
@@ -161,34 +221,16 @@ export function IntegrationsTab() {
         { body: {} },
       );
       setNotice(
-        res.ok
-          ? t('admin.integrations.testOk', { name: i.name })
-          : `${i.name}: ${serverMessage(res.error ?? '')}`,
+        !res.ok
+          ? `${i.name}: ${serverMessage(res.error ?? '')}`
+          : i.kind === 'llm' && res.models?.length
+            ? t('admin.integrations.testOkModels', { name: i.name, n: res.models.length })
+            : t('admin.integrations.testOk', { name: i.name }),
       );
-      if (res.ok && i.kind === 'llm' && res.models?.length) setFound({ id: i.id, models: res.models });
       await reload();
     } catch (err) {
       setNotice('');
       setError(messageOf(err, t('admin.integrations.couldNotTest')));
-    }
-  }
-
-  async function addModels(i: Integration, models: string[]) {
-    try {
-      await api(`/api/admin/integrations/${i.id}`, {
-        method: 'PUT',
-        body: {
-          kind: 'llm',
-          name: i.name,
-          baseUrl: i.baseUrl,
-          defaultModel: i.defaultModel,
-          models: [...new Set([...i.models, ...models])],
-        },
-      });
-      setFound(null);
-      await reload();
-    } catch (err) {
-      setError(messageOf(err, t('admin.integrations.couldNotSaveModels')));
     }
   }
 
@@ -210,6 +252,33 @@ export function IntegrationsTab() {
 
   if (editing) {
     const preset = LLM_PRESETS.find((p) => p.id === draft.preset) ?? LLM_PRESETS[0];
+    const catalogLine = !ready
+      ? t('admin.integrations.discoverHint')
+      : !catalog || catalog.state === 'loading'
+        ? t('admin.integrations.discovering')
+        : catalog.state === 'error'
+          ? t('admin.integrations.discoverFailed', {
+              error:
+                typeof catalog.error === 'string'
+                  ? serverMessage(catalog.error)
+                  : messageOf(catalog.error, t('admin.integrations.couldNotTest')),
+            })
+          : catalog.models.length > 0
+            ? t('admin.integrations.discovered', { n: catalog.models.length })
+            : t('admin.integrations.discoveredNone');
+    const catalogStatus = (
+      <div className="row discover-status">
+        <span className={catalog?.state === 'error' ? 'error' : 'muted'} role="status">
+          {catalogLine}
+        </span>
+        {ready && catalog && catalog.state !== 'loading' && (
+          <button type="button" className="btn secondary small" onClick={refresh}>
+            {t('admin.integrations.refreshModels')}
+          </button>
+        )}
+      </div>
+    );
+    const embeddingChoices = found.filter((m) => modelCategory(m) === 'embedding').slice(0, 24);
     return (
       <form onSubmit={save} className="card form" style={{ maxWidth: 720, margin: 0 }}>
         <strong>
@@ -272,46 +341,64 @@ export function IntegrationsTab() {
                 onChange={(e) => set('defaultModel', e.target.value)}
               />
               <datalist id="integration-models">
-                {draft.models.map((m) => (
+                {[...new Set([...found, ...draft.models])].map((m) => (
                   <option key={m} value={m} />
                 ))}
               </datalist>
             </label>
-            {draft.models.length > 0 && (
-              <div className="chips" aria-label={t('admin.integrations.enabledModels')}>
-                {draft.models.map((m) => (
-                  <span key={m} className="chip">
+            {catalogStatus}
+            {(found.length > 0 || draft.models.length > 0) && (
+              <ModelPicker
+                available={found}
+                selected={draft.models}
+                principal={draft.defaultModel}
+                onSelected={(models) => set('models', models)}
+                onPrincipal={(m) =>
+                  setDraft({
+                    ...draft,
+                    defaultModel: m,
+                    models: draft.models.includes(m) ? draft.models : [...draft.models, m],
+                  })
+                }
+              />
+            )}
+          </>
+        ) : draft.kind === 'embedding' ? (
+          <>
+            <label>
+              {t('admin.integrations.embeddingModel')}
+              <input
+                required
+                maxLength={120}
+                list="embedding-models"
+                placeholder="text-embedding-3-small"
+                value={draft.defaultModel}
+                onChange={(e) => set('defaultModel', e.target.value)}
+              />
+              <datalist id="embedding-models">
+                {embeddingsFirst(found).map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+              <span className="muted">{t('admin.integrations.embeddingHint')}</span>
+            </label>
+            {catalogStatus}
+            {embeddingChoices.length > 0 && (
+              <div className="chips" role="group" aria-label={t('admin.integrations.embeddingPick')}>
+                {embeddingChoices.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={m === draft.defaultModel ? 'chip add accent' : 'chip add'}
+                    aria-pressed={m === draft.defaultModel}
+                    onClick={() => set('defaultModel', m)}
+                  >
                     {m}
-                    <button
-                      type="button"
-                      aria-label={t('admin.integrations.removeModel', { model: m })}
-                      onClick={() =>
-                        set(
-                          'models',
-                          draft.models.filter((x) => x !== m),
-                        )
-                      }
-                    >
-                      ×
-                    </button>
-                  </span>
+                  </button>
                 ))}
               </div>
             )}
-            <span className="muted">{t('admin.integrations.testHint')}</span>
           </>
-        ) : draft.kind === 'embedding' ? (
-          <label>
-            {t('admin.integrations.embeddingModel')}
-            <input
-              required
-              maxLength={120}
-              placeholder="text-embedding-3-small"
-              value={draft.defaultModel}
-              onChange={(e) => set('defaultModel', e.target.value)}
-            />
-            <span className="muted">{t('admin.integrations.embeddingHint')}</span>
-          </label>
         ) : draft.kind !== 'fish' ? null : (
           <label>
             {t('admin.integrations.defaultVoiceModel')}
@@ -427,28 +514,6 @@ export function IntegrationsTab() {
                       <dt>{t('admin.integrations.agents')}</dt>
                       <dd>{i.usedBy}</dd>
                     </dl>
-                    {found?.id === i.id && (
-                      <div className="found">
-                        <span className="muted">
-                          {t('admin.integrations.foundModels', { n: found.models.length })}
-                        </span>
-                        <div className="chips">
-                          {found.models
-                            .filter((m) => !i.models.includes(m))
-                            .slice(0, 60)
-                            .map((m) => (
-                              <button
-                                key={m}
-                                type="button"
-                                className="chip add"
-                                onClick={() => addModels(i, [m])}
-                              >
-                                + {m}
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    )}
                     <footer className="row">
                       <button className="btn secondary small" onClick={() => test(i)}>
                         {t('admin.integrations.testConnection')}

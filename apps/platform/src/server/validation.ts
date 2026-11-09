@@ -283,7 +283,7 @@ export const integrationInput = z.discriminatedUnion('kind', [
     baseUrl: z.string().trim().min(1, 'Informe a URL da API').max(300),
     apiKey,
     defaultModel: modelId,
-    models: z.array(modelId).max(200).default([]),
+    models: z.array(modelId).max(500).default([]),
   }),
   z.object({
     kind: z.literal('fish'),
@@ -306,6 +306,14 @@ export const integrationInput = z.discriminatedUnion('kind', [
     defaultModel: modelId,
   }),
 ]);
+
+/** "Buscar modelos" while the form is still open: the typed key, or the saved one when editing. */
+export const modelDiscoveryInput = z.object({
+  kind: z.enum(['llm', 'embedding']),
+  baseUrl: z.string().trim().min(1, 'Informe a URL da API').max(300),
+  apiKey,
+  integrationId: z.string().uuid().optional(),
+});
 
 export const meetingInput = z.object({
   roomSlug,

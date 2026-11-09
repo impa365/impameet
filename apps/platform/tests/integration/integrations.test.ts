@@ -18,6 +18,7 @@ import {
   type IntegrationDeps,
   createIntegration,
   deleteIntegration,
+  discoverModels,
   integrationSecret,
   listIntegrations,
   testIntegration,
@@ -248,6 +249,95 @@ describe('integrations', () => {
       ['OpenRouter', true],
     ]);
     expect(list[0].lastTestError).toContain('recusada');
+  });
+
+  it('lists models while the form is open, with the typed key or the saved one', async () => {
+    const { admin, member } = await org('acme');
+    const seen: string[] = [];
+    const listing = (async (url: string, init: RequestInit) => {
+      seen.push(`${url} ${new Headers(init.headers).get('authorization')}`);
+      return Response.json({
+        data: [
+          { id: 'models/gemini-2.5-flash' },
+          { id: 'text-embedding-004' },
+          { id: 'models/gemini-2.5-flash' },
+        ],
+      });
+    }) as unknown as Fetch;
+    const typed = {
+      kind: 'llm' as const,
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+      apiKey: 'AIza-typed-0123456789',
+    };
+    expect(await discoverModels(deps(listing), admin, typed)).toEqual({
+      ok: true,
+      models: ['gemini-2.5-flash', 'text-embedding-004'],
+    });
+    expect(seen).toEqual([
+      'https://generativelanguage.googleapis.com/v1beta/openai/models Bearer AIza-typed-0123456789',
+    ]);
+
+    const llm = await createIntegration(deps(), admin, LLM(), null);
+    seen.length = 0;
+    const saved = { kind: 'llm' as const, baseUrl: 'https://openrouter.ai/api/v1', integrationId: llm.id };
+    expect((await discoverModels(deps(listing), admin, saved)).ok).toBe(true);
+    expect(seen).toEqual(['https://openrouter.ai/api/v1/models Bearer sk-or-0123456789abcdef']);
+
+    // A saved key never goes to another host, to another kind, or to someone else.
+    seen.length = 0;
+    await expectAppError(
+      discoverModels(deps(listing), admin, { ...saved, baseUrl: 'https://evil.example/v1' }),
+      400,
+    );
+    await expectAppError(discoverModels(deps(listing), admin, { ...saved, kind: 'embedding' }), 400);
+    await expectAppError(discoverModels(deps(listing), member, saved), 403);
+    await expectAppError(discoverModels(deps(listing), (await org('rival')).admin, saved), 404);
+    await expectAppError(discoverModels(deps(listing), admin, { kind: 'llm', baseUrl: saved.baseUrl }), 400);
+    await expectAppError(
+      discoverModels(deps(listing), admin, { ...typed, baseUrl: 'https://intranet.example/v1' }),
+      400,
+    );
+    expect(seen).toEqual([]);
+
+    const refused = (async () => new Response('{}', { status: 401 })) as unknown as Fetch;
+    expect(await discoverModels(deps(refused), admin, typed)).toEqual({
+      ok: false,
+      error: 'A chave foi recusada pelo provedor',
+    });
+    // Nothing is recorded: the saved integration keeps its last test.
+    expect((await listIntegrations(db(), admin))[0].lastTestOk).toBeNull();
+  });
+
+  it('asks for the key again when the API address moves to another host', async () => {
+    const { admin, tenant } = await org('acme');
+    const llm = await createIntegration(deps(), admin, LLM(), null);
+    await expectAppError(
+      updateIntegration(
+        deps(),
+        admin,
+        llm.id,
+        LLM({ apiKey: undefined, baseUrl: 'https://api.openai.com/v1' }),
+        null,
+      ),
+      400,
+    );
+    const samehost = await updateIntegration(
+      deps(),
+      admin,
+      llm.id,
+      LLM({ apiKey: undefined, baseUrl: 'https://openrouter.ai/api/v2' }),
+      null,
+    );
+    expect(samehost.baseUrl).toBe('https://openrouter.ai/api/v2');
+    const moved = await updateIntegration(
+      deps(),
+      admin,
+      llm.id,
+      LLM({ apiKey: 'sk-openai-0123456789', baseUrl: 'https://api.openai.com/v1' }),
+      null,
+    );
+    expect(moved.baseUrl).toBe('https://api.openai.com/v1');
+    expect((await integrationSecret(db(), KEY, tenant.id, llm.id)).apiKey).toBe('sk-openai-0123456789');
   });
 
   it('keeps organizations apart, even if a sealed key is copied between them', async () => {

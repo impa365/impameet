@@ -42,6 +42,8 @@ export async function probeLlm(fetchImpl: Fetch, baseUrl: string, apiKey: string
   const models = Array.isArray(body?.data)
     ? body.data
         .map((m) => (typeof m === 'object' && m && 'id' in m ? String((m as { id: unknown }).id) : ''))
+        // Gemini lists "models/gemini-…" but its chat endpoint takes the bare name.
+        .map((id) => id.trim().replace(/^models\//, ''))
         .filter((id) => id.length > 0 && id.length <= 120)
         .sort()
     : [];

@@ -6,7 +6,7 @@ import type { Sql } from '../db';
 import { badRequest, conflict, forbidden, notFound } from '../errors';
 import { type Resolver, assertPublicHttpsUrl, systemResolver } from '../security/public-url';
 import { openSecret, sealSecret, secretHint } from '../security/secrets';
-import type { integrationInput } from '../validation';
+import type { integrationInput, modelDiscoveryInput } from '../validation';
 import { type SpeechProvider, isSpeechProvider } from '@/lib/providers';
 import {
   type Fetch,
@@ -20,6 +20,7 @@ import {
 
 export type IntegrationKind = 'llm' | 'embedding' | SpeechProvider;
 export type IntegrationInput = z.infer<typeof integrationInput>;
+export type ModelDiscoveryInput = z.infer<typeof modelDiscoveryInput>;
 
 export interface Integration {
   id: string;
@@ -61,6 +62,11 @@ function assertAdmin(user: SessionUser): void {
 }
 
 const isUniqueViolation = (err: unknown) => (err as { code?: string }).code === '23505';
+
+/** A saved key is only ever sent to the host it was saved for. */
+const NEW_HOST_NEEDS_KEY = 'Ao trocar o endereço da API, informe a chave de novo';
+const sameOrigin = (a: string | null, b: string | null) =>
+  a === b || (!!a && !!b && new URL(a).origin === new URL(b).origin);
 
 export async function listIntegrations(sql: Sql, user: SessionUser): Promise<Integration[]> {
   assertAdmin(user);
@@ -134,6 +140,7 @@ export async function updateIntegration(
   const current = await findIntegration(sql, actor.tenantId, id);
   if (current.kind !== input.kind) throw badRequest('Não é possível mudar o tipo da integração');
   const f = await fields(deps, input);
+  if (!input.apiKey && !sameOrigin(current.baseUrl, f.baseUrl)) throw badRequest(NEW_HOST_NEEDS_KEY);
   const sealed = input.apiKey ? sealSecret(deps.key, input.apiKey, aad(actor.tenantId, id)) : null;
   try {
     await sql`
@@ -227,6 +234,25 @@ export async function testIntegration(
       last_test_error = ${result.ok ? null : result.error}
     where id = ${id} and tenant_id = ${actor.tenantId}`;
   return result;
+}
+
+/** "Buscar modelos" while filling the form, before anything is saved (nothing is recorded). */
+export async function discoverModels(
+  deps: IntegrationDeps,
+  actor: SessionUser,
+  input: ModelDiscoveryInput,
+): Promise<ProbeResult> {
+  assertAdmin(actor);
+  const baseUrl = await assertPublicHttpsUrl(input.baseUrl, deps.resolve ?? systemResolver);
+  let apiKey = input.apiKey;
+  if (!apiKey) {
+    if (!input.integrationId) throw badRequest('Informe a chave de API');
+    const saved = await integrationSecret(deps.sql, deps.key, actor.tenantId, input.integrationId);
+    if (saved.kind !== input.kind) throw badRequest('Não é possível mudar o tipo da integração');
+    if (!sameOrigin(saved.baseUrl, baseUrl)) throw badRequest(NEW_HOST_NEEDS_KEY);
+    apiKey = saved.apiKey;
+  }
+  return probeLlm(deps.fetch ?? fetch, baseUrl, apiKey);
 }
 
 async function integrationKind(sql: Sql, tenantId: string, id: string): Promise<string> {

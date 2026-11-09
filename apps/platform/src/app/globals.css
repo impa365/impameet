@@ -824,12 +824,74 @@ code.record {
   background: var(--brand-soft);
 }
 
-.found {
+.discover-status {
+  gap: 10px;
+  min-height: 32px;
+}
+
+.model-picker {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+.model-picker-tools {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-picker-tools > .muted {
+  margin-right: auto;
+}
+
+.model-picker-only {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
   gap: 6px;
-  max-height: 180px;
+  font-size: 13px;
+}
+
+.model-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 340px;
+  margin: 0;
+  padding: 0;
   overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.model-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.model-list li:last-child {
+  border-bottom: 0;
+}
+
+.model-list li.principal {
+  background: var(--brand-soft);
+}
+
+.model-list label {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.model-list .model-id {
+  overflow-wrap: anywhere;
 }
 
 /* --- Menus ------------------------------------------------------------------- */

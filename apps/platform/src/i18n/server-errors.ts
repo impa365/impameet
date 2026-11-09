@@ -17,6 +17,8 @@ const EN: Record<string, string> = {
     'The URL must point to a public internet address',
   'Agente de IA não encontrado': 'AI agent not found',
   'Agente não encontrado': 'Agent not found',
+  'Ao trocar o endereço da API, informe a chave de novo':
+    'When changing the API address, enter the key again',
   'Área exclusiva do super admin': 'Super admin only',
   'As legendas já estão ligadas': 'Captions are already on',
   'As legendas não estão ligadas': 'Captions are not on',
@@ -216,6 +218,8 @@ const ES: Record<string, string> = {
     'La URL debe apuntar a una dirección pública de internet',
   'Agente de IA não encontrado': 'Agente de IA no encontrado',
   'Agente não encontrado': 'Agente no encontrado',
+  'Ao trocar o endereço da API, informe a chave de novo':
+    'Al cambiar la dirección de la API, vuelve a escribir la clave',
   'Área exclusiva do super admin': 'Área exclusiva del superadministrador',
   'As legendas já estão ligadas': 'Los subtítulos ya están activados',
   'As legendas não estão ligadas': 'Los subtítulos no están activados',
