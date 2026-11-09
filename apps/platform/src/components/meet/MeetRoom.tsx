@@ -20,6 +20,8 @@ import { ModerationView } from '../ModerationPanel';
 import { PollsView, usePolls } from '../Polls';
 import { type CollabPolicy, RoomSettingsEditor } from '../RoomSettings';
 import { WhiteboardPanel, useWhiteboard } from '../Whiteboard';
+import { changeSentence } from '../BoardText';
+import { type BoardChange, ChangeDigest } from '@/lib/board-text';
 import { api } from '../api';
 import { Icon } from '../ui/Icon';
 import {
@@ -128,7 +130,33 @@ export function MeetRoom(props: {
   const canDraw = policies.board === 'everyone' || isModerator;
   const canCreatePoll = policies.polls === 'everyone' || isModerator;
 
-  const board = useWhiteboard(room, mayDraw);
+  const boardDigest = useRef(new ChangeDigest());
+  const boardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Whiteboard changes by others, read out as the person chose (never moving focus). */
+  const onBoardChange = useCallback(
+    (change: BoardChange) => {
+      const mode = prefsRef.current.boardAnnounce;
+      if (mode === 'off') return;
+      boardDigest.current.add(change);
+      if (boardTimer.current) return;
+      const due = boardDigest.current.dueAt(mode, Date.now());
+      if (due === null) return;
+      boardTimer.current = setTimeout(() => {
+        boardTimer.current = null;
+        if (prefsRef.current.boardAnnounce === 'off') return boardDigest.current.clear();
+        const said = boardDigest.current.take(Date.now()).map((c) => changeSentence(tr, c));
+        if (said.length > 0) announce(`${tr('room.whiteboard.title')}: ${said.join(' ')}`);
+      }, due - Date.now());
+    },
+    [announce, tr],
+  );
+  useEffect(
+    () => () => {
+      if (boardTimer.current) clearTimeout(boardTimer.current);
+    },
+    [],
+  );
+  const board = useWhiteboard(room, mayDraw, onBoardChange);
   const captions = useCaptions(room);
   const polls = usePolls(room, mayCreatePoll);
   const breakouts = useBreakouts(room, props.slug, props.breakout, props.onSwitchRoom);

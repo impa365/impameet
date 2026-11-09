@@ -5,6 +5,8 @@ const root = import.meta.dirname;
 
 /** Pure logic. Database-backed modules are covered by vitest.integration.config.ts. */
 export default defineConfig({
+  // Next keeps JSX as is; tests that render components need it compiled.
+  oxc: { jsx: { runtime: 'automatic' } },
   resolve: {
     alias: {
       '@': path.resolve(root, 'src'),
@@ -26,6 +28,7 @@ export default defineConfig({
         'src/server/plans.ts',
         'src/server/tools/http-tool.ts',
         'src/server/rooms/hand.ts',
+        'src/lib/board-text.ts',
       ],
       thresholds: { lines: 95, branches: 85 },
     },

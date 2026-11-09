@@ -3229,3 +3229,52 @@ kbd {
   border-radius: 8px;
   background: var(--surface-2, rgba(127, 127, 127, 0.12));
 }
+
+/* Whiteboard as text (#18): a real alternative to the canvas, keyboard and screen reader first. */
+.board-text {
+  margin: 8px 12px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.14);
+  max-height: 40vh;
+  overflow: auto;
+}
+.board-text summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0;
+}
+.board-text summary:focus-visible,
+.board-items li:focus-visible,
+.board-items button:focus-visible {
+  outline: 3px solid #8ab4f8;
+  outline-offset: 2px;
+}
+.board-items,
+.board-changes {
+  margin: 6px 0;
+  padding-left: 0;
+  list-style: none;
+}
+.board-items li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.board-items li:focus-within {
+  background: rgba(138, 180, 248, 0.16);
+}
+.board-changes li {
+  padding: 2px 0;
+}
+.board-changes time {
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+.board-changes-title {
+  font-size: 14px;
+  margin: 10px 0 2px;
+}

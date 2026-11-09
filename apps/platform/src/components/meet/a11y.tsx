@@ -12,6 +12,7 @@ import {
   SHORTCUTS,
   parseA11yPrefs,
 } from '@/lib/a11y';
+import { BOARD_ANNOUNCE, type BoardAnnounce } from '@/lib/board-text';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 
 export { DEFAULT_A11Y, SHORTCUTS, parseA11yPrefs, type A11yPrefs } from '@/lib/a11y';
@@ -29,6 +30,12 @@ export function useSystemDark(): boolean | null {
   }, []);
   return dark;
 }
+
+const BOARD_LABEL: Record<BoardAnnounce, MessageKey> = {
+  all: 'room.a11y.boardAll',
+  summary: 'room.a11y.boardSummary',
+  off: 'room.a11y.boardOff',
+};
 
 const THEME_LABEL: Record<PanelTheme, MessageKey> = {
   system: 'room.a11y.themeSystem',
@@ -172,7 +179,11 @@ export function A11yView(props: {
 }) {
   const { prefs, onChange } = props;
   const t = useT();
-  const row = (key: Exclude<keyof A11yPrefs, 'panelTheme'>, label: MessageKey, help: MessageKey) => (
+  const row = (
+    key: Exclude<keyof A11yPrefs, 'panelTheme' | 'boardAnnounce'>,
+    label: MessageKey,
+    help: MessageKey,
+  ) => (
     <label className="switch a11y-row" key={key}>
       <input type="checkbox" checked={prefs[key]} onChange={(e) => onChange({ [key]: e.target.checked })} />
       <span>
@@ -216,6 +227,22 @@ export function A11yView(props: {
       {row('announceActivity', 'room.a11y.activity', 'room.a11y.activityHelp')}
       {row('sounds', 'room.a11y.sounds', 'room.a11y.soundsHelp')}
       {row('largeCaptions', 'room.a11y.largeCaptions', 'room.a11y.largeCaptionsHelp')}
+      <fieldset className="group theme-choice">
+        <legend>{t('room.a11y.board')}</legend>
+        <small className="muted">{t('room.a11y.boardHelp')}</small>
+        {BOARD_ANNOUNCE.map((value) => (
+          <label key={value} className="radio-row">
+            <input
+              type="radio"
+              name="board-announce"
+              value={value}
+              checked={prefs.boardAnnounce === value}
+              onChange={() => onChange({ boardAnnounce: value })}
+            />
+            <span>{t(BOARD_LABEL[value])}</span>
+          </label>
+        ))}
+      </fieldset>
       <p className="muted">{t('room.a11y.always')}</p>
       <button className="btn tonal" onClick={props.onShortcuts}>
         {t('room.a11y.viewShortcuts')}
