@@ -30,7 +30,7 @@ import {
   setSourceEnabled,
   testSearch,
 } from '@/server/knowledge/service';
-import { keywords } from '@/server/knowledge/text';
+import { keywords, sparseVector } from '@/server/knowledge/text';
 import { createRoom } from '@/server/rooms/service';
 import { hashPassword } from '@/server/security/password';
 import {
@@ -474,10 +474,12 @@ describe.skipIf(!process.env.QDRANT_TEST_URL)('Qdrant contract', () => {
     await real.ensureCollection(name, DIMS);
     await real.ensureCollection(name, DIMS); // idempotent
     await expect(real.ensureCollection(name, DIMS + 1)).rejects.toThrow(/tamanho/);
-    const point = (id: string, tenant: string, source: string, text: string): VectorPoint => ({
+    // Clearly different meaning vectors (one axis each), so the ranking is never a coin toss.
+    const axis = (i: number) => Array.from({ length: DIMS }, (_, j) => (j === i ? 1 : 0));
+    const point = (id: string, tenant: string, source: string, text: string, dir: number): VectorPoint => ({
       id,
-      dense: vectorOf(text),
-      sparse: { indices: [1, 7, 42], values: [1, 1.5, 2] },
+      dense: axis(dir),
+      sparse: sparseVector(text),
       payload: {
         tenant_id: tenant,
         kb_id: 'kb',
@@ -490,28 +492,23 @@ describe.skipIf(!process.env.QDRANT_TEST_URL)('Qdrant contract', () => {
       },
     });
     await real.upsert(name, [
-      point(crypto.randomUUID(), 't1', 's1', 'plano pro custa noventa e nove reais'),
-      point(crypto.randomUUID(), 't1', 's2', 'entrega leva cinco dias'),
-      point(crypto.randomUUID(), 't2', 's3', 'plano pro de outra empresa'),
+      point(crypto.randomUUID(), 't1', 's1', 'plano pro custa noventa e nove reais', 0),
+      point(crypto.randomUUID(), 't1', 's2', 'entrega leva cinco dias', 1),
+      point(crypto.randomUUID(), 't2', 's3', 'plano pro custa pouco em outra empresa', 0),
     ]);
-    const hits = await real.search(
-      name,
-      't1',
-      vectorOf('quanto custa o plano pro'),
-      { indices: [7], values: [1] },
-      5,
-    );
+    // Meaning and keywords both point at s1: first in the fused ranking, and never t2's point.
+    const hits = await real.search(name, 't1', axis(0), sparseVector('quanto custa o plano pro'), 5);
     expect(hits.length).toBe(2);
     expect(hits.every((h) => h.payload.tenant_id === 't1')).toBe(true);
-    expect(hits[0].payload.content).toContain('custa');
+    expect(hits[0].payload.source_id).toBe('s1');
+    // Keywords alone find the right passage when the meaning vector says nothing useful.
+    const byWords = await real.search(name, 't1', axis(5), sparseVector('entrega cinco dias'), 5);
+    expect(byWords[0].payload.source_id).toBe('s2');
     await real.setSourceEnabled(name, 's1', false);
-    expect(
-      (await real.search(name, 't1', vectorOf('plano pro'), { indices: [], values: [] }, 5)).map(
-        (h) => h.payload.source_id,
-      ),
-    ).toEqual(['s2']);
+    const left = await real.search(name, 't1', axis(0), sparseVector('plano'), 5);
+    expect(left.map((h) => h.payload.source_id)).toEqual(['s2']);
     await real.deleteSource(name, 's2');
-    expect(await real.search(name, 't1', vectorOf('entrega'), { indices: [], values: [] }, 5)).toEqual([]);
+    expect(await real.search(name, 't1', axis(1), sparseVector('entrega'), 5)).toEqual([]);
     await real.dropCollection(name);
     await real.dropCollection(name); // already gone: fine
   });
