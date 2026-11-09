@@ -20,6 +20,8 @@ export interface JoinTokenRequest {
   identity: string;
   displayName: string;
   role: ParticipantRole;
+  /** The signed-in person's role in the organization (admin, manager, member); none for guests. */
+  orgRole?: string;
   agentName?: string;
   /** One dispatch per agent in the room (see `agentDispatchMetadata`). */
   agentMetadata?: string[];
@@ -34,7 +36,7 @@ export async function issueJoinToken(req: JoinTokenRequest): Promise<string> {
     identity: req.identity,
     name: req.displayName,
     ttl: JOIN_TOKEN_TTL_SECONDS,
-    attributes: { role: req.role },
+    attributes: { role: req.role, ...(req.orgRole ? { 'impa.org': req.orgRole } : {}) },
   });
   token.addGrant({
     roomJoin: true,

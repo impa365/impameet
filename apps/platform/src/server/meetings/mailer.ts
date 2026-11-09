@@ -6,7 +6,8 @@ export interface InviteMail {
   to: string;
   subject: string;
   text: string;
-  ics: string;
+  /** Calendar invite attached when present (meeting invitations). */
+  ics?: string;
 }
 
 export interface Mailer {
@@ -31,7 +32,7 @@ export function getMailer(): Mailer | null {
         to: mail.to,
         subject: mail.subject,
         text: mail.text,
-        icalEvent: { method: 'REQUEST', content: mail.ics },
+        ...(mail.ics ? { icalEvent: { method: 'REQUEST', content: mail.ics } } : {}),
       });
     },
   };

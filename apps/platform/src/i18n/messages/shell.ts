@@ -14,6 +14,7 @@ export default defineMessages(
         meetings: 'Reuniões agendadas',
         recordings: 'Gravações',
         transcripts: 'Transcrições',
+        reports: 'Atas',
       },
       tabs: {
         agents: 'Agentes de IA',
@@ -86,6 +87,7 @@ export default defineMessages(
           meetings: 'Scheduled meetings',
           recordings: 'Recordings',
           transcripts: 'Transcripts',
+          reports: 'Minutes',
         },
         tabs: {
           agents: 'AI agents',
@@ -157,6 +159,7 @@ export default defineMessages(
           meetings: 'Reuniones programadas',
           recordings: 'Grabaciones',
           transcripts: 'Transcripciones',
+          reports: 'Actas',
         },
         tabs: {
           agents: 'Agentes de IA',

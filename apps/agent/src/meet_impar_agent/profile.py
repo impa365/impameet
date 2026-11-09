@@ -16,6 +16,7 @@ import aiohttp
 
 from . import redaction
 from .config import Settings
+from .insights import clean_access, clean_insights
 from .languages import clean_voices
 from .providers import SpeechProvider, speech_provider
 
@@ -66,6 +67,9 @@ class AgentProfile:
     moderation_rules: str = ""
     # What in the meeting it may look at when asked (off unless an admin turned it on).
     perception: tuple[str, ...] = ()
+    # Minutes, "what did I miss?", copilot, metrics; and who sees the copilot and the metrics.
+    insights: tuple[str, ...] = ()
+    insights_access: str = "moderators"
 
     def secrets(self) -> list[str]:
         return [s for s in (self.llm_api_key, self.tts_api_key, self.stt_api_key) if s]
@@ -209,6 +213,8 @@ def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
         moderation_tools=clean_tools(remote.get("moderationTools")),
         moderation_rules=clean_rules(remote.get("moderationRules")),
         perception=clean_perception(remote.get("perception")),
+        insights=clean_insights(remote.get("insights")),
+        insights_access=clean_access(remote.get("insightsAccess")),
     )
 
 

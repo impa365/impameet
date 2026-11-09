@@ -26,6 +26,9 @@ interface Agent {
   moderationTools: ModerationTool[];
   moderationRules: string;
   perception: Perception[];
+  insights: Insight[];
+  insightsAccess: 'moderators' | 'managers';
+  minutesWebhook: string | null;
   llmIntegrationId: string | null;
   ttsIntegrationId: string | null;
   sttIntegrationId: string | null;
@@ -50,6 +53,9 @@ interface Draft {
   moderationTools: ModerationTool[];
   moderationRules: string;
   perception: Perception[];
+  insights: Insight[];
+  insightsAccess: 'moderators' | 'managers';
+  minutesWebhook: string;
   llmIntegrationId: string;
   ttsIntegrationId: string;
   sttIntegrationId: string;
@@ -66,6 +72,14 @@ const MODERATION = {
   lobby: ['admin.agents.modLobby', 'admin.agents.modLobbyHelp'],
   record: ['admin.agents.modRecord', 'admin.agents.modRecordHelp'],
 } as const satisfies Record<ModerationTool, readonly [MessageKey, MessageKey]>;
+
+type Insight = 'minutes' | 'catchup' | 'copilot' | 'metrics';
+const INSIGHTS = {
+  minutes: ['admin.agents.insightMinutes', 'admin.agents.insightMinutesHelp'],
+  catchup: ['admin.agents.insightCatchup', 'admin.agents.insightCatchupHelp'],
+  copilot: ['admin.agents.insightCopilot', 'admin.agents.insightCopilotHelp'],
+  metrics: ['admin.agents.insightMetrics', 'admin.agents.insightMetricsHelp'],
+} as const satisfies Record<Insight, readonly [MessageKey, MessageKey]>;
 
 type Perception = 'board' | 'polls' | 'screen';
 const PERCEPTION = {
@@ -90,6 +104,9 @@ const EMPTY: Draft = {
   moderationTools: [],
   moderationRules: '',
   perception: [],
+  insights: [],
+  insightsAccess: 'moderators',
+  minutesWebhook: '',
   llmIntegrationId: '',
   ttsIntegrationId: '',
   sttIntegrationId: '',
@@ -155,6 +172,9 @@ export function AgentsTab() {
       moderationTools: agent.moderationTools ?? [],
       moderationRules: agent.moderationRules ?? '',
       perception: agent.perception ?? [],
+      insights: agent.insights ?? [],
+      insightsAccess: agent.insightsAccess ?? 'moderators',
+      minutesWebhook: agent.minutesWebhook ?? '',
       llmIntegrationId: agent.llmIntegrationId ?? '',
       ttsIntegrationId: agent.ttsIntegrationId ?? '',
       sttIntegrationId: agent.sttIntegrationId ?? '',
@@ -360,6 +380,64 @@ export function AgentsTab() {
               />
               <span className="muted">{t('admin.agents.rulesHelp')}</span>
             </label>
+          </fieldset>
+          <fieldset className="group">
+            <legend>{t('admin.agents.insightsLegend')}</legend>
+            <p className="muted small-print">{t('admin.agents.insightsHint')}</p>
+            {(Object.keys(INSIGHTS) as Insight[]).map((what) => (
+              <label key={what} className="switch">
+                <input
+                  type="checkbox"
+                  checked={draft.insights.includes(what)}
+                  onChange={(e) =>
+                    set(
+                      'insights',
+                      e.target.checked ? [...draft.insights, what] : draft.insights.filter((x) => x !== what),
+                    )
+                  }
+                />
+                <span>
+                  {t(INSIGHTS[what][0])}
+                  <small>{t(INSIGHTS[what][1])}</small>
+                </span>
+              </label>
+            ))}
+            {(draft.insights.includes('copilot') || draft.insights.includes('metrics')) && (
+              <fieldset className="group">
+                <legend>{t('admin.agents.insightsAccessLegend')}</legend>
+                {(['moderators', 'managers'] as const).map((access) => (
+                  <label key={access} className="radio-row">
+                    <input
+                      type="radio"
+                      name="insights-access"
+                      checked={draft.insightsAccess === access}
+                      onChange={() => set('insightsAccess', access)}
+                    />
+                    <span>
+                      {t(
+                        access === 'moderators'
+                          ? 'admin.agents.insightsAccessModerators'
+                          : 'admin.agents.insightsAccessManagers',
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            )}
+            {draft.insights.includes('minutes') && (
+              <label>
+                {t('admin.agents.minutesWebhookLabel')}
+                <input
+                  type="text"
+                  inputMode="url"
+                  maxLength={2000}
+                  value={draft.minutesWebhook}
+                  onChange={(e) => set('minutesWebhook', e.target.value)}
+                  placeholder="https://n8n.suaempresa.com/webhook/ata"
+                />
+                <span className="muted small-print">{t('admin.agents.minutesWebhookHelp')}</span>
+              </label>
+            )}
           </fieldset>
           <fieldset className="group">
             <legend>{t('admin.agents.perceptionLegend')}</legend>

@@ -103,6 +103,7 @@ class VoiceAgent(Agent):
         tool_specs: tuple[ToolSpec, ...] = (),
         perception: Perception | None = None,
         actions: bool = True,
+        hearing: Callable[[Talker, str], None] | None = None,
     ) -> None:
         self._profile = profile
         self._speaker = speaker
@@ -122,6 +123,7 @@ class VoiceAgent(Agent):
         self._authors: tuple[Talker, ...] = ()
         self._actions = actions
         self.perception = perception
+        self._hearing = hearing
 
         tools: list[Any] = []
         if handoff is not None:
@@ -175,6 +177,8 @@ class VoiceAgent(Agent):
                 )
                 if who.identity:
                     self._speaking[who.identity] = who
+                if self._hearing is not None:
+                    self._hearing(who, first.text)
             self._maybe_barge_in(first.text, who)
         tag = ""
         if len(self._voices) > 1:

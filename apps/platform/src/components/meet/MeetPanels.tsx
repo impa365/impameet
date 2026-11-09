@@ -20,6 +20,7 @@ const TITLES: Record<PanelId, MessageKey> = {
   effects: 'room.panels.effects',
   host: 'room.panels.host',
   a11y: 'room.panels.a11y',
+  copilot: 'room.panels.copilot',
 };
 
 const SUBVIEWS: Partial<Record<PanelId, PanelId>> = { polls: 'activities' };

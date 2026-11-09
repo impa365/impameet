@@ -36,6 +36,8 @@ export async function POST(
       identity,
       displayName: entry.displayName,
       role: entry.userId ? 'participant' : 'guest',
+      // Admins and managers moderate and skip the waiting room: whoever waited is a member.
+      orgRole: entry.userId ? 'member' : undefined,
     });
     return json({ status: 'approved', ...grant });
   });

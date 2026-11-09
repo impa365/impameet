@@ -140,6 +140,24 @@ export default defineMessages(
       seePollsHelp: 'Sabe as perguntas e quantos votos cada opção tem (nunca em quem cada pessoa votou).',
       seeScreen: 'Telas compartilhadas',
       seeScreenHelp: 'Olha a tela que alguém está compartilhando, no momento em que pedem.',
+      insightsLegend: 'Recursos da reunião',
+      insightsHint:
+        'O que o assistente faz pela reunião além de conversar. Tudo desligado até você ligar. A conversa só fica guardada quando a ata está ligada, e as respostas privadas usam o mesmo modelo de linguagem do agente.',
+      insightMinutes: 'Ata automática',
+      insightMinutesHelp:
+        'Quando a reunião acaba, escreve o resumo, as decisões e as tarefas (com responsável e prazo, se foram ditos) e envia por e-mail para o dono da sala e para quem participou com login. Fica em Painel → Atas.',
+      insightCatchup: '“O que eu perdi?”',
+      insightCatchupHelp: 'Quem chega atrasado pede um resumo do que já aconteceu, e só essa pessoa vê.',
+      insightCopilot: 'Copiloto privado',
+      insightCopilotHelp: 'Perguntas por texto durante a reunião, com resposta que só quem perguntou vê.',
+      insightMetrics: 'Métricas da reunião',
+      insightMetricsHelp: 'Tempo de fala de cada pessoa ao vivo e no relatório da reunião.',
+      insightsAccessLegend: 'Quem pode usar o copiloto e ver as métricas',
+      insightsAccessModerators: 'Moderadores da sala, gestores e administradores',
+      insightsAccessManagers: 'Só gestores e administradores da organização',
+      minutesWebhookLabel: 'Enviar a ata também para (opcional)',
+      minutesWebhookHelp:
+        'Um endereço que recebe a ata em JSON (por exemplo um fluxo do n8n ou seu CRM). A conversa completa não é enviada.',
       rulesLabel: 'Regras de moderação (opcional): quando o assistente deve agir sozinho',
       rulesPlaceholder:
         'Ex.:\n- Quando alguém pedir para entrar, aprove automaticamente.\n- Se alguém estiver com barulho alto no microfone, silencie e avise com educação.\n- Nunca aprove quem não disser o nome completo.',
@@ -479,6 +497,25 @@ export default defineMessages(
         seePollsHelp: 'Knows the questions and how many votes each option has (never who voted for what).',
         seeScreen: 'Shared screens',
         seeScreenHelp: 'Looks at the screen someone is sharing, at the moment they ask.',
+        insightsLegend: 'Meeting features',
+        insightsHint:
+          'What the assistant does for the meeting besides talking. Everything is off until you turn it on. The conversation is only kept when the minutes are on, and private answers use the agent’s own language model.',
+        insightMinutes: 'Automatic minutes',
+        insightMinutesHelp:
+          'When the meeting ends, writes the summary, decisions and tasks (with owner and due date, if they were said) and e-mails them to the room owner and to signed-in participants. Also under Dashboard → Minutes.',
+        insightCatchup: '“What did I miss?”',
+        insightCatchupHelp:
+          'Whoever arrives late asks for a summary of what happened so far, and only they see it.',
+        insightCopilot: 'Private copilot',
+        insightCopilotHelp: 'Text questions during the meeting, answered only to whoever asked.',
+        insightMetrics: 'Meeting metrics',
+        insightMetricsHelp: 'How long each person spoke, live and in the meeting report.',
+        insightsAccessLegend: 'Who may use the copilot and see the metrics',
+        insightsAccessModerators: 'Room moderators, managers and admins',
+        insightsAccessManagers: 'Only the organization’s managers and admins',
+        minutesWebhookLabel: 'Also send the minutes to (optional)',
+        minutesWebhookHelp:
+          'An address that receives the minutes as JSON (for example an n8n flow or your CRM). The full conversation is not sent.',
         rulesLabel: 'Moderation rules (optional): when the assistant acts on its own',
         rulesPlaceholder:
           'E.g.:\n- When someone asks to join, let them in automatically.\n- If someone has loud noise on their microphone, mute them and kindly say so.\n- Never let in anyone who does not give their full name.',
@@ -821,6 +858,25 @@ export default defineMessages(
         seePollsHelp: 'Conoce las preguntas y cuántos votos tiene cada opción (nunca quién votó qué).',
         seeScreen: 'Pantallas compartidas',
         seeScreenHelp: 'Mira la pantalla que alguien está compartiendo, en el momento en que lo piden.',
+        insightsLegend: 'Funciones de la reunión',
+        insightsHint:
+          'Lo que el asistente hace por la reunión además de conversar. Todo está desactivado hasta que lo actives. La conversación solo se guarda cuando el acta está activada, y las respuestas privadas usan el mismo modelo de lenguaje del agente.',
+        insightMinutes: 'Acta automática',
+        insightMinutesHelp:
+          'Cuando termina la reunión, escribe el resumen, las decisiones y las tareas (con responsable y plazo, si se dijeron) y las envía por correo al dueño de la sala y a quienes participaron con sesión. También en Panel → Actas.',
+        insightCatchup: '“¿Qué me perdí?”',
+        insightCatchupHelp: 'Quien llega tarde pide un resumen de lo que ya pasó, y solo esa persona lo ve.',
+        insightCopilot: 'Copiloto privado',
+        insightCopilotHelp:
+          'Preguntas por texto durante la reunión, con respuesta que solo ve quien preguntó.',
+        insightMetrics: 'Métricas de la reunión',
+        insightMetricsHelp: 'Cuánto habló cada persona, en vivo y en el informe de la reunión.',
+        insightsAccessLegend: 'Quién puede usar el copiloto y ver las métricas',
+        insightsAccessModerators: 'Moderadores de la sala, gestores y administradores',
+        insightsAccessManagers: 'Solo gestores y administradores de la organización',
+        minutesWebhookLabel: 'Enviar el acta también a (opcional)',
+        minutesWebhookHelp:
+          'Una dirección que recibe el acta en JSON (por ejemplo un flujo de n8n o tu CRM). La conversación completa no se envía.',
         rulesLabel: 'Reglas de moderación (opcional): cuándo el asistente actúa solo',
         rulesPlaceholder:
           'Ej.:\n- Cuando alguien pida entrar, admítelo automáticamente.\n- Si alguien tiene mucho ruido en el micrófono, siléncialo y avísale con amabilidad.\n- Nunca admitas a quien no diga su nombre completo.',

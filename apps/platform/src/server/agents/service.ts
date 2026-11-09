@@ -50,6 +50,7 @@ const AGENT_COLUMNS = (sql: Sql) => sql`
   voices, tts_model as "ttsModel", stt_model as "sttModel", llm_model as "llmModel", listen_mode as "listenMode",
   respond_mode as "respondMode", mute_policy as "mutePolicy",
   moderation_tools as "moderationTools", moderation_rules as "moderationRules", perception,
+  insights, insights_access as "insightsAccess", minutes_webhook as "minutesWebhook",
   llm_integration_id as "llmIntegrationId", tts_integration_id as "ttsIntegrationId",
   stt_integration_id as "sttIntegrationId",
   is_default as "isDefault", created_at as "createdAt", updated_at as "updatedAt",
@@ -123,11 +124,12 @@ export async function createAgent(sql: Sql, actor: SessionUser, input: AgentInpu
     const [agent] = await sql<AgentConfig[]>`
       insert into agents (tenant_id, name, description, instructions, knowledge, greeting, voice_id, voices, tts_model, stt_model,
                           llm_model, listen_mode, respond_mode, mute_policy, moderation_tools, moderation_rules,
-                          perception, llm_integration_id, tts_integration_id, stt_integration_id)
+                          perception, insights, insights_access, minutes_webhook, llm_integration_id, tts_integration_id, stt_integration_id)
       values (${actor.tenantId}, ${input.name}, ${input.description}, ${input.instructions}, ${input.knowledge}, ${input.greeting},
               ${mainVoice(input)}, ${sql.json(input.voices)}, ${input.ttsModel}, ${input.sttModel}, ${input.llmModel}, ${input.listenMode}, ${input.respondMode},
               ${input.mutePolicy}, ${input.moderationTools}, ${input.moderationRules},
-              ${input.perception}, ${input.llmIntegrationId}, ${input.ttsIntegrationId}, ${input.sttIntegrationId})
+              ${input.perception}, ${input.insights}, ${input.insightsAccess}, ${input.minutesWebhook},
+              ${input.llmIntegrationId}, ${input.ttsIntegrationId}, ${input.sttIntegrationId})
       returning ${AGENT_COLUMNS(sql)}`;
     await audit(sql, {
       tenantId: actor.tenantId,
@@ -161,7 +163,8 @@ export async function updateAgent(
         tts_model = ${input.ttsModel}, stt_model = ${input.sttModel}, llm_model = ${input.llmModel}, listen_mode = ${input.listenMode},
         respond_mode = ${input.respondMode}, mute_policy = ${input.mutePolicy},
         moderation_tools = ${input.moderationTools}, moderation_rules = ${input.moderationRules},
-        perception = ${input.perception},
+        perception = ${input.perception}, insights = ${input.insights},
+        insights_access = ${input.insightsAccess}, minutes_webhook = ${input.minutesWebhook},
         llm_integration_id = ${input.llmIntegrationId}, tts_integration_id = ${input.ttsIntegrationId},
         stt_integration_id = ${input.sttIntegrationId},
         updated_at = now()
@@ -304,6 +307,8 @@ export interface WorkerAgent {
   moderationTools: string[];
   moderationRules: string;
   perception: string[];
+  insights: string[];
+  insightsAccess: string;
   /** Present when the agent uses a saved LLM integration (decrypted, internal API only). */
   llm: { baseUrl: string; apiKey: string; model: string } | null;
   /** Speaking and listening providers, each with its own key (decrypted, internal API only). */
@@ -354,6 +359,8 @@ export async function agentForWorker(sql: Sql, key: Buffer | null, id: string): 
     moderationTools: row.moderationTools,
     moderationRules: row.moderationRules,
     perception: row.perception,
+    insights: row.insights,
+    insightsAccess: row.insightsAccess,
     llm,
     tts,
     stt,

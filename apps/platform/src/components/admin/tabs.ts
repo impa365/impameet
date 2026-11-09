@@ -24,13 +24,14 @@ export function pickAdminTab(role: 'admin' | 'manager', requested: string | unde
   return tabs.find((t) => t === requested) ?? tabs[0];
 }
 
-export type DashboardView = 'rooms' | 'meetings' | 'recordings' | 'transcripts';
+export type DashboardView = 'rooms' | 'meetings' | 'recordings' | 'transcripts' | 'reports';
 
 export const DASHBOARD_VIEWS: Record<DashboardView, { label: MessageKey; icon: IconName }> = {
   rooms: { label: 'shell.nav.views.rooms', icon: 'video_call' },
   meetings: { label: 'shell.nav.views.meetings', icon: 'calendar_month' },
   recordings: { label: 'shell.nav.views.recordings', icon: 'video_library' },
   transcripts: { label: 'shell.nav.views.transcripts', icon: 'description' },
+  reports: { label: 'shell.nav.views.reports', icon: 'auto_awesome' },
 };
 
 export function pickDashboardView(requested: string | undefined): DashboardView {

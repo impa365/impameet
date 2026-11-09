@@ -118,6 +118,7 @@ export async function switchRoom(
     identity: claims.sub,
     displayName: claims.name || claims.sub,
     role: (claims.attributes?.role ?? 'guest') as ParticipantRole,
+    orgRole: claims.attributes?.['impa.org'],
   };
   if (input.target === 0) return grantJoin(sql, cfg, room, who);
 

@@ -18,7 +18,8 @@ export type PanelId =
   | 'breakouts'
   | 'effects'
   | 'host'
-  | 'a11y';
+  | 'a11y'
+  | 'copilot';
 
 export interface MoreItem {
   id: string;

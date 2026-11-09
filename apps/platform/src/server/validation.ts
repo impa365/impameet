@@ -174,6 +174,10 @@ export const tenantAdminInput = z
 export const AGENT_MODERATION_TOOLS = ['remove', 'mute', 'lobby', 'camera', 'record'] as const;
 /** What in the meeting an agent may look at when asked. */
 export const AGENT_PERCEPTION = ['board', 'polls', 'screen'] as const;
+/** What an agent does for the meeting: minutes, "what did I miss?", a private copilot, metrics. */
+export const AGENT_INSIGHTS = ['minutes', 'catchup', 'copilot', 'metrics'] as const;
+/** Who may use the copilot and see the metrics. */
+export const INSIGHTS_ACCESS = ['moderators', 'managers'] as const;
 
 export const agentModerationInput = z.object({
   room: z.string().min(3).max(200),
@@ -232,6 +236,21 @@ export const agentInput = z.object({
     .max(AGENT_MODERATION_TOOLS.length)
     .default([])
     .transform((list) => [...new Set(list)]),
+  insights: z
+    .array(z.enum(AGENT_INSIGHTS))
+    .max(AGENT_INSIGHTS.length)
+    .default([])
+    .transform((list) => [...new Set(list)]),
+  insightsAccess: z.enum(INSIGHTS_ACCESS).default('moderators'),
+  /** Optional: where the minutes are also POSTed as JSON (checked like any tool URL). */
+  minutesWebhook: z
+    .string()
+    .trim()
+    .max(2000, 'URL muito longa')
+    .refine((v) => !v || /^https?:\/\/[^\s/?#]+/.test(v), 'Use uma URL https://')
+    .nullable()
+    .default(null)
+    .transform((v) => v || null),
   /** What in the meeting it may look at: the whiteboard, polls, shared screens. */
   perception: z
     .array(z.enum(AGENT_PERCEPTION))
@@ -425,3 +444,39 @@ export function slugify(text: string, maxLength = 64): string {
     .slice(0, maxLength)
     .replace(/-+$/g, '');
 }
+
+const reportPerson = z.object({
+  identity: z.string().min(1).max(200),
+  name: z.string().max(200),
+  role: z.string().max(40).default('participant'),
+  talkSeconds: z
+    .number()
+    .min(0)
+    .max(7 * 24 * 3600),
+  turns: z.number().int().min(0).max(1_000_000),
+  words: z.number().int().min(0).max(10_000_000),
+  joinedAt: z.number().positive(),
+  leftAt: z.number().positive().nullable(),
+});
+
+/** What the voice agent sends when it leaves a meeting. */
+export const meetingReportInput = z.object({
+  room: z.string().min(3).max(200),
+  startedAt: z.number().positive(),
+  endedAt: z.number().positive(),
+  participants: z.array(reportPerson).max(500),
+  lines: z
+    .array(
+      z.object({
+        at: z
+          .number()
+          .min(0)
+          .max(7 * 24 * 3600),
+        identity: z.string().max(200),
+        name: z.string().max(200),
+        text: z.string().max(5000),
+      }),
+    )
+    .max(20_000)
+    .default([]),
+});

@@ -4,7 +4,9 @@ import type { Sql } from '@/server/db';
 import { createIntegration } from '@/server/integrations/service';
 import { integrationInput } from '@/server/validation';
 
-const KEY = randomBytes(32);
+/** The key the helper's integrations are sealed with (tests that read them back need it). */
+export const READY_AGENT_KEY = randomBytes(32);
+const KEY = READY_AGENT_KEY;
 
 /**
  * Everything an agent has to choose (there is no server provider, model or voice): an LLM and a

@@ -318,6 +318,8 @@ export async function entersDirectly(
 export interface JoinDecision {
   role: ParticipantRole;
   identity: string;
+  /** Signed-in people only: admin, manager or member of the organization. */
+  orgRole?: string;
 }
 
 /** Who may enter, and as what. Moderators skip the room password. */
@@ -331,7 +333,11 @@ export async function authorizeJoin(
   if (user) {
     const moderator = room.ownerId === user.id || canManageAllRooms(user);
     if (!moderator) await checkRoomPassword(sql, room, password);
-    return { role: moderator ? 'moderator' : 'participant', identity: `u-${user.id}-${suffix}` };
+    return {
+      role: moderator ? 'moderator' : 'participant',
+      identity: `u-${user.id}-${suffix}`,
+      orgRole: user.role,
+    };
   }
   if (!room.allowGuests) throw unauthorized('Esta sala é só para membros da organização. Faça login.');
   await checkRoomPassword(sql, room, password);

@@ -32,7 +32,7 @@ export async function grantJoin(
   sql: Sql,
   cfg: Pick<Config, 'livekitApiKey' | 'livekitApiSecret' | 'livekitUrl' | 'agentName'>,
   room: Room,
-  who: { identity: string; displayName: string; role: ParticipantRole },
+  who: { identity: string; displayName: string; role: ParticipantRole; orgRole?: string },
 ): Promise<JoinGrant> {
   const limits = await tenantLimits(sql, room.tenantId);
   const withAgent = room.agentEnabled && limits.agents;
@@ -45,6 +45,7 @@ export async function grantJoin(
     identity: who.identity,
     displayName: who.displayName,
     role: who.role,
+    orgRole: who.orgRole,
     agentName: agents.length > 0 ? cfg.agentName : undefined,
     agentMetadata: agents.map((a) => agentDispatchMetadata(room.tenantId, a, room)),
     maxParticipants: capParticipants(room.maxParticipants, limits.maxParticipants),

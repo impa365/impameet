@@ -4,6 +4,7 @@ import { AppShell } from '@/components/AppShell';
 import { MeetingsPanel } from '@/components/MeetingsPanel';
 import { RecordingsPanel } from '@/components/RecordingsPanel';
 import { RoomsPanel } from '@/components/RoomsPanel';
+import { ReportsPanel } from '@/components/ReportsPanel';
 import { TranscriptsPanel } from '@/components/TranscriptsPanel';
 import { DASHBOARD_VIEWS, pickDashboardView } from '@/components/admin/tabs';
 import { getT } from '@/i18n/server';
@@ -55,6 +56,7 @@ export default async function Dashboard({ searchParams }: Props) {
       {view === 'meetings' && <MeetingsPanel rooms={rooms.map((r) => ({ slug: r.slug, name: r.name }))} />}
       {view === 'recordings' && <RecordingsPanel />}
       {view === 'transcripts' && <TranscriptsPanel />}
+      {view === 'reports' && <ReportsPanel />}
     </AppShell>
   );
 }

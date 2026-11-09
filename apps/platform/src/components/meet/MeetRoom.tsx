@@ -21,6 +21,7 @@ import { PollsView, usePolls } from '../Polls';
 import { type CollabPolicy, RoomSettingsEditor } from '../RoomSettings';
 import { WhiteboardPanel, useWhiteboard } from '../Whiteboard';
 import { changeSentence } from '../BoardText';
+import { CopilotView, useInsights } from './Copilot';
 import { type BoardChange, ChangeDigest } from '@/lib/board-text';
 import { api } from '../api';
 import { Icon } from '../ui/Icon';
@@ -157,6 +158,7 @@ export function MeetRoom(props: {
     [],
   );
   const board = useWhiteboard(room, mayDraw, onBoardChange);
+  const insights = useInsights(room, participants);
   const captions = useCaptions(room);
   const polls = usePolls(room, mayCreatePoll);
   const breakouts = useBreakouts(room, props.slug, props.breakout, props.onSwitchRoom);
@@ -489,6 +491,16 @@ export function MeetRoom(props: {
   const effectsAvailable = background.supported;
 
   const more: MoreItem[] = [
+    ...(insights.any
+      ? [
+          {
+            id: 'copilot',
+            icon: 'auto_awesome' as const,
+            label: t('room.panels.copilot'),
+            onSelect: () => openPanel('copilot'),
+          },
+        ]
+      : []),
     ...(effectsAvailable
       ? [
           {
@@ -686,6 +698,7 @@ export function MeetRoom(props: {
               />
             </div>
           )}
+          {panel === 'copilot' && <CopilotView insights={insights} />}
           {panel === 'a11y' && (
             <A11yView prefs={prefs} onChange={updatePrefs} onShortcuts={() => setShortcutsOpen(true)} />
           )}

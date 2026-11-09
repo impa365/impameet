@@ -17,6 +17,14 @@ from livekit.plugins import silero
 from . import redaction, telemetry
 from .captions import MODE_ATTRIBUTE, run_captions
 from .config import Settings, get_settings
+from .insights import (
+    COPILOT_TOPIC,
+    Copilot,
+    MeetingRecord,
+    insights_attributes,
+    llm_answer,
+    send_report,
+)
 from .listening import Speaker, next_linked, same_name
 from .moderation import ModerationClient
 from .perception import BOARD_TOPIC, POLICY_TOPIC, POLLS_TOPIC, Board, Perception
@@ -199,6 +207,8 @@ def _build_agent(
     profile: AgentProfile,
     session: AgentSession[Any],
     tools: tuple[ToolsClient | None, tuple[ToolSpec, ...]] = (None, ()),
+    *,
+    record: MeetingRecord | None = None,
 ) -> VoiceAgent:
     """Screen sharing tools exist only when the optional screen service is configured."""
 
@@ -232,6 +242,11 @@ def _build_agent(
         tool_specs=tool_specs,
         perception=perception,
         actions=agent_actions(ctx.job.metadata),
+        hearing=(
+            (lambda who, text: record.heard(who.identity, who.name, who.role, text))
+            if record is not None
+            else None
+        ),
     )
 
 
@@ -285,12 +300,45 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(_log_usage)
 
+    record = meeting_record(profile)
     agent = _build_agent(
-        ctx, settings, profile, session, await load_tools(settings, profile, ctx.room.name)
+        ctx,
+        settings,
+        profile,
+        session,
+        await load_tools(settings, profile, ctx.room.name),
+        record=record,
     )
     await session.start(agent=agent, room=ctx.room, record=False)
     # Lets the platform tell the voice agent apart from captions and the AI screen.
-    await ctx.room.local_participant.set_attributes({MODE_ATTRIBUTE: "voice"})
+    await ctx.room.local_participant.set_attributes(
+        {MODE_ATTRIBUTE: "voice", **insights_attributes(profile.insights, profile.insights_access)}
+    )
+    if record is not None:
+        follow_record(ctx.room, session, record, profile.name)
+        if set(profile.insights) & {"catchup", "copilot", "metrics"}:
+            follow_copilot(
+                ctx.room,
+                Copilot(
+                    ctx.room,
+                    record,
+                    profile.insights,
+                    profile.insights_access,
+                    llm_answer(session.llm),  # type: ignore[arg-type]
+                ),
+            )
+        if (
+            settings.platform
+            and profile.agent_id
+            and {"minutes", "metrics"} & set(profile.insights)
+        ):
+            platform, agent_id = settings.platform, profile.agent_id
+
+            async def _report() -> None:
+                report = record.report(ctx.room.name, include_lines="minutes" in profile.insights)
+                await send_report(platform, agent_id, report)
+
+            ctx.add_shutdown_callback(_report)
     follow_speakers(ctx.room, session, profile.listen_mode)
     follow_peers(ctx.room, agent)
     follow_lobby(ctx.room, agent)
@@ -335,6 +383,49 @@ def spawn(coro: Awaitable[Any]) -> None:
     task = asyncio.ensure_future(coro)
     _TASKS.add(task)
     task.add_done_callback(_TASKS.discard)
+
+
+def meeting_record(profile: AgentProfile) -> MeetingRecord | None:
+    """Kept only when the admin turned an insight on; the conversation only when one needs it."""
+    if not profile.insights:
+        return None
+    return MeetingRecord(keep_lines=bool({"minutes", "catchup", "copilot"} & set(profile.insights)))
+
+
+def follow_record(
+    room: rtc.Room, session: AgentSession[Any], record: MeetingRecord, agent_name: str
+) -> None:
+    """Who joins and leaves, who is talking and what the agent itself says."""
+
+    def joined(p: rtc.RemoteParticipant) -> None:
+        if p.kind != rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
+            record.joined(p.identity, p.name or p.identity, (p.attributes or {}).get("role", ""))
+
+    for p in room.remote_participants.values():
+        joined(p)
+    room.on("participant_connected", joined)
+    room.on("participant_disconnected", lambda p: record.left(p.identity))
+    room.on("active_speakers_changed", lambda ps: record.speakers({p.identity for p in ps}))
+
+    def said(event: Any) -> None:
+        item = getattr(event, "item", None)
+        if getattr(item, "role", None) == "assistant":
+            record.said(agent_name, getattr(item, "text_content", None) or "")
+
+    session.on("conversation_item_added", said)
+
+
+def follow_copilot(room: rtc.Room, copilot: Copilot) -> None:
+    """Private requests from the browsers: answered only to whoever asked."""
+
+    def on_stream(reader: Any, identity: str) -> None:
+        async def read() -> None:
+            with contextlib.suppress(Exception):
+                await copilot.handle(await reader.read_all(), identity)
+
+        spawn(read())
+
+    room.register_text_stream_handler(COPILOT_TOPIC, on_stream)
 
 
 def follow_agent_settings(room: rtc.Room, agent: VoiceAgent) -> None:
