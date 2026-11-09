@@ -9,6 +9,7 @@ import { AgentExamples } from './AgentExamples';
 import { AgentTools } from './AgentTools';
 import type { Integration } from './IntegrationsTab';
 import { messageOf, useLoad } from './useLoad';
+import { VoicePicker } from './VoicePicker';
 
 interface Agent {
   id: string;
@@ -159,8 +160,12 @@ export function AgentsTab() {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState<VoiceLanguage | null>(null);
+  /** Names of the voices picked from the list, to show next to their ids. */
+  const [voiceNames, setVoiceNames] = useState<Record<string, string>>({});
 
   function edit(agent: Agent | null) {
+    setPicking(null);
     setEditing(agent?.id ?? 'new');
     if (!agent) {
       setDraft(EMPTY);
@@ -590,21 +595,54 @@ export function AgentsTab() {
               )}
               <div className="row">
                 {VOICE_LANGUAGES.map((lang) => (
-                  <label key={lang} style={{ flex: 1 }}>
-                    {t(VOICE_LABEL[lang])}
-                    <input
-                      value={draft.voices[lang]}
-                      maxLength={64}
-                      pattern="[A-Za-z0-9_\-]{4,64}"
-                      placeholder={
-                        (ttsKind && SPEECH_CATALOG[ttsKind].voiceExample?.[lang]) ||
-                        t('admin.agents.voicePlaceholder')
-                      }
-                      onChange={(e) => set('voices', { ...draft.voices, [lang]: e.target.value })}
-                    />
-                  </label>
+                  <div key={lang} className="voice-field">
+                    <label>
+                      {t(VOICE_LABEL[lang])}
+                      <input
+                        value={draft.voices[lang]}
+                        maxLength={64}
+                        pattern="[A-Za-z0-9_\-]{4,64}"
+                        placeholder={
+                          (ttsKind && SPEECH_CATALOG[ttsKind].voiceExample?.[lang]) ||
+                          t('admin.agents.voicePlaceholder')
+                        }
+                        onChange={(e) => set('voices', { ...draft.voices, [lang]: e.target.value })}
+                      />
+                    </label>
+                    <div className="row voice-actions">
+                      <button
+                        type="button"
+                        className="btn secondary small"
+                        disabled={!ttsKind}
+                        title={ttsKind ? undefined : t('admin.agents.pickVoiceFirst')}
+                        aria-expanded={picking === lang}
+                        onClick={() => setPicking(picking === lang ? null : lang)}
+                      >
+                        {t('admin.agents.pickVoice')}
+                      </button>
+                      {voiceNames[draft.voices[lang]] && (
+                        <span className="muted small-print">🔊 {voiceNames[draft.voices[lang]]}</span>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
+              {picking && ttsKind && (
+                <VoicePicker
+                  key={`${draft.ttsIntegrationId}:${picking}`}
+                  integrationId={draft.ttsIntegrationId}
+                  kind={ttsKind}
+                  family={draft.ttsModel}
+                  language={picking}
+                  languageName={t(VOICE_LABEL[picking])}
+                  value={draft.voices[picking]}
+                  onPick={(voice) => {
+                    setDraft({ ...draft, voices: { ...draft.voices, [picking]: voice.id } });
+                    setVoiceNames({ ...voiceNames, [voice.id]: voice.name });
+                  }}
+                  onClose={() => setPicking(null)}
+                />
+              )}
             </fieldset>
           </fieldset>
           <fieldset className="group">

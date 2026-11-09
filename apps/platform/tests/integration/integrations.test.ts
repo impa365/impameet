@@ -21,6 +21,7 @@ import {
   discoverModels,
   integrationSecret,
   listIntegrations,
+  listVoices,
   testIntegration,
   updateIntegration,
 } from '@/server/integrations/service';
@@ -306,6 +307,32 @@ describe('integrations', () => {
     });
     // Nothing is recorded: the saved integration keeps its last test.
     expect((await listIntegrations(db(), admin))[0].lastTestOk).toBeNull();
+  });
+
+  it('lists the voices of a saved speech key, only for its admins', async () => {
+    const { admin, member } = await org('acme');
+    const fish = await createIntegration(deps(), admin, FISH(), null);
+    const llm = await createIntegration(deps(), admin, LLM(), null);
+    const seen: string[] = [];
+    const library = (async (url: string, init: RequestInit) => {
+      seen.push(`${url} ${new Headers(init.headers).get('authorization')}`);
+      return Response.json({
+        total: 1,
+        items: [{ _id: '54e3a85ac9594ffa83264b8a494b901b', type: 'tts', state: 'trained', title: 'Ana' }],
+      });
+    }) as unknown as Fetch;
+    const query = { query: 'ana', scope: 'public' as const, language: 'pt' as const, licensed: true };
+    const res = await listVoices(deps(library), admin, fish.id, query);
+    expect(res.ok && res.voices.map((v) => [v.id, v.name])).toEqual([
+      ['54e3a85ac9594ffa83264b8a494b901b', 'Ana'],
+    ]);
+    expect(seen).toEqual([
+      'https://api.fish.audio/model?page_size=100&sort_by=task_count&title=ana&language=pt&licensed=true Bearer fish-0123456789abcdef',
+    ]);
+    await expectAppError(listVoices(deps(library), admin, llm.id, query), 400);
+    await expectAppError(listVoices(deps(library), member, fish.id, query), 403);
+    await expectAppError(listVoices(deps(library), (await org('rival')).admin, fish.id, query), 404);
+    expect(seen).toHaveLength(1);
   });
 
   it('asks for the key again when the API address moves to another host', async () => {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { VOICE_LANGUAGES } from '@/lib/providers';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from './security/password';
 
 export const RESERVED_SLUGS = new Set([
@@ -306,6 +307,15 @@ export const integrationInput = z.discriminatedUnion('kind', [
     defaultModel: modelId,
   }),
 ]);
+
+/** "Escolher voz" in the agent form: a search in the voices of a saved speech key. */
+export const voiceSearchInput = z.object({
+  query: z.string().trim().max(80).default(''),
+  scope: z.enum(['mine', 'public']).default('mine'),
+  language: z.enum(VOICE_LANGUAGES).optional(),
+  /** Fish Audio's public library: only voices whose owner granted the rights. */
+  licensed: z.boolean().default(true),
+});
 
 /** "Buscar modelos" while the form is still open: the typed key, or the saved one when editing. */
 export const modelDiscoveryInput = z.object({

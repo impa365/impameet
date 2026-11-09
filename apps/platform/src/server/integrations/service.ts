@@ -17,6 +17,7 @@ import {
   probeFish,
   probeLlm,
 } from './probe';
+import { type VoiceQuery, type VoicesResult, fetchVoices } from './voices';
 
 export type IntegrationKind = 'llm' | 'embedding' | SpeechProvider;
 export type IntegrationInput = z.infer<typeof integrationInput>;
@@ -253,6 +254,20 @@ export async function discoverModels(
     apiKey = saved.apiKey;
   }
   return probeLlm(deps.fetch ?? fetch, baseUrl, apiKey);
+}
+
+/** The voices of a saved speech key (Fish Audio, Deepgram or ElevenLabs), for the agent form. */
+export async function listVoices(
+  deps: IntegrationDeps,
+  actor: SessionUser,
+  id: string,
+  query: VoiceQuery,
+): Promise<VoicesResult> {
+  assertAdmin(actor);
+  const secret = await integrationSecret(deps.sql, deps.key, actor.tenantId, id);
+  if (!isSpeechProvider(secret.kind))
+    throw badRequest('Escolha uma integração de voz (Fish Audio, Deepgram ou ElevenLabs)');
+  return fetchVoices(deps.fetch ?? fetch, secret.kind, secret.apiKey, query);
 }
 
 async function integrationKind(sql: Sql, tenantId: string, id: string): Promise<string> {

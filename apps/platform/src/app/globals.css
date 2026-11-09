@@ -894,6 +894,57 @@ code.record {
   overflow-wrap: anywhere;
 }
 
+.voice-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.voice-actions {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.voice-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.voice-picker-tools {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voice-picker-tools input[type='search'] {
+  flex: 1;
+  min-width: 220px;
+}
+
+.voice-list li {
+  align-items: flex-start;
+}
+
+.voice-play {
+  min-width: 36px;
+}
+
+.voice-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.voice-info .small-print {
+  margin: 0;
+}
+
 /* --- Menus ------------------------------------------------------------------- */
 
 .popover-anchor {
