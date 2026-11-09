@@ -153,7 +153,10 @@ export function MeetRoom(props: {
   const pollCount = polls.state.polls.length;
   const unseenPolls = panel !== 'polls' && pollCount > pollsSeen;
   const unreadChat = panel === 'chat' ? 0 : chatCount - chatSeen;
-  const aiSilent = participants.some((p) => p.isAgent && p.attributes?.[AGENT_MUTED_ATTRIBUTE] === 'true');
+  const silentAgents = participants
+    .filter((p) => p.isAgent && p.attributes?.[AGENT_MUTED_ATTRIBUTE] === 'true')
+    .map((p) => displayName(p, t('room.aiAssistant')));
+  const aiSilent = silentAgents.length > 0;
   const showBreakouts = breakouts.canManage || !!breakouts.session || props.breakout > 0;
   const raisedPeople = participants
     .filter((p) => p.attributes?.[HAND_ATTRIBUTE])
@@ -560,7 +563,8 @@ export function MeetRoom(props: {
             {captionerRunning && <span className="chip-soft">{t('room.stage.transcribing')}</span>}
             {aiSilent && (
               <span className="chip-soft" title={t('room.stage.aiSilentTip')}>
-                <Icon name="smart_toy" size={16} /> {t('room.status.aiSilent')}
+                <Icon name="smart_toy" size={16} />{' '}
+                {t('room.status.aiSilentNamed', { name: silentAgents.join(', ') })}
               </span>
             )}
             {raised.length > 0 && (

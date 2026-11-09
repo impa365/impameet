@@ -71,25 +71,30 @@ export async function pendingRequests(sql: Sql, room: Room): Promise<LobbyReques
     order by created_at limit 100`;
 }
 
-/** Caller must already be authorized as a moderator of `room`. */
+/**
+ * Caller must already be authorized as a moderator of `room`. `decidedBy` is the moderator's
+ * user id (null when an AI agent applied an admin rule); `meta` notes how it was decided.
+ */
 export async function decide(
   sql: Sql,
   room: Room,
-  moderator: SessionUser,
+  decidedBy: string | null,
   id: string,
   approve: boolean,
   ip: string | null,
+  meta?: Record<string, string>,
 ): Promise<void> {
   const result = await sql`
     update lobby_requests set status = ${approve ? 'approved' : 'denied'},
-           decided_by = ${moderator.id}, decided_at = now()
+           decided_by = ${decidedBy}, decided_at = now()
     where id = ${id} and room_id = ${room.id} and status = 'pending'`;
   if (result.count === 0) throw notFound('Pedido já respondido ou inexistente');
   await audit(sql, {
     tenantId: room.tenantId,
-    actorId: moderator.id,
+    actorId: decidedBy,
     action: approve ? 'lobby.approved' : 'lobby.denied',
     target: room.slug,
+    meta,
     ip,
   });
 }

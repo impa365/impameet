@@ -19,6 +19,7 @@ export default defineMessages(
       camOff: 'Câmera desativada',
       speaking: 'Falando',
       aiSilent: 'IA em silêncio',
+      aiSilentNamed: '{name} em silêncio',
       ai: 'IA',
     },
     device: {
@@ -302,6 +303,7 @@ export default defineMessages(
         camOff: 'Camera off',
         speaking: 'Speaking',
         aiSilent: 'AI silent',
+        aiSilentNamed: '{name} is silent',
         ai: 'AI',
       },
       device: {
@@ -584,6 +586,7 @@ export default defineMessages(
         camOff: 'Cámara desactivada',
         speaking: 'Hablando',
         aiSilent: 'IA en silencio',
+        aiSilentNamed: '{name} en silencio',
         ai: 'IA',
       },
       device: {

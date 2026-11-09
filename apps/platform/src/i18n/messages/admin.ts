@@ -43,6 +43,20 @@ export default defineMessages(
       muteLabel: 'Quem pode mandar ele ficar em silêncio',
       muteHint:
         'Em silêncio o agente continua ouvindo, mas não gera voz (economiza o custo de voz). Para ele voltar, basta dizer, por exemplo: “Kaiser, pode ligar o microfone”.',
+      moderationLegend: 'Moderação pela IA',
+      moderationHint:
+        'O que o assistente pode fazer com as pessoas da reunião. Fica tudo desligado até você ligar. Ele só age quando um moderador pede, e confirma antes de remover alguém, ou quando uma das suas regras abaixo se aplica. Nunca age sobre moderadores, o dono da sala, administradores ou outros assistentes, e tudo fica na auditoria.',
+      modRemove: 'Remover participantes',
+      modRemoveHelp: 'Ex.: “Kaiser, remove o João da chamada”. Ele confirma antes de remover.',
+      modMute: 'Silenciar microfones',
+      modMuteHelp: 'Ex.: “Kaiser, muta a Maria”. A pessoa pode ligar de novo quando quiser.',
+      modLobby: 'Responder à sala de espera',
+      modLobbyHelp: 'Aprova ou recusa quem pede para entrar, e avisa quando alguém está esperando.',
+      rulesLabel: 'Regras de moderação (opcional): quando o assistente deve agir sozinho',
+      rulesPlaceholder:
+        'Ex.:\n- Quando alguém pedir para entrar, aprove automaticamente.\n- Se alguém estiver com barulho alto no microfone, silencie e avise com educação.\n- Nunca aprove quem não disser o nome completo.',
+      rulesHelp:
+        'Escreva em linguagem natural. O assistente segue essas regras junto com as instruções dele, e diz em voz alta o que fez.',
       brainLegend: 'Cérebro (modelo de linguagem)',
       integration: 'Integração',
       choose: 'Escolha…',
@@ -282,6 +296,20 @@ export default defineMessages(
         muteLabel: 'Who can tell it to stay silent',
         muteHint:
           'While silent, the agent keeps listening but does not generate speech (saving voice costs). To bring it back, just say, for example: “Kaiser, turn your mic back on”.',
+        moderationLegend: 'Moderation by the AI',
+        moderationHint:
+          'What the assistant may do to people in the meeting. Everything is off until you turn it on. It only acts when a moderator asks, confirming before it removes anyone, or when one of your rules below applies. It never acts on moderators, the room owner, admins or other assistants, and everything goes to the audit log.',
+        modRemove: 'Remove participants',
+        modRemoveHelp: 'E.g. “Kaiser, remove John from the call”. It confirms before removing.',
+        modMute: 'Mute microphones',
+        modMuteHelp: 'E.g. “Kaiser, mute Mary”. The person can unmute whenever they want.',
+        modLobby: 'Answer the waiting room',
+        modLobbyHelp: 'Lets people in or turns them away, and says when someone is waiting.',
+        rulesLabel: 'Moderation rules (optional): when the assistant acts on its own',
+        rulesPlaceholder:
+          'E.g.:\n- When someone asks to join, let them in automatically.\n- If someone has loud noise on their microphone, mute them and kindly say so.\n- Never let in anyone who does not give their full name.',
+        rulesHelp:
+          'Write in plain language. The assistant follows these rules along with its instructions, and says out loud what it did.',
         brainLegend: 'Brain (language model)',
         integration: 'Integration',
         choose: 'Choose…',
@@ -519,6 +547,20 @@ export default defineMessages(
         muteLabel: 'Quién puede pedirle que se quede en silencio',
         muteHint:
           'En silencio, el agente sigue escuchando, pero no genera voz (ahorra el costo de voz). Para que vuelva, basta con decir, por ejemplo: “Kaiser, enciende el micrófono”.',
+        moderationLegend: 'Moderación por la IA',
+        moderationHint:
+          'Lo que el asistente puede hacer con las personas de la reunión. Todo está apagado hasta que lo actives. Solo actúa cuando un moderador lo pide, confirmando antes de quitar a alguien, o cuando se aplica una de tus reglas. Nunca actúa sobre moderadores, el dueño de la sala, administradores u otros asistentes, y todo queda en la auditoría.',
+        modRemove: 'Quitar participantes',
+        modRemoveHelp: 'Ej.: “Kaiser, saca a Juan de la llamada”. Confirma antes de quitar.',
+        modMute: 'Silenciar micrófonos',
+        modMuteHelp: 'Ej.: “Kaiser, silencia a María”. La persona puede volver a activarlo cuando quiera.',
+        modLobby: 'Responder a la sala de espera',
+        modLobbyHelp: 'Admite o rechaza a quien pide entrar, y avisa cuando alguien está esperando.',
+        rulesLabel: 'Reglas de moderación (opcional): cuándo el asistente actúa solo',
+        rulesPlaceholder:
+          'Ej.:\n- Cuando alguien pida entrar, admítelo automáticamente.\n- Si alguien tiene mucho ruido en el micrófono, siléncialo y avísale con amabilidad.\n- Nunca admitas a quien no diga su nombre completo.',
+        rulesHelp:
+          'Escribe en lenguaje natural. El asistente sigue estas reglas junto con sus instrucciones, y dice en voz alta lo que hizo.',
         brainLegend: 'Cerebro (modelo de lenguaje)',
         integration: 'Integración',
         choose: 'Elige…',

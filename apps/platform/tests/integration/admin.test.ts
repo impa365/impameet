@@ -16,6 +16,7 @@ import {
 import { AppError } from '@/server/errors';
 import type { LiveKitAdmin, LiveParticipant } from '@/server/livekit-admin';
 import { decide, entryStatus, pendingRequests, requestEntry } from '@/server/lobby/service';
+import { agentModerate, agentModerationView } from '@/server/moderation/agent';
 import { canModerate, listLiveParticipants, moderate } from '@/server/moderation/service';
 import { tenantLimits } from '@/server/plans';
 import {
@@ -30,7 +31,7 @@ import { hashPassword } from '@/server/security/password';
 import { listTenants, updateTenant } from '@/server/superadmin/service';
 import type { Tenant } from '@/server/tenants/repo';
 import { createUser, listUsers, updateUser } from '@/server/users/service';
-import { agentInput, createRoomInput } from '@/server/validation';
+import { agentInput, agentModerationInput, createRoomInput } from '@/server/validation';
 import { type TestSql, freshDatabase } from './db';
 import { agentChoices } from './ready-agent';
 import { listAgents, updateAgent } from '@/server/agents/service';
@@ -238,16 +239,16 @@ describe('waiting room', () => {
     await expectAppError(entryStatus(db(), room, ticket.id, 'x'.repeat(43)), 404);
     expect((await pendingRequests(db(), room)).map((r) => r.displayName)).toEqual(['Visitante']);
 
-    await decide(db(), room, admin, ticket.id, true, null);
+    await decide(db(), room, admin.id, ticket.id, true, null);
     expect((await entryStatus(db(), room, ticket.id, ticket.secret)).status).toBe('approved');
     expect(await pendingRequests(db(), room)).toHaveLength(0);
-    await expectAppError(decide(db(), room, admin, ticket.id, false, null), 404);
+    await expectAppError(decide(db(), room, admin.id, ticket.id, false, null), 404);
   });
 
   it('uses the account name for signed-in users and supports denial', async () => {
     const ticket = await requestEntry(db(), room, admin, 'ignored');
     expect((await entryStatus(db(), room, ticket.id, ticket.secret)).displayName).toBe('Admin');
-    await decide(db(), room, admin, ticket.id, false, null);
+    await decide(db(), room, admin.id, ticket.id, false, null);
     expect((await entryStatus(db(), room, ticket.id, ticket.secret)).status).toBe('denied');
   });
 
@@ -262,7 +263,7 @@ describe('waiting room', () => {
     const other = await createRoom(db(), admin, R({ name: 'Outra' }), null);
     const ticket = await requestEntry(db(), room, null, 'V');
     await expectAppError(entryStatus(db(), other, ticket.id, ticket.secret), 404);
-    await expectAppError(decide(db(), other, admin, ticket.id, true, null), 404);
+    await expectAppError(decide(db(), other, admin.id, ticket.id, true, null), 404);
   });
 });
 
@@ -654,5 +655,114 @@ describe('room access, as in Google Meet', () => {
     );
     expect(open.boardPolicy).toBe('moderators');
     expect(await entersDirectly(db(), open, null, 'guest')).toBe(true);
+  });
+});
+
+describe('moderation by an AI agent', () => {
+  async function setup(tools: string[], rules = '') {
+    const { tenant, user } = await org('acme');
+    const [kaiser] = await listAgents(db(), user);
+    const choices = await agentChoices(db(), user);
+    await updateAgent(
+      db(),
+      user,
+      kaiser.id,
+      agentInput.parse({
+        name: 'Kaiser',
+        instructions: 'x',
+        ...choices,
+        moderationTools: tools,
+        moderationRules: rules,
+      }),
+      null,
+    );
+    const room = await createRoom(db(), user, R({ name: 'Aula', agentIds: [kaiser.id] }), null);
+    const lkRoom = `${tenant.id}.${room.slug}`;
+    const lk = new FakeLiveKit();
+    const mod = lk.participant(`u-${user.id}-a1`, { name: 'Ana', role: 'moderator' });
+    const john = lk.participant('g-john', { name: 'João', role: 'guest' });
+    const mary = lk.participant('g-mary', { name: 'Maria', role: 'guest' });
+    const bot = lk.participant('agent-AJ_1', { name: 'Kaiser', isAgent: true });
+    lk.rooms.set(lkRoom, [mod, john, mary, bot]);
+    const act = (input: Record<string, unknown>) =>
+      agentModerate(db(), lk, kaiser.id, agentModerationInput.parse({ room: lkRoom, ...input }));
+    return { tenant, user, kaiser, room, lkRoom, lk, mod, act };
+  }
+
+  it('does nothing unless the admin turned the action on', async () => {
+    const { act, mod } = await setup([]);
+    await expectAppError(
+      act({ action: 'remove', target: 'g-john', requestedBy: mod.identity }),
+      403,
+      /permissão/,
+    );
+  });
+
+  it('acts when a moderator asks, never on protected people, and logs who asked', async () => {
+    const { act, mod, lk, kaiser, lkRoom, user } = await setup(['remove', 'mute']);
+    // nobody asked and there are no rules: refused
+    await expectAppError(act({ action: 'mute', target: 'g-john' }), 403, /moderador/);
+    // a guest asking does not count
+    await expectAppError(act({ action: 'remove', target: 'g-mary', requestedBy: 'g-john' }), 403);
+    // moderators, the room owner and other assistants are off limits
+    await expectAppError(
+      act({ action: 'remove', target: mod.identity, requestedBy: mod.identity }),
+      403,
+      /IA não age/,
+    );
+    await expectAppError(act({ action: 'mute', target: 'agent-AJ_1', requestedBy: mod.identity }), 403);
+    await expectAppError(act({ action: 'mute', target: 'g-nobody', requestedBy: mod.identity }), 404);
+
+    expect(await act({ action: 'mute', target: 'g-mary', requestedBy: mod.identity })).toEqual({
+      done: 'Maria teve o microfone silenciado',
+    });
+    expect(await act({ action: 'remove', target: 'g-john', requestedBy: mod.identity })).toEqual({
+      done: 'João foi removido da chamada',
+    });
+    expect(lk.calls).toEqual(['mute g-mary TR_g-mary', 'remove g-john']);
+
+    const view = await agentModerationView(db(), lk, kaiser.id, lkRoom);
+    expect(view.people.map((p) => [p.name, p.protected])).toEqual([
+      ['Ana', true],
+      ['João', false],
+      ['Maria', false],
+    ]);
+    const [entry] = await sql<{ action: string; actorId: string | null; meta: Record<string, string> }[]>`
+      select action, actor_id as "actorId", meta from audit_log
+      where action = 'moderation.remove' order by created_at desc limit 1`;
+    expect(entry).toMatchObject({
+      actorId: user.id,
+      meta: { via: 'ai', agent: 'Kaiser', requestedBy: 'Ana' },
+    });
+  });
+
+  it('applies the admin rules on its own, for the waiting room too', async () => {
+    const noRules = await setup(['lobby']);
+    const waiting = await requestEntry(db(), noRules.room, null, 'Carlos');
+    await expectAppError(noRules.act({ action: 'admit', target: waiting.id, rule: 'aprovar todos' }), 403);
+
+    await sql`truncate tenants, audit_log restart identity cascade`;
+    const { act, room, kaiser, lk, lkRoom } = await setup(['lobby'], 'Aprove quem pedir para entrar.');
+    const ticket = await requestEntry(db(), room, null, 'Carlos');
+    expect((await agentModerationView(db(), lk, kaiser.id, lkRoom)).lobby).toEqual([
+      { id: ticket.id, name: 'Carlos' },
+    ]);
+    await expectAppError(act({ action: 'admit', target: ticket.id }), 403); // no rule cited
+    expect(await act({ action: 'admit', target: ticket.id, rule: 'Aprove quem pedir para entrar.' })).toEqual(
+      {
+        done: 'Carlos entrou',
+      },
+    );
+    expect((await entryStatus(db(), room, ticket.id, ticket.secret)).status).toBe('approved');
+    await expectAppError(act({ action: 'deny', target: ticket.id, rule: 'x' }), 404);
+    // only the lobby tool is on
+    await expectAppError(act({ action: 'mute', target: 'g-john', rule: 'x' }), 403, /permissão/);
+  });
+
+  it('only works in rooms the agent was put in, of its own organization', async () => {
+    const { kaiser, lk, tenant } = await setup(['remove']);
+    await expectAppError(agentModerationView(db(), lk, kaiser.id, `${tenant.id}.outra-sala`), 404);
+    const rival = await org('rival');
+    await expectAppError(agentModerationView(db(), lk, kaiser.id, `${rival.tenant.id}.aula`), 404);
   });
 });

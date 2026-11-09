@@ -168,6 +168,20 @@ export const tenantAdminInput = z
   .strict()
   .refine((p) => Object.keys(p).length > 0, 'Nada para alterar');
 
+/** Remove people, mute microphones, answer the waiting room. */
+export const AGENT_MODERATION_TOOLS = ['remove', 'mute', 'lobby'] as const;
+
+export const agentModerationInput = z.object({
+  room: z.string().min(3).max(200),
+  action: z.enum(['remove', 'mute', 'admit', 'deny']),
+  /** A participant identity (remove, mute) or a waiting-room request id (admit, deny). */
+  target: z.string().min(1).max(200),
+  /** The moderator who asked, when someone asked. */
+  requestedBy: z.string().min(1).max(200).optional(),
+  /** The admin rule the agent applied, when it acted on its own. */
+  rule: z.string().trim().max(500).optional(),
+});
+
 const voiceRef = z
   .string()
   .trim()
@@ -208,6 +222,14 @@ export const agentInput = z.object({
   listenMode: z.enum(['everyone', 'moderators', 'members']).default('everyone'),
   respondMode: z.enum(['always', 'when_named']).default('always'),
   mutePolicy: z.enum(['everyone', 'moderators', 'disabled']).default('everyone'),
+  /** What the agent may do to other people in a meeting (nothing unless turned on). */
+  moderationTools: z
+    .array(z.enum(AGENT_MODERATION_TOOLS))
+    .max(AGENT_MODERATION_TOOLS.length)
+    .default([])
+    .transform((list) => [...new Set(list)]),
+  /** The admin's rules for when the agent acts on its own (e.g. who to let in). */
+  moderationRules: z.string().trim().max(4000, 'Regras muito longas (máx. 4000 caracteres)').default(''),
   /** Saved provider credentials (Integrações): required, there is no server fallback. */
   llmIntegrationId: z.string({ error: 'Escolha a integração de LLM' }).uuid('Escolha a integração de LLM'),
   /** Speaking (TTS) and listening (STT) are chosen separately: any provider for each. */

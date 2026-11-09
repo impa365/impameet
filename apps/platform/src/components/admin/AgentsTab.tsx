@@ -22,6 +22,8 @@ interface Agent {
   listenMode: 'everyone' | 'moderators' | 'members';
   respondMode: 'always' | 'when_named';
   mutePolicy: 'everyone' | 'moderators' | 'disabled';
+  moderationTools: ModerationTool[];
+  moderationRules: string;
   llmIntegrationId: string | null;
   ttsIntegrationId: string | null;
   sttIntegrationId: string | null;
@@ -43,12 +45,22 @@ interface Draft {
   listenMode: Agent['listenMode'];
   respondMode: Agent['respondMode'];
   mutePolicy: Agent['mutePolicy'];
+  moderationTools: ModerationTool[];
+  moderationRules: string;
   llmIntegrationId: string;
   ttsIntegrationId: string;
   sttIntegrationId: string;
 }
 
 const KNOWLEDGE_MAX = 100000;
+const RULES_MAX = 4000;
+
+type ModerationTool = 'remove' | 'mute' | 'lobby';
+const MODERATION = {
+  remove: ['admin.agents.modRemove', 'admin.agents.modRemoveHelp'],
+  mute: ['admin.agents.modMute', 'admin.agents.modMuteHelp'],
+  lobby: ['admin.agents.modLobby', 'admin.agents.modLobbyHelp'],
+} as const satisfies Record<ModerationTool, readonly [MessageKey, MessageKey]>;
 
 const EMPTY: Draft = {
   name: '',
@@ -63,6 +75,8 @@ const EMPTY: Draft = {
   listenMode: 'everyone',
   respondMode: 'always',
   mutePolicy: 'everyone',
+  moderationTools: [],
+  moderationRules: '',
   llmIntegrationId: '',
   ttsIntegrationId: '',
   sttIntegrationId: '',
@@ -125,6 +139,8 @@ export function AgentsTab() {
       listenMode: agent.listenMode,
       respondMode: agent.respondMode,
       mutePolicy: agent.mutePolicy,
+      moderationTools: agent.moderationTools ?? [],
+      moderationRules: agent.moderationRules ?? '',
       llmIntegrationId: agent.llmIntegrationId ?? '',
       ttsIntegrationId: agent.ttsIntegrationId ?? '',
       sttIntegrationId: agent.sttIntegrationId ?? '',
@@ -294,6 +310,42 @@ export function AgentsTab() {
         <p className="muted" style={{ margin: 0 }}>
           {t('admin.agents.muteHint')}
         </p>
+        <fieldset className="group">
+          <legend>{t('admin.agents.moderationLegend')}</legend>
+          <p className="muted small-print">{t('admin.agents.moderationHint')}</p>
+          {(Object.keys(MODERATION) as ModerationTool[]).map((tool) => (
+            <label key={tool} className="switch">
+              <input
+                type="checkbox"
+                checked={draft.moderationTools.includes(tool)}
+                onChange={(e) =>
+                  set(
+                    'moderationTools',
+                    e.target.checked
+                      ? [...draft.moderationTools, tool]
+                      : draft.moderationTools.filter((x) => x !== tool),
+                  )
+                }
+              />
+              <span>
+                {t(MODERATION[tool][0])}
+                <small>{t(MODERATION[tool][1])}</small>
+              </span>
+            </label>
+          ))}
+          <label>
+            {t('admin.agents.rulesLabel')}
+            <textarea
+              rows={5}
+              maxLength={RULES_MAX}
+              value={draft.moderationRules}
+              disabled={draft.moderationTools.length === 0}
+              onChange={(e) => set('moderationRules', e.target.value)}
+              placeholder={t('admin.agents.rulesPlaceholder')}
+            />
+            <span className="muted">{t('admin.agents.rulesHelp')}</span>
+          </label>
+        </fieldset>
         <fieldset className="group">
           <legend>{t('admin.agents.brainLegend')}</legend>
           <div className="row">
@@ -495,6 +547,12 @@ export function AgentsTab() {
               <span className="badge">
                 {t('admin.agents.muteBadge', { mode: t(MUTE[a.mutePolicy]).toLowerCase() })}
               </span>
+              {(a.moderationTools ?? []).length > 0 && (
+                <span className="badge">
+                  🛡️{' '}
+                  {(a.moderationTools ?? []).map((tool) => t(MODERATION[tool][0]).toLowerCase()).join(', ')}
+                </span>
+              )}
               {a.description && <div className="agent-about">{a.description}</div>}
               <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
                 {a.instructions.slice(0, 140)}

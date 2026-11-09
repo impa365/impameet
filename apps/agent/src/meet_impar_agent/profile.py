@@ -32,6 +32,8 @@ KNOWLEDGE_HEADER = (
     "aqui nem for conhecimento geral seguro, diga que não sabe):\n"
 )
 LOOKUP_TIMEOUT_S = 5.0
+MODERATION_TOOLS = ("remove", "mute", "lobby")
+MAX_RULES_CHARS = 4000
 MAX_AGENT_ID_LENGTH = 64
 
 
@@ -57,6 +59,10 @@ class AgentProfile:
     stt_model: str = ""
     # The TTS provider's voice per language ("pt", "en", "es").
     voices: dict[str, str] = field(default_factory=dict)
+    agent_id: str = ""
+    # What it may do to other people (off unless an admin turned it on) and the admin's rules.
+    moderation_tools: tuple[str, ...] = ()
+    moderation_rules: str = ""
 
     def secrets(self) -> list[str]:
         return [s for s in (self.llm_api_key, self.tts_api_key, self.stt_api_key) if s]
@@ -186,7 +192,21 @@ def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
         stt_provider=stt_provider,
         stt_api_key=required["stt_api_key"],
         voices=voices,
+        agent_id=str(remote.get("id") or ""),
+        moderation_tools=clean_tools(remote.get("moderationTools")),
+        moderation_rules=clean_rules(remote.get("moderationRules")),
     )
+
+
+def clean_tools(raw: object) -> tuple[str, ...]:
+    """The moderation tools an admin turned on, in a fixed order; anything else is dropped."""
+    if not isinstance(raw, list):
+        return ()
+    return tuple(t for t in MODERATION_TOOLS if t in raw)
+
+
+def clean_rules(raw: object) -> str:
+    return raw.strip()[:MAX_RULES_CHARS] if isinstance(raw, str) else ""
 
 
 def _section(remote: dict[str, Any], key: str) -> dict[str, Any]:

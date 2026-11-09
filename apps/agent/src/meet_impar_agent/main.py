@@ -16,6 +16,7 @@ from . import redaction, telemetry
 from .captions import MODE_ATTRIBUTE, run_captions
 from .config import Settings, get_settings
 from .listening import Speaker, next_linked, same_name
+from .moderation import ModerationClient
 from .persona import Talker, VoiceAgent
 from .pipeline import (
     ThinkingAudio,
@@ -42,6 +43,7 @@ MUTED_ATTRIBUTE = "impa.muted"
 MAX_TOOL_STEPS = 10
 HANDOFF_TOPIC = "impa.handoff"
 AGENT_SETTINGS_TOPIC = "impa.agent"
+LOBBY_TOPIC = "impa.lobby"
 MAX_HANDOFF_CHARS = 500
 
 
@@ -179,12 +181,17 @@ def _build_agent(
     if settings.screen:
         screen = ScreenClient(settings.screen, ctx.room.name)
         ctx.add_shutdown_callback(screen.aclose)
+    moderation = None
+    if settings.platform and profile.moderation_tools and profile.agent_id:
+        moderation = ModerationClient(settings.platform, profile.agent_id, ctx.room.name)
+        ctx.add_shutdown_callback(moderation.aclose)
     return VoiceAgent(
         profile,
         speaker=speaker_lookup(session),
         on_mute=on_mute,
         screen=screen,
         handoff=handoff_sender(ctx.room, profile.name),
+        moderation=moderation,
     )
 
 
@@ -244,6 +251,7 @@ async def entrypoint(ctx: JobContext) -> None:
     await ctx.room.local_participant.set_attributes({MODE_ATTRIBUTE: "voice"})
     follow_speakers(ctx.room, session, profile.listen_mode)
     follow_peers(ctx.room, agent)
+    follow_lobby(ctx.room, agent)
 
     if thinking_audio := build_thinking_audio(
         settings.agent, enabled=thinking_sound(ctx.job.metadata)
@@ -251,6 +259,16 @@ async def entrypoint(ctx: JobContext) -> None:
         await thinking_audio.start(room=ctx.room, agent_session=session)
         ctx.add_shutdown_callback(thinking_audio.aclose)
         follow_room_settings(ctx.room, thinking_audio)
+
+
+def follow_lobby(room: rtc.Room, agent: VoiceAgent) -> None:
+    """The server says someone knocked; an agent that answers the waiting room speaks up."""
+
+    def on_data(packet: rtc.DataPacket) -> None:
+        if packet.topic == LOBBY_TOPIC and packet.participant is None:
+            agent.on_lobby_knock()
+
+    room.on("data_received", on_data)
 
 
 def follow_room_settings(room: rtc.Room, thinking_audio: ThinkingAudio) -> None:

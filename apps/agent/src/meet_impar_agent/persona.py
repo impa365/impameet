@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, Iterable
 from dataclasses import dataclass, replace
 from typing import Any
@@ -14,6 +15,7 @@ from livekit.agents import Agent, ModelSettings, StopResponse, llm, stt
 from .bargein import Engagement, should_interrupt
 from .languages import guess_language, languages_note, main_language, pick_language, words
 from .listening import is_addressed
+from .moderation import KNOCK_PROMPT, Heard, ModerationClient, moderation_note, moderation_tools
 from .profile import AgentProfile, MutePolicy
 from .providers import voice_options
 from .screen import SCREEN_INSTRUCTIONS, ScreenClient, Snapshot, screen_tools
@@ -90,6 +92,7 @@ class VoiceAgent(Agent):
         on_mute: MuteListener | None = None,
         screen: ScreenClient | None = None,
         handoff: Handoff | None = None,
+        moderation: ModerationClient | None = None,
     ) -> None:
         self._profile = profile
         self._speaker = speaker
@@ -103,6 +106,7 @@ class VoiceAgent(Agent):
         self.language = self._main_language
         self._current_voice: str | None = self._voices.get(self._main_language)
         self._engagement = Engagement()
+        self._heard: Heard | None = None
 
         tools: list[Any] = []
         if handoff is not None:
@@ -114,6 +118,15 @@ class VoiceAgent(Agent):
         if profile.mute_policy != "disabled":
             tools += self._mute_tools()
             parts.append(MUTE_INSTRUCTIONS[profile.mute_policy])
+        self._moderates_lobby = moderation is not None and "lobby" in profile.moderation_tools
+        if moderation is not None and profile.moderation_tools:
+            tools += moderation_tools(
+                moderation,
+                self,
+                profile.moderation_tools,
+                has_rules=bool(profile.moderation_rules),
+            )
+            parts.append(moderation_note(profile.moderation_tools, profile.moderation_rules))
         self._base_instructions = "\n\n".join(p for p in parts if p)
         # Voice activity alone never cuts the agent off; see `_maybe_barge_in`.
         super().__init__(
@@ -135,6 +148,10 @@ class VoiceAgent(Agent):
         first = event.alternatives[0]
         who = self._speaker()
         if event.type == stt.SpeechEventType.FINAL_TRANSCRIPT:
+            if who is not None:
+                self._heard = Heard(
+                    at=time.monotonic(), text=first.text, identity=who.identity, role=who.role
+                )
             self._maybe_barge_in(first.text, who)
         tag = ""
         if len(self._voices) > 1:
@@ -172,6 +189,21 @@ class VoiceAgent(Agent):
             raise StopResponse()
         if who := self._speaker():
             self._engagement.touch(who.identity)
+
+    def current_speaker(self) -> Talker | None:
+        return self._speaker()
+
+    def last_heard(self) -> Heard | None:
+        return self._heard
+
+    def on_lobby_knock(self) -> None:
+        """Someone asked to join: an agent that answers the waiting room tells the meeting."""
+        if not self._moderates_lobby or self.muted:
+            return
+        try:
+            self.session.generate_reply(instructions=KNOCK_PROMPT)
+        except RuntimeError:
+            return
 
     def _maybe_barge_in(self, text: str, who: Talker | None) -> bool:
         """Stops the agent's current speech for a complete utterance from a participant."""

@@ -1564,14 +1564,18 @@ code.record {
   color: var(--call-muted);
 }
 
+/* Room-wide notices (recording, captions, silent AI, hands): top centre, never on a tile's corner. */
 .meet-chips {
   position: absolute;
   top: 10px;
-  left: 10px;
+  left: 50%;
   z-index: 6;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
+  max-width: calc(100% - 120px);
+  transform: translateX(-50%);
   pointer-events: none;
 }
 

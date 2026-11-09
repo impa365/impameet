@@ -29,7 +29,7 @@ export async function POST(
       throw forbidden('Só moderadores podem responder a sala de espera');
 
     const { id, approve } = await readJson(req, lobbyDecisionInput);
-    await decide(db(), room, user, id, approve, clientIp(req));
+    await decide(db(), room, user.id, id, approve, clientIp(req));
     return json({ ok: true });
   });
 }
