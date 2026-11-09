@@ -72,6 +72,9 @@ class FakeLiveKit implements LiveKitAdmin {
   async setRole(room: string, identity: string, role: string) {
     this.calls.push(`role ${identity} ${role}`);
   }
+  async setAttributes(room: string, identity: string, attributes: Record<string, string>) {
+    this.calls.push(`attributes ${room} ${identity} ${JSON.stringify(attributes)}`);
+  }
   async dispatchAgent(room: string, agentName: string, metadata: string) {
     this.calls.push(`dispatch ${agentName} ${metadata}`);
   }

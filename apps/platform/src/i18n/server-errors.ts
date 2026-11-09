@@ -137,6 +137,36 @@ const EN: Record<string, string> = {
     'Deepgram voices must belong to the chosen model (e.g. flux-bianca-pt)',
   'Para transcrever, a sala precisa de um assistente de IA configurado':
     'To transcribe, the room needs a fully configured AI assistant',
+  'Entre na reunião antes de levantar a mão': 'Join the meeting before raising your hand',
+  'Você não está nesta reunião': 'You are not in this meeting',
+  'Nome da ferramenta: letras minúsculas, números e _ (até {n})':
+    'Tool name: lowercase letters, numbers and _ (up to {n})',
+  'Nome de parâmetro inválido': 'Invalid parameter name',
+  'Nome de cabeçalho inválido': 'Invalid header name',
+  'Esse cabeçalho é definido pela plataforma': 'The platform sets this header itself',
+  'Valor de cabeçalho inválido': 'Invalid header value',
+  'Informe a URL': 'Enter the URL',
+  'URL muito longa': 'URL too long',
+  'Cabeçalho repetido': 'Repeated header',
+  'Parâmetro repetido': 'Repeated parameter',
+  'Explique para a IA quando usar a ferramenta': 'Tell the AI when to use the tool',
+  'Até {n} ferramentas por agente': 'Up to {n} tools per agent',
+  'Este agente já tem uma ferramenta com esse nome': 'This agent already has a tool with this name',
+  'Não é possível mudar o tipo da ferramenta': 'The tool type cannot be changed',
+  'Ferramenta não encontrada': 'Tool not found',
+  'Parâmetros só podem aparecer no caminho ou na consulta da URL':
+    'Parameters can only appear in the URL path or query',
+  'Só POST, PUT e PATCH enviam corpo': 'Only POST, PUT and PATCH send a body',
+  'O modelo do corpo precisa ser um JSON válido': 'The body template must be valid JSON',
+  'Não foi possível encontrar o servidor da ferramenta': 'Could not find the tool server',
+  'Não foi possível conectar à ferramenta': 'Could not connect to the tool',
+  'A ferramenta demorou demais para responder': 'The tool took too long to answer',
+  'A conexão com a ferramenta caiu': 'The connection to the tool dropped',
+  'O servidor MCP recusou as credenciais': 'The MCP server rejected the credentials',
+  'O servidor MCP respondeu HTTP {n}': 'The MCP server answered HTTP {n}',
+  'O servidor MCP não respondeu ao pedido': 'The MCP server did not answer the request',
+  'O servidor MCP respondeu algo que não é JSON-RPC':
+    'The MCP server answered something that is not JSON-RPC',
 };
 
 const ES: Record<string, string> = {
@@ -274,6 +304,35 @@ const ES: Record<string, string> = {
     'Las voces de Deepgram deben ser del modelo elegido (ej.: flux-bianca-pt)',
   'Para transcrever, a sala precisa de um assistente de IA configurado':
     'Para transcribir, la sala necesita un asistente de IA configurado',
+  'Entre na reunião antes de levantar a mão': 'Únete a la reunión antes de levantar la mano',
+  'Você não está nesta reunião': 'No estás en esta reunión',
+  'Nome da ferramenta: letras minúsculas, números e _ (até {n})':
+    'Nombre de la herramienta: minúsculas, números y _ (hasta {n})',
+  'Nome de parâmetro inválido': 'Nombre de parámetro no válido',
+  'Nome de cabeçalho inválido': 'Nombre de encabezado no válido',
+  'Esse cabeçalho é definido pela plataforma': 'La plataforma define este encabezado',
+  'Valor de cabeçalho inválido': 'Valor de encabezado no válido',
+  'Informe a URL': 'Ingresa la URL',
+  'URL muito longa': 'URL demasiado larga',
+  'Cabeçalho repetido': 'Encabezado repetido',
+  'Parâmetro repetido': 'Parámetro repetido',
+  'Explique para a IA quando usar a ferramenta': 'Explica a la IA cuándo usar la herramienta',
+  'Até {n} ferramentas por agente': 'Hasta {n} herramientas por agente',
+  'Este agente já tem uma ferramenta com esse nome': 'Este agente ya tiene una herramienta con ese nombre',
+  'Não é possível mudar o tipo da ferramenta': 'No se puede cambiar el tipo de herramienta',
+  'Ferramenta não encontrada': 'Herramienta no encontrada',
+  'Parâmetros só podem aparecer no caminho ou na consulta da URL':
+    'Los parámetros solo pueden aparecer en la ruta o la consulta de la URL',
+  'Só POST, PUT e PATCH enviam corpo': 'Solo POST, PUT y PATCH envían cuerpo',
+  'O modelo do corpo precisa ser um JSON válido': 'La plantilla del cuerpo debe ser un JSON válido',
+  'Não foi possível encontrar o servidor da ferramenta': 'No se encontró el servidor de la herramienta',
+  'Não foi possível conectar à ferramenta': 'No se pudo conectar a la herramienta',
+  'A ferramenta demorou demais para responder': 'La herramienta tardó demasiado en responder',
+  'A conexão com a ferramenta caiu': 'Se cayó la conexión con la herramienta',
+  'O servidor MCP recusou as credenciais': 'El servidor MCP rechazó las credenciales',
+  'O servidor MCP respondeu HTTP {n}': 'El servidor MCP respondió HTTP {n}',
+  'O servidor MCP não respondeu ao pedido': 'El servidor MCP no respondió a la solicitud',
+  'O servidor MCP respondeu algo que não é JSON-RPC': 'El servidor MCP respondió algo que no es JSON-RPC',
 };
 
 export const SERVER_ERRORS: Record<Locale, Record<string, string>> = { 'pt-BR': {}, en: EN, es: ES };

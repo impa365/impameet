@@ -28,6 +28,7 @@ export interface LiveKitAdmin {
   muteAudio(room: string, identity: string, trackSid: string): Promise<void>;
   remove(room: string, identity: string): Promise<void>;
   setRole(room: string, identity: string, role: string): Promise<void>;
+  setAttributes(room: string, identity: string, attributes: Record<string, string>): Promise<void>;
   dispatchAgent(room: string, agentName: string, metadata: string): Promise<void>;
   /** Server-sent message to everyone in a room (reliable data packet on `topic`). */
   sendData(room: string, payload: string, topic: string): Promise<void>;
@@ -76,6 +77,9 @@ export function liveKitAdmin(apiUrl: string, apiKey: string, apiSecret: string):
     },
     async setRole(room, identity, role) {
       await client.updateParticipant(room, identity, { attributes: { role } });
+    },
+    async setAttributes(room, identity, attributes) {
+      await client.updateParticipant(room, identity, { attributes });
     },
     async dispatchAgent(room, agentName, metadata) {
       await dispatch.createDispatch(room, agentName, { metadata });

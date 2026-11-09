@@ -19,6 +19,7 @@ from .moderation import KNOCK_PROMPT, Heard, ModerationClient, moderation_note, 
 from .profile import AgentProfile, MutePolicy
 from .providers import voice_options
 from .screen import SCREEN_INSTRUCTIONS, ScreenClient, Snapshot, screen_tools
+from .tools import ToolsClient, ToolSpec, external_tools, tools_note
 
 logger = logging.getLogger("meet_impar_agent.persona")
 
@@ -93,6 +94,8 @@ class VoiceAgent(Agent):
         screen: ScreenClient | None = None,
         handoff: Handoff | None = None,
         moderation: ModerationClient | None = None,
+        tools_client: ToolsClient | None = None,
+        tool_specs: tuple[ToolSpec, ...] = (),
     ) -> None:
         self._profile = profile
         self._speaker = speaker
@@ -107,6 +110,9 @@ class VoiceAgent(Agent):
         self._current_voice: str | None = self._voices.get(self._main_language)
         self._engagement = Engagement()
         self._heard: Heard | None = None
+        # Who spoke in the turn being heard, and in the turn the agent is answering.
+        self._speaking: dict[str, Talker] = {}
+        self._authors: tuple[Talker, ...] = ()
 
         tools: list[Any] = []
         if handoff is not None:
@@ -127,6 +133,9 @@ class VoiceAgent(Agent):
                 has_rules=bool(profile.moderation_rules),
             )
             parts.append(moderation_note(profile.moderation_tools, profile.moderation_rules))
+        if tools_client is not None and tool_specs:
+            tools += external_tools(tools_client, self, tool_specs)
+            parts.append(tools_note(tool_specs))
         self._base_instructions = "\n\n".join(p for p in parts if p)
         # Voice activity alone never cuts the agent off; see `_maybe_barge_in`.
         super().__init__(
@@ -152,6 +161,8 @@ class VoiceAgent(Agent):
                 self._heard = Heard(
                     at=time.monotonic(), text=first.text, identity=who.identity, role=who.role
                 )
+                if who.identity:
+                    self._speaking[who.identity] = who
             self._maybe_barge_in(first.text, who)
         tag = ""
         if len(self._voices) > 1:
@@ -181,6 +192,8 @@ class VoiceAgent(Agent):
         self, turn_ctx: llm.ChatContext, new_message: llm.ChatMessage
     ) -> None:
         """Silent or "when named" agents only react when someone says their name."""
+        self._authors = tuple(self._speaking.values())
+        self._speaking = {}
         text = new_message.text_content or ""
         # With other assistants in the call, answering everything would make them talk over
         # each other: each one waits for its name (or for the floor to be handed to it).
@@ -193,6 +206,10 @@ class VoiceAgent(Agent):
     def current_speaker(self) -> Talker | None:
         return self._speaker()
 
+    def turn_authors(self) -> tuple[Talker, ...]:
+        """Everyone who spoke in the turn being answered (empty for replies nobody asked for)."""
+        return self._authors
+
     def last_heard(self) -> Heard | None:
         return self._heard
 
@@ -200,6 +217,7 @@ class VoiceAgent(Agent):
         """Someone asked to join: an agent that answers the waiting room tells the meeting."""
         if not self._moderates_lobby or self.muted:
             return
+        self._authors = ()
         try:
             self.session.generate_reply(instructions=KNOCK_PROMPT)
         except RuntimeError:
@@ -249,6 +267,7 @@ class VoiceAgent(Agent):
         """Another assistant handed over: speak now, unless told to stay quiet."""
         if self.muted:
             return
+        self._authors = ()  # a handoff is not a request from anyone in the call
         self.session.generate_reply(
             instructions=HANDOFF_PROMPT.format(
                 giver=giver, request=request or "apresente a sua parte"

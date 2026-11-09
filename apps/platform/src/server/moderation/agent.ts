@@ -35,7 +35,7 @@ export function identityUserId(identity: string): string | null {
 }
 
 /** The agent and the room it sits in. The LiveKit room must be one of its organization's rooms. */
-async function agentInRoom(
+export async function agentInRoom(
   sql: Sql,
   agentId: string,
   lkRoom: string,

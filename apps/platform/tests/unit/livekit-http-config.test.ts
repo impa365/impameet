@@ -45,7 +45,7 @@ describe('livekit join token', () => {
     expect(claims.video).toMatchObject({
       roomJoin: true,
       room: `${TENANT}.daily`,
-      canUpdateOwnMetadata: true,
+      canUpdateOwnMetadata: false,
     });
     expect(claims.video?.roomAdmin).toBeFalsy();
     expect(claims.attributes).toEqual({ role: 'moderator' });

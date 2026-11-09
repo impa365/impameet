@@ -42,7 +42,8 @@ export async function issueJoinToken(req: JoinTokenRequest): Promise<string> {
     canPublish: true,
     canSubscribe: true,
     canPublishData: true,
-    canUpdateOwnMetadata: true,
+    // Role and hand live in attributes: only the server may change them (see rooms/hand.ts).
+    canUpdateOwnMetadata: false,
   });
   token.roomConfig = new RoomConfiguration({
     maxParticipants: req.maxParticipants ?? 0,

@@ -30,6 +30,8 @@ services:
     environment:
       PLATFORM_DOMAIN: ${PLATFORM_HOST:?set PLATFORM_HOST}
       DEFAULT_TENANT: ${DEFAULT_TENANT-main}
+      # Internal host names AI agent tools may call (e.g. n8n on this network); empty = none.
+      AGENT_TOOLS_PRIVATE_HOSTS: ${AGENT_TOOLS_PRIVATE_HOSTS-}
       LIVEKIT_URL: wss://${LIVEKIT_HOST:?set LIVEKIT_HOST}
       LIVEKIT_API_URL: http://livekit:7880
       DATABASE_URL_FILE: /run/secrets/meet_platform_database_url

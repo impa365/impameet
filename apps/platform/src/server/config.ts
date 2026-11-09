@@ -59,6 +59,11 @@ const schema = z.object({
     .regex(/^smtps?:\/\/\S+$/, 'must be an smtp:// or smtps:// URL')
     .optional(),
   mailFrom: z.string().min(3).max(200).optional(),
+  /**
+   * Host names AI agent tools may reach on a private network (e.g. "n8n" in the same Docker
+   * network), over http or https. Every other tool URL must be https on the public internet.
+   */
+  toolsPrivateHosts: z.array(hostname).max(50).default([]),
   /** Master key (base64, 32 bytes) that encrypts provider API keys stored in the database. */
   encryptionKey: z
     .string()
@@ -86,6 +91,10 @@ export function loadConfig(env: Env = process.env): Config {
     smtpUrl: readSecret(env, 'SMTP_URL'),
     mailFrom: env.MAIL_FROM?.trim() || undefined,
     encryptionKey: readSecret(env, 'ENCRYPTION_KEY'),
+    toolsPrivateHosts: (env.AGENT_TOOLS_PRIVATE_HOSTS ?? '')
+      .split(',')
+      .map((h) => h.trim())
+      .filter(Boolean),
   });
   if (!parsed.success) {
     // Field names only: values may be secrets.

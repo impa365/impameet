@@ -288,6 +288,117 @@ export const joinInput = z.object({
   password: z.string().max(128).optional(),
 });
 
+export const handInput = z.object({
+  token: z.string().min(20).max(4096),
+  raised: z.boolean(),
+});
+
+export const TOOL_KINDS = ['http', 'mcp'] as const;
+export const TOOL_ACCESS = ['moderators', 'members'] as const;
+export const TOOL_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
+export const TOOL_PARAM_TYPES = ['string', 'number', 'integer', 'boolean'] as const;
+export const MAX_TOOLS_PER_AGENT = 20;
+/** Headers the platform sets itself (or that would let a tool smuggle another request). */
+export const RESERVED_HEADERS = new Set([
+  'host',
+  'content-length',
+  'transfer-encoding',
+  'connection',
+  'upgrade',
+  'te',
+  'trailer',
+  'expect',
+  'proxy-authorization',
+  'keep-alive',
+  'mcp-session-id',
+  'mcp-protocol-version',
+]);
+
+const toolName = z
+  .string()
+  .trim()
+  .regex(/^[a-z][a-z0-9_]{1,39}$/, 'Nome da ferramenta: letras minúsculas, números e _ (até 40)');
+
+const toolParam = z.object({
+  name: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,39}$/, 'Nome de parâmetro inválido'),
+  type: z.enum(TOOL_PARAM_TYPES),
+  description: z.string().trim().max(300).default(''),
+  required: z.boolean().default(false),
+});
+
+const toolHeader = z.object({
+  name: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9-]{1,64}$/, 'Nome de cabeçalho inválido')
+    .refine((n) => !RESERVED_HEADERS.has(n.toLowerCase()), 'Esse cabeçalho é definido pela plataforma'),
+  /** Empty keeps the value already saved for this header. */
+  value: z
+    .string()
+    .max(4000)
+    .refine((v) => !/[\r\n]/.test(v), 'Valor de cabeçalho inválido'),
+});
+
+const toolCommon = {
+  name: toolName,
+  enabled: z.boolean().default(true),
+  access: z.enum(TOOL_ACCESS).default('moderators'),
+  confirm: z.boolean().default(true),
+  url: z.string().trim().min(1, 'Informe a URL').max(2000, 'URL muito longa'),
+  timeoutMs: z.number().int().min(1000).max(30000).default(10000),
+  /** null keeps the saved headers; a list replaces them. */
+  headers: z
+    .array(toolHeader)
+    .max(20)
+    .nullable()
+    .default(null)
+    .refine(
+      (hs) => !hs || new Set(hs.map((h) => h.name.toLowerCase())).size === hs.length,
+      'Cabeçalho repetido',
+    ),
+};
+
+export const agentToolInput = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('http'),
+    ...toolCommon,
+    description: z
+      .string()
+      .trim()
+      .min(1, 'Explique para a IA quando usar a ferramenta')
+      .max(1000, 'Descrição muito longa (máx. 1000 caracteres)'),
+    method: z.enum(TOOL_METHODS),
+    params: z
+      .array(toolParam)
+      .max(20)
+      .default([])
+      .refine((ps) => new Set(ps.map((p) => p.name)).size === ps.length, 'Parâmetro repetido'),
+    bodyTemplate: z.string().trim().max(8000).nullable().default(null),
+  }),
+  z.object({
+    kind: z.literal('mcp'),
+    ...toolCommon,
+    description: z.string().trim().max(1000, 'Descrição muito longa (máx. 1000 caracteres)').default(''),
+    /** The server's tools the agent may call; none until an admin picks them. */
+    mcpTools: z
+      .array(z.string().min(1).max(128))
+      .max(100)
+      .default([])
+      .transform((ts) => [...new Set(ts)]),
+  }),
+]);
+
+/** What the voice worker sends when the model calls an external tool. */
+export const agentToolRunInput = z.object({
+  room: z.string().min(3).max(200),
+  tool: z.string().min(1).max(64),
+  args: z.record(z.string(), z.unknown()).default({}),
+  /** Everyone who spoke in the turn being answered: all of them must be allowed. */
+  requestedBy: z.array(z.string().min(1).max(200)).min(1).max(5),
+});
+
+export const agentToolTestInput = z.object({ args: z.record(z.string(), z.unknown()).default({}) });
+
 /** First validation message, safe to show to the user. */
 export function firstIssue(error: z.ZodError): string {
   return error.issues[0]?.message ?? 'Dados inválidos';

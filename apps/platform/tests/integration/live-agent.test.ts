@@ -39,6 +39,7 @@ class FakeLiveKit implements LiveKitAdmin {
     this.participants = this.participants.filter((p) => p.identity !== identity);
   }
   async setRole() {}
+  async setAttributes() {}
   async dispatchAgent(_room: string, agentName: string, metadata: string) {
     this.calls.push(`dispatch ${agentName} ${metadata}`);
   }

@@ -69,6 +69,8 @@ const isModeratorParticipant = (p: Participant | undefined) => p?.attributes?.ro
 /** Everything inside the call, laid out like Google Meet. Must render inside `LiveKitRoom`. */
 export function MeetRoom(props: {
   slug: string;
+  /** The join token: proves who we are when asking the server to change our own attributes. */
+  token: string;
   roomName: string;
   role: string;
   signedIn: boolean;
@@ -334,8 +336,15 @@ export function MeetRoom(props: {
     const next = !handUp;
     setHandUp(next);
     announce(next ? t('room.announce.youRaised') : t('room.announce.youLowered'));
-    await localParticipant.setAttributes({ [HAND_ATTRIBUTE]: next ? String(Date.now()) : '' });
-  }, [handUp, localParticipant, announce, t]);
+    try {
+      await api(`/api/rooms/${encodeURIComponent(props.slug)}/hand`, {
+        body: { token: props.token, raised: next },
+      });
+    } catch {
+      setHandUp(!next);
+      notify(t('room.announce.handFailed'));
+    }
+  }, [handUp, props.slug, props.token, announce, notify, t]);
 
   async function copyInvite() {
     await navigator.clipboard

@@ -42,6 +42,7 @@ class FakeLiveKit implements LiveKitAdmin {
   async muteAudio() {}
   async remove() {}
   async setRole() {}
+  async setAttributes() {}
   async dispatchAgent() {}
   async sendData(room: string, payload: string, topic: string) {
     this.sent.push(`${room} ${topic} ${payload}`);

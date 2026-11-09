@@ -230,6 +230,20 @@ async def test_a_confirmation_goes_stale() -> None:
     assert platform.posts == []
 
 
+async def test_another_moderators_yes_does_not_take_the_request_over() -> None:
+    platform, host, clock = Platform(), Host(ANA), Clock()
+    remove = tools(platform, host, clock=clock)["remover_participante"]
+    await remove("José")
+    lia = Talker(name="Lia", role="moderator", identity="u-lia")
+    host.speaker = lia
+    host.heard = Heard(at=clock.now + 1, text="sim", identity="u-lia", role="moderator")
+    assert "Quer mesmo" in await remove("José")
+    host.speaker = ANA
+    host.heard = Heard(at=clock.now + 2, text="pode sim", identity="u-ana", role="moderator")
+    clock.now += 3
+    assert await remove("José") == "Feito: g-jose ok."
+
+
 async def test_an_admin_rule_removes_without_asking() -> None:
     platform = Platform()
     remove = tools(platform, Host(), has_rules=True)["remover_participante"]

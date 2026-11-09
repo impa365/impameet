@@ -197,6 +197,7 @@ export function MeetingRoom(props: {
     >
       <MeetRoom
         slug={props.slug}
+        token={session.token}
         roomName={session.roomName}
         role={session.role}
         signedIn={props.userName !== null}

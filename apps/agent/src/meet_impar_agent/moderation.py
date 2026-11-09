@@ -183,7 +183,7 @@ class ModerationClient:
         return f"Não foi possível: {message}."
 
 
-def _affirmative(text: str) -> bool:
+def affirmative(text: str) -> bool:
     tokens = set(words(text))
     return bool(tokens & AFFIRMATIVE) and not tokens & NEGATIVE
 
@@ -291,17 +291,20 @@ def moderation_tools(  # noqa: PLR0915 - one closure per tool keeps each one sel
                 return target
             if by:
                 asked = pending.get(target.identity)
+                if asked is not None and clock() - asked[0] > CONFIRM_WINDOW_S:
+                    asked = None
                 heard = host.last_heard()
                 confirmed = (
                     asked is not None
-                    and clock() - asked[0] <= CONFIRM_WINDOW_S
                     and heard is not None
                     and heard.at > asked[0]
                     and heard.identity == asked[1]
-                    and _affirmative(heard.text)
+                    and affirmative(heard.text)
                 )
                 if not confirmed:
-                    pending[target.identity] = (clock(), by)
+                    # Someone else's "yes" does not take the request over from who asked.
+                    if asked is None:
+                        pending[target.identity] = (clock(), by)
                     return (
                         f"Antes de remover, pergunte em voz alta: 'Quer mesmo que eu remova "
                         f"{target.name} da chamada?'. Só chame remover_participante de novo "

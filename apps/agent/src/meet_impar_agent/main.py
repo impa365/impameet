@@ -8,6 +8,7 @@ import logging
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
 
+import httpx
 from livekit import rtc
 from livekit.agents import AgentServer, AgentSession, JobContext, JobProcess, JobRequest, cli
 from livekit.plugins import silero
@@ -37,6 +38,7 @@ from .profile import (
     thinking_sound,
 )
 from .screen import ScreenClient
+from .tools import ToolsClient, ToolSpec
 
 logger = logging.getLogger("meet_impar_agent")
 MUTED_ATTRIBUTE = "impa.muted"
@@ -169,8 +171,30 @@ def follow_peers(room: rtc.Room, agent: VoiceAgent) -> None:
     refresh()
 
 
+async def load_tools(
+    settings: Settings, profile: AgentProfile, room: str
+) -> tuple[ToolsClient | None, tuple[ToolSpec, ...]]:
+    """The external tools the admin gave this agent; without them the agent still works."""
+    if not settings.platform or not profile.agent_id:
+        return None, ()
+    client = ToolsClient(settings.platform, profile.agent_id, room)
+    try:
+        specs = await client.specs()
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("could not load external tools", extra={"error": type(exc).__name__})
+        specs = ()
+    if not specs:
+        await client.aclose()
+        return None, ()
+    return client, specs
+
+
 def _build_agent(
-    ctx: JobContext, settings: Settings, profile: AgentProfile, session: AgentSession[Any]
+    ctx: JobContext,
+    settings: Settings,
+    profile: AgentProfile,
+    session: AgentSession[Any],
+    tools: tuple[ToolsClient | None, tuple[ToolSpec, ...]] = (None, ()),
 ) -> VoiceAgent:
     """Screen sharing tools exist only when the optional screen service is configured."""
 
@@ -185,6 +209,9 @@ def _build_agent(
     if settings.platform and profile.moderation_tools and profile.agent_id:
         moderation = ModerationClient(settings.platform, profile.agent_id, ctx.room.name)
         ctx.add_shutdown_callback(moderation.aclose)
+    tools_client, tool_specs = tools
+    if tools_client is not None:
+        ctx.add_shutdown_callback(tools_client.aclose)
     return VoiceAgent(
         profile,
         speaker=speaker_lookup(session),
@@ -192,6 +219,8 @@ def _build_agent(
         screen=screen,
         handoff=handoff_sender(ctx.room, profile.name),
         moderation=moderation,
+        tools_client=tools_client,
+        tool_specs=tool_specs,
     )
 
 
@@ -245,7 +274,9 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(_log_usage)
 
-    agent = _build_agent(ctx, settings, profile, session)
+    agent = _build_agent(
+        ctx, settings, profile, session, await load_tools(settings, profile, ctx.room.name)
+    )
     await session.start(agent=agent, room=ctx.room, record=False)
     # Lets the platform tell the voice agent apart from captions and the AI screen.
     await ctx.room.local_participant.set_attributes({MODE_ATTRIBUTE: "voice"})
