@@ -8,6 +8,7 @@ import { limits } from '@/server/limits';
 import { currentUser } from '@/server/request';
 import { livekitRoomName } from '@/server/livekit';
 import { AGENT_SETTINGS_TOPIC, POLICY_TOPIC, roomPolicies } from '@/server/rooms/join';
+import { currentBreakouts } from '@/server/breakouts/service';
 import { deleteRoom, updateRoom } from '@/server/rooms/service';
 import { roomSlug, updateRoomInput } from '@/server/validation';
 
@@ -40,14 +41,16 @@ export async function PATCH(
         .sendData(livekitRoomName(room.tenantId, room.slug), JSON.stringify(roomPolicies(room)), POLICY_TOPIC)
         .catch(() => undefined);
     }
-    if (patch.thinkingSound !== undefined) {
-      void lk()
-        .sendData(
-          livekitRoomName(room.tenantId, room.slug),
-          JSON.stringify({ thinkingSound: room.thinkingSound }),
-          AGENT_SETTINGS_TOPIC,
-        )
-        .catch(() => undefined);
+    if (patch.thinkingSound !== undefined || patch.agentActions !== undefined) {
+      const settings = { thinkingSound: room.thinkingSound, agentActions: room.agentActions };
+      const main = livekitRoomName(room.tenantId, room.slug);
+      const breakouts = await currentBreakouts(db(), room).catch(() => null);
+      // Breakout rooms have their own agents: they must hear it too (actions above all).
+      const rooms = [main, ...Array.from({ length: breakouts?.count ?? 0 }, (_, i) => `${main}~${i + 1}`)];
+      for (const name of rooms)
+        void lk()
+          .sendData(name, JSON.stringify(settings), AGENT_SETTINGS_TOPIC)
+          .catch(() => undefined);
     }
     return json({ room, live });
   });

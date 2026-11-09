@@ -21,7 +21,7 @@ import httpx
 from livekit.agents import llm
 
 from .config import PlatformSettings
-from .moderation import CONFIRM_WINDOW_S, Heard, affirmative
+from .moderation import ACTIONS_OFF, CONFIRM_WINDOW_S, Heard, affirmative
 
 logger = logging.getLogger("meet_impar_agent.tools")
 
@@ -59,6 +59,8 @@ class Host(Protocol):
     def turn_authors(self) -> tuple[Author, ...]: ...
 
     def last_heard(self) -> Heard | None: ...
+
+    def actions_allowed(self) -> bool: ...
 
 
 def clean_specs(raw: object) -> tuple[ToolSpec, ...]:
@@ -148,6 +150,8 @@ def external_tools(
 
     def make(spec: ToolSpec) -> llm.RawFunctionTool[..., Any]:
         async def call(raw_arguments: dict[str, object]) -> str:
+            if not host.actions_allowed():
+                return ACTIONS_OFF
             args = dict(raw_arguments)
             authors = {a.identity for a in host.turn_authors() if a.identity}
             if not authors:

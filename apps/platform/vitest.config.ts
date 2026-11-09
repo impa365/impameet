@@ -24,6 +24,8 @@ export default defineConfig({
         'src/server/http.ts',
         'src/server/config.ts',
         'src/server/plans.ts',
+        'src/server/tools/http-tool.ts',
+        'src/server/rooms/hand.ts',
       ],
       thresholds: { lines: 95, branches: 85 },
     },

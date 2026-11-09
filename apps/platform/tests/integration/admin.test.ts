@@ -16,7 +16,7 @@ import {
 import { AppError } from '@/server/errors';
 import type { LiveKitAdmin, LiveParticipant } from '@/server/livekit-admin';
 import { decide, entryStatus, pendingRequests, requestEntry } from '@/server/lobby/service';
-import { agentModerate, agentModerationView } from '@/server/moderation/agent';
+import { agentModerate, agentModerationView, identityUserId } from '@/server/moderation/agent';
 import { canModerate, listLiveParticipants, moderate } from '@/server/moderation/service';
 import { tenantLimits } from '@/server/plans';
 import {
@@ -31,7 +31,7 @@ import { hashPassword } from '@/server/security/password';
 import { listTenants, updateTenant } from '@/server/superadmin/service';
 import type { Tenant } from '@/server/tenants/repo';
 import { createUser, listUsers, updateUser } from '@/server/users/service';
-import { agentInput, agentModerationInput, createRoomInput } from '@/server/validation';
+import { agentInput, agentModerationInput, createRoomInput, updateRoomInput } from '@/server/validation';
 import { type TestSql, freshDatabase } from './db';
 import { agentChoices } from './ready-agent';
 import { listAgents, updateAgent } from '@/server/agents/service';
@@ -63,7 +63,7 @@ class FakeLiveKit implements LiveKitAdmin {
   async listRooms() {
     return [...this.rooms.entries()].map(([name, ps]) => ({ name, participants: ps.length, createdAt: 0 }));
   }
-  async muteAudio(room: string, identity: string, sid: string) {
+  async muteTrack(room: string, identity: string, sid: string) {
     this.calls.push(`mute ${identity} ${sid}`);
   }
   async remove(room: string, identity: string) {
@@ -760,6 +760,88 @@ describe('moderation by an AI agent', () => {
     await expectAppError(act({ action: 'deny', target: ticket.id, rule: 'x' }), 404);
     // only the lobby tool is on
     await expectAppError(act({ action: 'mute', target: 'g-john', rule: 'x' }), 403, /permissão/);
+  });
+
+  it('switches cameras off and records only when a moderator asks, never by a rule', async () => {
+    const { act, mod, lk, lkRoom, room, kaiser, user } = await setup(
+      ['camera', 'record'],
+      'Grave toda reunião.',
+    );
+    const john = lk.rooms.get(lkRoom)!.find((p) => p.identity === 'g-john')!;
+    john.videoTrackSids = ['TV_john'];
+    john.videoMuted = false;
+    // rules never switch a camera off or start a recording
+    await expectAppError(
+      act({ action: 'camera', target: 'g-john', rule: 'Grave toda reunião.' }),
+      403,
+      /moderador/,
+    );
+    await expectAppError(act({ action: 'record_start', target: 'room', rule: 'Grave toda reunião.' }), 403);
+    await expectAppError(act({ action: 'camera', target: mod.identity, requestedBy: mod.identity }), 403);
+
+    expect(await act({ action: 'camera', target: 'g-john', requestedBy: mod.identity })).toEqual({
+      done: 'João teve a câmera desligada',
+    });
+    expect(lk.calls).toEqual(['mute g-john TV_john']);
+    expect(
+      (await agentModerationView(db(), lk, kaiser.id, lkRoom)).people.find((p) => p.name === 'João'),
+    ).toMatchObject({ camOn: true, micOn: true });
+
+    // recording needs the recorder installed, and only the main room is recorded
+    await expectAppError(act({ action: 'record_start', target: 'room', requestedBy: mod.identity }), 501);
+    const started: string[] = [];
+    const recorder = {
+      sql: db(),
+      lk,
+      outputDir: '/out',
+      egress: {
+        start: async (r: string) => {
+          started.push(r);
+          return `EG_${started.length}`;
+        },
+        stop: async () => {},
+        info: async () => null,
+      },
+    };
+    const record = (input: Record<string, unknown>) =>
+      agentModerate(db(), lk, kaiser.id, agentModerationInput.parse(input), recorder);
+    lk.rooms.set(`${lkRoom}~1`, [mod]);
+    await expectAppError(
+      record({ room: `${lkRoom}~1`, action: 'record_start', target: 'room', requestedBy: mod.identity }),
+      400,
+    );
+    expect(
+      await record({ room: lkRoom, action: 'record_start', target: 'room', requestedBy: mod.identity }),
+    ).toEqual({
+      done: 'A gravação começou',
+    });
+    expect(started).toEqual([lkRoom]);
+    await expectAppError(
+      record({ room: lkRoom, action: 'record_start', target: 'room', requestedBy: mod.identity }),
+      409,
+    );
+    expect(
+      await record({ room: lkRoom, action: 'record_stop', target: 'room', requestedBy: mod.identity }),
+    ).toEqual({
+      done: 'A gravação foi encerrada',
+    });
+    const [rec] = await sql<{ startedBy: string }[]>`select started_by as "startedBy" from recordings`;
+    expect(rec.startedBy).toBe(identityUserId(mod.identity));
+    const audits = await sql<{ action: string; meta: Record<string, string> }[]>`
+      select action, meta from audit_log where action like 'recording.%' order by id`;
+    expect(audits.map((a) => [a.action, a.meta.via, a.meta.requestedBy])).toEqual([
+      ['recording.started', 'ai', 'Ana'],
+      ['recording.stopped', 'ai', 'Ana'],
+    ]);
+
+    // a moderator switches the AI's actions off for this room: everything stops at once
+    await updateRoom(db(), user, room.slug, updateRoomInput.parse({ agentActions: false }), null);
+    await expectAppError(
+      act({ action: 'camera', target: 'g-john', requestedBy: mod.identity }),
+      403,
+      /desligaram/,
+    );
+    expect((await agentModerationView(db(), lk, kaiser.id, lkRoom)).actions).toBe(false);
   });
 
   it('only works in rooms the agent was put in, of its own organization', async () => {

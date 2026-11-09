@@ -56,7 +56,7 @@ export async function moderate(
   if (action === 'mute_all') {
     for (const p of participants) {
       if (p.isAgent || isUsersIdentity(p.identity, user.id)) continue;
-      for (const sid of p.audioTrackSids) await lk.muteAudio(lkRoom, p.identity, sid);
+      for (const sid of p.audioTrackSids) await lk.muteTrack(lkRoom, p.identity, sid);
       affected += p.audioTrackSids.length > 0 ? 1 : 0;
     }
   } else {
@@ -67,7 +67,7 @@ export async function moderate(
       throw badRequest('Você não pode fazer isso com você mesmo');
     switch (action) {
       case 'mute':
-        for (const sid of p.audioTrackSids) await lk.muteAudio(lkRoom, p.identity, sid);
+        for (const sid of p.audioTrackSids) await lk.muteTrack(lkRoom, p.identity, sid);
         break;
       case 'remove':
         await lk.remove(lkRoom, p.identity);

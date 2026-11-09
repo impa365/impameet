@@ -191,6 +191,8 @@ describe('rooms with a chosen agent', () => {
       agentName: agent.name,
       tenantId: tenant.id,
       thinkingSound: true,
+      agentActions: true,
+      boardPolicy: 'everyone',
     });
 
     const fallback = await defaultAgentId(db(), tenant.id);

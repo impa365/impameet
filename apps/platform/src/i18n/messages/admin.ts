@@ -125,6 +125,21 @@ export default defineMessages(
       modMuteHelp: 'Ex.: “Kaiser, muta a Maria”. A pessoa pode ligar de novo quando quiser.',
       modLobby: 'Responder à sala de espera',
       modLobbyHelp: 'Aprova ou recusa quem pede para entrar, e avisa quando alguém está esperando.',
+      modCamera: 'Desligar câmeras',
+      modCameraHelp:
+        'Só quando um moderador pede, ex.: “Kaiser, desliga a câmera do Pedro”. A pessoa pode ligar de novo.',
+      modRecord: 'Iniciar e parar a gravação',
+      modRecordHelp:
+        'Só quando um moderador pede, ex.: “Kaiser, começa a gravar”. Vale para a sala principal.',
+      perceptionLegend: 'O que a IA pode ver',
+      perceptionHint:
+        'Quando alguém pede (“Kaiser, o que tem no quadro?”), o assistente olha e descreve, dizendo de quem é o conteúdo. Fica tudo desligado até você ligar. As imagens vão para o modelo de linguagem escolhido, mas não são guardadas. Os moderadores podem desligar isso em cada sala.',
+      seeBoard: 'Quadro branco',
+      seeBoardHelp: 'Lê o que está desenhado e escrito no quadro, respeitando quem pode desenhar na sala.',
+      seePolls: 'Enquetes',
+      seePollsHelp: 'Sabe as perguntas e quantos votos cada opção tem (nunca em quem cada pessoa votou).',
+      seeScreen: 'Telas compartilhadas',
+      seeScreenHelp: 'Olha a tela que alguém está compartilhando, no momento em que pedem.',
       rulesLabel: 'Regras de moderação (opcional): quando o assistente deve agir sozinho',
       rulesPlaceholder:
         'Ex.:\n- Quando alguém pedir para entrar, aprove automaticamente.\n- Se alguém estiver com barulho alto no microfone, silencie e avise com educação.\n- Nunca aprove quem não disser o nome completo.',
@@ -450,6 +465,20 @@ export default defineMessages(
         modMuteHelp: 'E.g. “Kaiser, mute Mary”. The person can unmute whenever they want.',
         modLobby: 'Answer the waiting room',
         modLobbyHelp: 'Lets people in or turns them away, and says when someone is waiting.',
+        modCamera: 'Switch cameras off',
+        modCameraHelp:
+          'Only when a moderator asks, e.g. “Kaiser, turn Peter’s camera off”. They can turn it back on.',
+        modRecord: 'Start and stop the recording',
+        modRecordHelp: 'Only when a moderator asks, e.g. “Kaiser, start recording”. For the main room.',
+        perceptionLegend: 'What the AI may see',
+        perceptionHint:
+          'When someone asks (“Kaiser, what is on the whiteboard?”), the assistant looks and describes it, saying whose content it is. Everything is off until you turn it on. Images go to the chosen language model but are not stored. Moderators can turn this off in each room.',
+        seeBoard: 'Whiteboard',
+        seeBoardHelp: 'Reads what is drawn and written on the board, honouring who may draw in the room.',
+        seePolls: 'Polls',
+        seePollsHelp: 'Knows the questions and how many votes each option has (never who voted for what).',
+        seeScreen: 'Shared screens',
+        seeScreenHelp: 'Looks at the screen someone is sharing, at the moment they ask.',
         rulesLabel: 'Moderation rules (optional): when the assistant acts on its own',
         rulesPlaceholder:
           'E.g.:\n- When someone asks to join, let them in automatically.\n- If someone has loud noise on their microphone, mute them and kindly say so.\n- Never let in anyone who does not give their full name.',
@@ -776,6 +805,22 @@ export default defineMessages(
         modMuteHelp: 'Ej.: “Kaiser, silencia a María”. La persona puede volver a activarlo cuando quiera.',
         modLobby: 'Responder a la sala de espera',
         modLobbyHelp: 'Admite o rechaza a quien pide entrar, y avisa cuando alguien está esperando.',
+        modCamera: 'Apagar cámaras',
+        modCameraHelp:
+          'Solo cuando un moderador lo pide, ej.: “Kaiser, apaga la cámara de Pedro”. La persona puede encenderla de nuevo.',
+        modRecord: 'Iniciar y detener la grabación',
+        modRecordHelp:
+          'Solo cuando un moderador lo pide, ej.: “Kaiser, empieza a grabar”. Para la sala principal.',
+        perceptionLegend: 'Lo que la IA puede ver',
+        perceptionHint:
+          'Cuando alguien lo pide (“Kaiser, ¿qué hay en la pizarra?”), el asistente mira y lo describe, diciendo de quién es el contenido. Todo está desactivado hasta que lo actives. Las imágenes van al modelo de lenguaje elegido, pero no se guardan. Los moderadores pueden desactivarlo en cada sala.',
+        seeBoard: 'Pizarra',
+        seeBoardHelp:
+          'Lee lo que está dibujado y escrito en la pizarra, respetando quién puede dibujar en la sala.',
+        seePolls: 'Encuestas',
+        seePollsHelp: 'Conoce las preguntas y cuántos votos tiene cada opción (nunca quién votó qué).',
+        seeScreen: 'Pantallas compartidas',
+        seeScreenHelp: 'Mira la pantalla que alguien está compartiendo, en el momento en que lo piden.',
         rulesLabel: 'Reglas de moderación (opcional): cuándo el asistente actúa solo',
         rulesPlaceholder:
           'Ej.:\n- Cuando alguien pida entrar, admítelo automáticamente.\n- Si alguien tiene mucho ruido en el micrófono, siléncialo y avísale con amabilidad.\n- Nunca admitas a quien no diga su nombre completo.',

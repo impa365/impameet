@@ -25,6 +25,7 @@ interface Agent {
   mutePolicy: 'everyone' | 'moderators' | 'disabled';
   moderationTools: ModerationTool[];
   moderationRules: string;
+  perception: Perception[];
   llmIntegrationId: string | null;
   ttsIntegrationId: string | null;
   sttIntegrationId: string | null;
@@ -48,6 +49,7 @@ interface Draft {
   mutePolicy: Agent['mutePolicy'];
   moderationTools: ModerationTool[];
   moderationRules: string;
+  perception: Perception[];
   llmIntegrationId: string;
   ttsIntegrationId: string;
   sttIntegrationId: string;
@@ -56,12 +58,21 @@ interface Draft {
 const KNOWLEDGE_MAX = 100000;
 const RULES_MAX = 4000;
 
-type ModerationTool = 'remove' | 'mute' | 'lobby';
+type ModerationTool = 'remove' | 'mute' | 'camera' | 'lobby' | 'record';
 const MODERATION = {
   remove: ['admin.agents.modRemove', 'admin.agents.modRemoveHelp'],
   mute: ['admin.agents.modMute', 'admin.agents.modMuteHelp'],
+  camera: ['admin.agents.modCamera', 'admin.agents.modCameraHelp'],
   lobby: ['admin.agents.modLobby', 'admin.agents.modLobbyHelp'],
+  record: ['admin.agents.modRecord', 'admin.agents.modRecordHelp'],
 } as const satisfies Record<ModerationTool, readonly [MessageKey, MessageKey]>;
+
+type Perception = 'board' | 'polls' | 'screen';
+const PERCEPTION = {
+  board: ['admin.agents.seeBoard', 'admin.agents.seeBoardHelp'],
+  polls: ['admin.agents.seePolls', 'admin.agents.seePollsHelp'],
+  screen: ['admin.agents.seeScreen', 'admin.agents.seeScreenHelp'],
+} as const satisfies Record<Perception, readonly [MessageKey, MessageKey]>;
 
 const EMPTY: Draft = {
   name: '',
@@ -78,6 +89,7 @@ const EMPTY: Draft = {
   mutePolicy: 'everyone',
   moderationTools: [],
   moderationRules: '',
+  perception: [],
   llmIntegrationId: '',
   ttsIntegrationId: '',
   sttIntegrationId: '',
@@ -142,6 +154,7 @@ export function AgentsTab() {
       mutePolicy: agent.mutePolicy,
       moderationTools: agent.moderationTools ?? [],
       moderationRules: agent.moderationRules ?? '',
+      perception: agent.perception ?? [],
       llmIntegrationId: agent.llmIntegrationId ?? '',
       ttsIntegrationId: agent.ttsIntegrationId ?? '',
       sttIntegrationId: agent.sttIntegrationId ?? '',
@@ -347,6 +360,30 @@ export function AgentsTab() {
               />
               <span className="muted">{t('admin.agents.rulesHelp')}</span>
             </label>
+          </fieldset>
+          <fieldset className="group">
+            <legend>{t('admin.agents.perceptionLegend')}</legend>
+            <p className="muted small-print">{t('admin.agents.perceptionHint')}</p>
+            {(Object.keys(PERCEPTION) as Perception[]).map((what) => (
+              <label key={what} className="switch">
+                <input
+                  type="checkbox"
+                  checked={draft.perception.includes(what)}
+                  onChange={(e) =>
+                    set(
+                      'perception',
+                      e.target.checked
+                        ? [...draft.perception, what]
+                        : draft.perception.filter((x) => x !== what),
+                    )
+                  }
+                />
+                <span>
+                  {t(PERCEPTION[what][0])}
+                  <small>{t(PERCEPTION[what][1])}</small>
+                </span>
+              </label>
+            ))}
           </fieldset>
           <fieldset className="group">
             <legend>{t('admin.agents.brainLegend')}</legend>
@@ -559,6 +596,11 @@ export function AgentsTab() {
                 <span className="badge">
                   🛡️{' '}
                   {(a.moderationTools ?? []).map((tool) => t(MODERATION[tool][0]).toLowerCase()).join(', ')}
+                </span>
+              )}
+              {(a.perception ?? []).length > 0 && (
+                <span className="badge">
+                  👁️ {(a.perception ?? []).map((what) => t(PERCEPTION[what][0]).toLowerCase()).join(', ')}
                 </span>
               )}
               {a.description && <div className="agent-about">{a.description}</div>}

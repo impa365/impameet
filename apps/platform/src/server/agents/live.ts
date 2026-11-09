@@ -50,11 +50,7 @@ export async function syncLiveAgents(
   if (people.length > 0) {
     for (const agent of await roomAgents(sql, room)) {
       if (!wanted.has(agent.id) || present.has(agent.id)) continue;
-      await lk.dispatchAgent(
-        lkRoom,
-        agentName,
-        agentDispatchMetadata(room.tenantId, agent, room.thinkingSound),
-      );
+      await lk.dispatchAgent(lkRoom, agentName, agentDispatchMetadata(room.tenantId, agent, room));
       dispatched++;
     }
   }

@@ -51,6 +51,7 @@ class Person:
     role: str
     mic_on: bool
     protected: bool
+    cam_on: bool = False
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,18 @@ class Host(Protocol):
 
     def last_heard(self) -> Heard | None: ...
 
+    def actions_allowed(self) -> bool: ...
+
+
+ACTIONS_OFF = (
+    "Os moderadores desligaram as ações da IA nesta sala: você não pode agir sobre as pessoas "
+    "nem usar ferramentas agora. Explique isso com educação."
+)
+MODERATOR_ONLY = (
+    "Só um moderador da reunião pode pedir isso (o papel aparece entre parênteses). Explique "
+    "com educação."
+)
+
 
 def moderation_note(tools: Iterable[str], rules: str) -> str:
     """Instructions for an agent that may act on people."""
@@ -86,6 +99,9 @@ def moderation_note(tools: Iterable[str], rules: str) -> str:
         "remove": "remover participantes (remover_participante)",
         "mute": "silenciar o microfone de alguém (silenciar_participante)",
         "lobby": "aprovar ou recusar quem está na sala de espera (responder_sala_de_espera)",
+        "camera": "desligar a câmera de alguém (desligar_camera), só quando um moderador pedir",
+        "record": "iniciar e parar a gravação (iniciar_gravacao, parar_gravacao), só quando um "
+        "moderador pedir",
     }
     note = (
         "MODERAÇÃO: você pode " + "; ".join(can[t] for t in tools) + ". Chame ver_participantes "
@@ -157,6 +173,7 @@ class ModerationClient:
                 role=str(p.get("role") or "participant"),
                 mic_on=bool(p.get("micOn")),
                 protected=bool(p.get("protected")),
+                cam_on=bool(p.get("camOn")),
             )
             for p in body.get("people", [])
         ]
@@ -207,6 +224,8 @@ def moderation_tools(  # noqa: PLR0915 - one closure per tool keeps each one sel
 
     def authority(regra: str) -> tuple[str | None, str | None] | str:
         """(requested_by, rule), or the reason the agent may not act."""
+        if not host.actions_allowed():
+            return ACTIONS_OFF
         by = moderator()
         if by:
             return by, None
@@ -259,7 +278,8 @@ def moderation_tools(  # noqa: PLR0915 - one closure per tool keeps each one sel
         except httpx.HTTPError:
             return "Não consegui ver a lista de participantes agora."
         lines = [
-            f"- {p.name} ({p.role}, microfone {'ligado' if p.mic_on else 'desligado'})"
+            f"- {p.name} ({p.role}, microfone {'ligado' if p.mic_on else 'desligado'}, "
+            f"câmera {'ligada' if p.cam_on else 'desligada'})"
             + (" [protegido]" if p.protected else "")
             for p in people
         ]
@@ -336,6 +356,54 @@ def moderation_tools(  # noqa: PLR0915 - one closure per tool keeps each one sel
             return await client.act("mute", target.identity, requested_by=by, rule=rule)
 
         result.append(mute)
+
+    def moderator_only() -> str:
+        """The moderator asking, or why not: rules never cover cameras or the recording."""
+        if not host.actions_allowed():
+            return ACTIONS_OFF
+        return moderator() or MODERATOR_ONLY
+
+    if "camera" in enabled:
+
+        @llm.function_tool(name="desligar_camera")
+        @safe
+        async def camera(pessoa: str) -> str:
+            """Desliga a câmera de alguém (a pessoa pode ligar de novo). Só a pedido de moderador.
+
+            Args:
+                pessoa: o nome da pessoa, como aparece em ver_participantes.
+            """
+            by = moderator_only()
+            if by in (ACTIONS_OFF, MODERATOR_ONLY):
+                return by
+            target = await person(pessoa)
+            if isinstance(target, str):
+                return target
+            return await client.act("camera", target.identity, requested_by=by, rule=None)
+
+        result.append(camera)
+
+    if "record" in enabled:
+
+        @llm.function_tool(name="iniciar_gravacao")
+        @safe
+        async def record_start() -> str:
+            """Começa a gravar a reunião. Só a pedido de moderador; avise a todos que começou."""
+            by = moderator_only()
+            if by in (ACTIONS_OFF, MODERATOR_ONLY):
+                return by
+            return await client.act("record_start", "room", requested_by=by, rule=None)
+
+        @llm.function_tool(name="parar_gravacao")
+        @safe
+        async def record_stop() -> str:
+            """Para a gravação da reunião. Só a pedido de moderador."""
+            by = moderator_only()
+            if by in (ACTIONS_OFF, MODERATOR_ONLY):
+                return by
+            return await client.act("record_stop", "room", requested_by=by, rule=None)
+
+        result += [record_start, record_stop]
 
     if "lobby" in enabled:
 

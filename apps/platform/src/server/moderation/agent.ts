@@ -1,9 +1,11 @@
 import type { z } from 'zod';
 import { audit } from '../audit';
 import type { Sql } from '../db';
-import { badRequest, forbidden, notFound, tooManyRequests } from '../errors';
+import { AppError, badRequest, forbidden, notFound, tooManyRequests } from '../errors';
 import type { LiveKitAdmin, LiveParticipant } from '../livekit-admin';
+import { livekitRoomName } from '../livekit';
 import { decide, pendingRequests } from '../lobby/service';
+import { type RecordingDeps, beginRecording, endRecording } from '../recordings/service';
 import { RateLimiter } from '../security/rate-limit';
 import { type Room, findRoom } from '../rooms/service';
 import type { agentModerationInput } from '../validation';
@@ -13,7 +15,17 @@ export type AgentModerationInput = z.infer<typeof agentModerationInput>;
 /** An AI agent never acts on more than this many people in ten minutes, in one room. */
 const agentActions = new RateLimiter(10, 10 * 60_000);
 
-const TOOL_FOR = { remove: 'remove', mute: 'mute', admit: 'lobby', deny: 'lobby' } as const;
+const TOOL_FOR = {
+  remove: 'remove',
+  mute: 'mute',
+  camera: 'camera',
+  admit: 'lobby',
+  deny: 'lobby',
+  record_start: 'record',
+  record_stop: 'record',
+} as const;
+/** Never on the agent's own initiative: only when a moderator in the call asks. */
+const MODERATOR_ONLY = new Set(['camera', 'record_start', 'record_stop']);
 const USER_IDENTITY = /^u-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-/;
 
 interface ModeratingAgent {
@@ -25,8 +37,22 @@ interface ModeratingAgent {
 }
 
 export interface AgentModerationView {
-  people: { identity: string; name: string; role: string; micOn: boolean; protected: boolean }[];
+  people: {
+    identity: string;
+    name: string;
+    role: string;
+    micOn: boolean;
+    camOn: boolean;
+    protected: boolean;
+  }[];
   lobby: { id: string; name: string }[];
+  /** False when the room's moderators switched the AI's actions off. */
+  actions: boolean;
+}
+
+/** Thrown whenever a room's moderators have switched the AI's actions off. */
+export function assertAgentActions(room: Room): void {
+  if (!room.agentActions) throw forbidden('Os moderadores desligaram as ações da IA nesta sala');
 }
 
 /** The user behind a signed-in participant identity (`u-<user id>-…`). */
@@ -93,9 +119,11 @@ export async function agentModerationView(
         name: p.name,
         role: p.role,
         micOn: !p.audioMuted,
+        camOn: p.videoMuted === false,
         protected: shielded.has(p.identity),
       })),
     lobby: (await pendingRequests(sql, room)).map((r) => ({ id: r.id, name: r.displayName })),
+    actions: room.agentActions,
   };
 }
 
@@ -109,18 +137,28 @@ export async function agentModerate(
   lk: LiveKitAdmin,
   agentId: string,
   input: AgentModerationInput,
+  recorder: RecordingDeps | null = null,
 ): Promise<{ done: string }> {
   const { agent, room } = await agentInRoom(sql, agentId, input.room);
   if (!agent.moderationTools.includes(TOOL_FOR[input.action]))
     throw forbidden('Este agente não tem permissão para essa ação');
+  assertAgentActions(room);
 
   const people = await lk.listParticipants(input.room);
   const shielded = await protectedIdentities(sql, room, people);
   const requester = input.requestedBy ? people.find((p) => p.identity === input.requestedBy) : undefined;
   const byModerator = requester !== undefined && shielded.has(requester.identity) && !requester.isAgent;
-  const byRule = !byModerator && agent.moderationRules.trim() !== '' && (input.rule ?? '').trim() !== '';
+  const byRule =
+    !byModerator &&
+    !MODERATOR_ONLY.has(input.action) &&
+    agent.moderationRules.trim() !== '' &&
+    (input.rule ?? '').trim() !== '';
   if (!byModerator && !byRule)
-    throw forbidden('Só um moderador da reunião ou uma regra definida pelo administrador autoriza isso');
+    throw forbidden(
+      MODERATOR_ONLY.has(input.action)
+        ? 'Só um moderador da reunião pode pedir isso'
+        : 'Só um moderador da reunião ou uma regra definida pelo administrador autoriza isso',
+    );
   if (!agentActions.take(`${agent.id}:${input.room}`)) throw tooManyRequests();
 
   const meta = {
@@ -130,6 +168,19 @@ export async function agentModerate(
     rule: byRule ? (input.rule ?? '').slice(0, 200) : '',
   };
   const actorId = byModerator ? identityUserId(requester.identity) : null;
+
+  if (input.action === 'record_start' || input.action === 'record_stop') {
+    if (!recorder)
+      throw new AppError(501, 'recording_disabled', 'A gravação não está instalada neste servidor');
+    if (input.room !== livekitRoomName(room.tenantId, room.slug))
+      throw badRequest('Só a sala principal pode ser gravada');
+    if (input.action === 'record_start') {
+      await beginRecording(recorder, room, actorId, null, meta);
+      return { done: 'A gravação começou' };
+    }
+    await endRecording(recorder, room, actorId, null, meta);
+    return { done: 'A gravação foi encerrada' };
+  }
 
   if (input.action === 'admit' || input.action === 'deny') {
     const waiting = await pendingRequests(sql, room);
@@ -147,7 +198,9 @@ export async function agentModerate(
 
   // `input.room` is the agent's own LiveKit room (the main room or one of its breakouts).
   if (input.action === 'remove') await lk.remove(input.room, target.identity);
-  else for (const sid of target.audioTrackSids) await lk.muteAudio(input.room, target.identity, sid);
+  else if (input.action === 'camera')
+    for (const sid of target.videoTrackSids ?? []) await lk.muteTrack(input.room, target.identity, sid);
+  else for (const sid of target.audioTrackSids) await lk.muteTrack(input.room, target.identity, sid);
 
   await audit(sql, {
     tenantId: room.tenantId,
@@ -156,7 +209,10 @@ export async function agentModerate(
     target: `${room.slug}:${target.identity}`,
     meta,
   });
-  return {
-    done: `${target.name} ${input.action === 'remove' ? 'foi removido da chamada' : 'teve o microfone silenciado'}`,
+  const what = {
+    remove: 'foi removido da chamada',
+    camera: 'teve a câmera desligada',
+    mute: 'teve o microfone silenciado',
   };
+  return { done: `${target.name} ${what[input.action]}` };
 }

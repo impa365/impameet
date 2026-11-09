@@ -5,6 +5,7 @@ import { handle, json, readJson } from '@/server/http';
 import { internalAuthorized } from '@/server/internal';
 import { lk } from '@/server/livekit-client';
 import { agentModerate, agentModerationView } from '@/server/moderation/agent';
+import { recordingDeps } from '@/server/recordings/client';
 import { agentModerationInput } from '@/server/validation';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   return handle(async () => {
     const id = agentId.parse((await params).id);
     const input = await readJson(req, agentModerationInput);
-    return json(await agentModerate(db(), lk(), id, input));
+    return json(await agentModerate(db(), lk(), id, input, recordingDeps()));
   });
 }

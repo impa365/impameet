@@ -282,6 +282,7 @@ export default defineMessages(
     },
     errors: {
       recording: 'Não foi possível alterar a gravação',
+      recordingFailed: 'A gravação não continuou: o gravador falhou. Você já pode tentar gravar de novo.',
       transcription: 'Não foi possível alterar a transcrição',
     },
   },
@@ -567,6 +568,7 @@ export default defineMessages(
       },
       errors: {
         recording: 'Could not change the recording',
+        recordingFailed: 'The recording stopped: the recorder failed. You can try recording again now.',
         transcription: 'Could not change the transcription',
       },
     },
@@ -852,6 +854,7 @@ export default defineMessages(
       },
       errors: {
         recording: 'No se pudo cambiar la grabación',
+        recordingFailed: 'La grabación se detuvo: falló el grabador. Ya puedes intentar grabar de nuevo.',
         transcription: 'No se pudo cambiar la transcripción',
       },
     },

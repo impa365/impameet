@@ -68,6 +68,10 @@ class Host:
     def __init__(self, *authors: Talker) -> None:
         self.authors = authors
         self.heard: Heard | None = None
+        self.actions = True
+
+    def actions_allowed(self) -> bool:
+        return self.actions
 
     def turn_authors(self) -> tuple[Talker, ...]:
         return self.authors

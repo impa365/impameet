@@ -33,7 +33,7 @@ class FakeLiveKit implements LiveKitAdmin {
   async listRooms() {
     return [];
   }
-  async muteAudio() {}
+  async muteTrack() {}
   async remove(room: string, identity: string) {
     this.calls.push(`remove ${room} ${identity}`);
     this.participants = this.participants.filter((p) => p.identity !== identity);

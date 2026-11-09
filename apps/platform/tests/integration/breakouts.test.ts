@@ -39,7 +39,7 @@ class FakeLiveKit implements LiveKitAdmin {
   async listRooms() {
     return [];
   }
-  async muteAudio() {}
+  async muteTrack() {}
   async remove() {}
   async setRole() {}
   async setAttributes() {}

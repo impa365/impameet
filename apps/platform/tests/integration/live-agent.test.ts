@@ -33,7 +33,7 @@ class FakeLiveKit implements LiveKitAdmin {
   async listRooms() {
     return [];
   }
-  async muteAudio() {}
+  async muteTrack() {}
   async remove(_room: string, identity: string) {
     this.calls.push(`remove ${identity}`);
     this.participants = this.participants.filter((p) => p.identity !== identity);
@@ -100,7 +100,7 @@ describe('turning the AI on and off in a running meeting', () => {
     expect(on.agentIds).toEqual([fallback]);
     expect(await syncLiveAgents(db(), lk, 'kaiser', on)).toEqual({ removed: 0, dispatched: 1 });
     expect(lk.calls).toEqual([
-      `dispatch kaiser {"agentId":"${fallback}","agentName":"Kaiser","tenantId":"${tenant.id}","thinkingSound":true}`,
+      `dispatch kaiser {"agentId":"${fallback}","agentName":"Kaiser","tenantId":"${tenant.id}","thinkingSound":true,"agentActions":true,"boardPolicy":"everyone"}`,
     ]);
 
     lk.participants.push(person('agent-AJ_1', { isAgent: true, mode: 'voice', agentId: fallback }));
@@ -129,7 +129,7 @@ describe('turning the AI on and off in a running meeting', () => {
     expect(both.agentIds).toEqual([kaiser, ana.id]);
     expect(await syncLiveAgents(db(), lk, 'kaiser', both)).toEqual({ removed: 0, dispatched: 1 });
     expect(lk.calls).toEqual([
-      `dispatch kaiser {"agentId":"${ana.id}","agentName":"Ana","agentDescription":"Vendas","tenantId":"${tenant.id}","thinkingSound":true}`,
+      `dispatch kaiser {"agentId":"${ana.id}","agentName":"Ana","agentDescription":"Vendas","tenantId":"${tenant.id}","thinkingSound":true,"agentActions":true,"boardPolicy":"everyone"}`,
     ]);
 
     lk.participants.push(person('agent-A', { isAgent: true, mode: 'voice', agentId: ana.id }));
@@ -158,7 +158,7 @@ describe('turning the AI on and off in a running meeting', () => {
     expect(await syncLiveAgents(db(), lk, 'kaiser', swapped)).toEqual({ removed: 1, dispatched: 1 });
     expect(lk.calls).toEqual([
       'remove agent-AJ_1',
-      `dispatch kaiser {"agentId":"${ana.id}","agentName":"Ana","tenantId":"${tenant.id}","thinkingSound":true}`,
+      `dispatch kaiser {"agentId":"${ana.id}","agentName":"Ana","tenantId":"${tenant.id}","thinkingSound":true,"agentActions":true,"boardPolicy":"everyone"}`,
     ]);
   });
 

@@ -1,4 +1,10 @@
-import { AgentDispatchClient, DataPacket_Kind, RoomServiceClient, TrackType } from 'livekit-server-sdk';
+import {
+  AgentDispatchClient,
+  DataPacket_Kind,
+  RoomServiceClient,
+  TrackSource,
+  TrackType,
+} from 'livekit-server-sdk';
 
 export interface LiveParticipant {
   identity: string;
@@ -12,6 +18,9 @@ export interface LiveParticipant {
   handRaised: boolean;
   audioTrackSids: string[];
   audioMuted: boolean;
+  /** Camera tracks only (never a shared screen). */
+  videoTrackSids?: string[];
+  videoMuted?: boolean;
   joinedAt: number;
 }
 
@@ -25,7 +34,8 @@ export interface LiveRoom {
 export interface LiveKitAdmin {
   listParticipants(room: string): Promise<LiveParticipant[]>;
   listRooms(): Promise<LiveRoom[]>;
-  muteAudio(room: string, identity: string, trackSid: string): Promise<void>;
+  /** Mutes one published track (microphone or camera); its owner can turn it on again. */
+  muteTrack(room: string, identity: string, trackSid: string): Promise<void>;
   remove(room: string, identity: string): Promise<void>;
   setRole(room: string, identity: string, role: string): Promise<void>;
   setAttributes(room: string, identity: string, attributes: Record<string, string>): Promise<void>;
@@ -47,6 +57,7 @@ export function liveKitAdmin(apiUrl: string, apiKey: string, apiSecret: string):
       });
       return list.map((p) => {
         const audio = p.tracks.filter((t) => t.type === TrackType.AUDIO);
+        const camera = p.tracks.filter((t) => t.type === TrackType.VIDEO && t.source === TrackSource.CAMERA);
         return {
           identity: p.identity,
           name: p.name || p.identity,
@@ -57,6 +68,8 @@ export function liveKitAdmin(apiUrl: string, apiKey: string, apiSecret: string):
           handRaised: Boolean(p.attributes?.hand),
           audioTrackSids: audio.map((t) => t.sid),
           audioMuted: audio.length === 0 || audio.every((t) => t.muted),
+          videoTrackSids: camera.map((t) => t.sid),
+          videoMuted: camera.length === 0 || camera.every((t) => t.muted),
           joinedAt: Number(p.joinedAt) * 1000,
         };
       });
@@ -69,7 +82,7 @@ export function liveKitAdmin(apiUrl: string, apiKey: string, apiSecret: string):
         createdAt: Number(r.creationTime) * 1000,
       }));
     },
-    async muteAudio(room, identity, trackSid) {
+    async muteTrack(room, identity, trackSid) {
       await client.mutePublishedTrack(room, identity, trackSid, true);
     },
     async remove(room, identity) {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from collections.abc import Awaitable, Callable, Iterable
@@ -18,6 +19,7 @@ from .captions import MODE_ATTRIBUTE, run_captions
 from .config import Settings, get_settings
 from .listening import Speaker, next_linked, same_name
 from .moderation import ModerationClient
+from .perception import BOARD_TOPIC, POLICY_TOPIC, POLLS_TOPIC, Board, Perception
 from .persona import Talker, VoiceAgent
 from .pipeline import (
     ThinkingAudio,
@@ -31,6 +33,8 @@ from .pipeline import (
 from .profile import (
     AgentProfile,
     ListenMode,
+    agent_actions,
+    board_policy,
     display_name,
     job_mode,
     join_attributes,
@@ -212,6 +216,11 @@ def _build_agent(
     tools_client, tool_specs = tools
     if tools_client is not None:
         ctx.add_shutdown_callback(tools_client.aclose)
+    perception = None
+    if profile.perception:
+        perception = Perception(
+            ctx.room, profile.perception, board=Board(policy=board_policy(ctx.job.metadata))
+        )
     return VoiceAgent(
         profile,
         speaker=speaker_lookup(session),
@@ -221,6 +230,8 @@ def _build_agent(
         moderation=moderation,
         tools_client=tools_client,
         tool_specs=tool_specs,
+        perception=perception,
+        actions=agent_actions(ctx.job.metadata),
     )
 
 
@@ -283,6 +294,9 @@ async def entrypoint(ctx: JobContext) -> None:
     follow_speakers(ctx.room, session, profile.listen_mode)
     follow_peers(ctx.room, agent)
     follow_lobby(ctx.room, agent)
+    follow_agent_settings(ctx.room, agent)
+    if agent.perception is not None:
+        await follow_meeting(ctx.room, agent.perception)
 
     if thinking_audio := build_thinking_audio(
         settings.agent, enabled=thinking_sound(ctx.job.metadata)
@@ -302,17 +316,74 @@ def follow_lobby(room: rtc.Room, agent: VoiceAgent) -> None:
     room.on("data_received", on_data)
 
 
+def _server_settings(packet: rtc.DataPacket) -> dict[str, Any] | None:
+    """Room settings the server sent (no participant sends them)."""
+    if packet.topic != AGENT_SETTINGS_TOPIC or packet.participant is not None:
+        return None
+    try:
+        data = json.loads(packet.data)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+_TASKS: set[asyncio.Future[Any]] = set()
+
+
+def spawn(coro: Awaitable[Any]) -> None:
+    """Runs a coroutine in the background, keeping it alive until it ends."""
+    task = asyncio.ensure_future(coro)
+    _TASKS.add(task)
+    task.add_done_callback(_TASKS.discard)
+
+
+def follow_agent_settings(room: rtc.Room, agent: VoiceAgent) -> None:
+    """A moderator switching the AI's actions off (or on) during the meeting."""
+
+    def on_data(packet: rtc.DataPacket) -> None:
+        data = _server_settings(packet)
+        if data is not None and isinstance(data.get("agentActions"), bool):
+            spawn(agent.set_actions(data["agentActions"]))
+
+    room.on("data_received", on_data)
+
+
+async def follow_meeting(room: rtc.Room, view: Perception) -> None:
+    """Keeps the board and polls the agent may look at, and asks the browsers for what exists."""
+
+    def reader(apply: Callable[[str, str], None]) -> Callable[[Any, str], None]:
+        def on_stream(stream: Any, identity: str) -> None:
+            async def read() -> None:
+                with contextlib.suppress(Exception):
+                    apply(await stream.read_all(), identity)
+
+            spawn(read())
+
+        return on_stream
+
+    def on_data(packet: rtc.DataPacket) -> None:
+        if packet.topic == POLICY_TOPIC and packet.participant is None:
+            view.on_policy(packet.data)
+
+    room.on("data_received", on_data)
+    request = json.dumps({"type": "request"})
+    for topic, apply, kind in (
+        (BOARD_TOPIC, view.on_board, "board"),
+        (POLLS_TOPIC, view.on_polls, "polls"),
+    ):
+        if kind not in view.allowed:
+            continue
+        room.register_text_stream_handler(topic, reader(apply))
+        with contextlib.suppress(Exception):
+            await room.local_participant.send_text(request, topic=topic)
+
+
 def follow_room_settings(room: rtc.Room, thinking_audio: ThinkingAudio) -> None:
     """Applies the room's agent settings changed during the meeting (the typing sound)."""
 
     def on_data(packet: rtc.DataPacket) -> None:
-        if packet.topic != AGENT_SETTINGS_TOPIC or packet.participant is not None:
-            return  # only the server (no participant) sends room settings
-        try:
-            data = json.loads(packet.data)
-        except ValueError:
-            return
-        if isinstance(data, dict) and isinstance(data.get("thinkingSound"), bool):
+        data = _server_settings(packet)
+        if data is not None and isinstance(data.get("thinkingSound"), bool):
             thinking_audio.set_enabled(data["thinkingSound"])
 
     room.on("data_received", on_data)

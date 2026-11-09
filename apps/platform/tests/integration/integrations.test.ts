@@ -152,6 +152,8 @@ describe('the default agent', () => {
       agentName: 'Kaiser',
       tenantId: tenant.id,
       thinkingSound: true,
+      agentActions: true,
+      boardPolicy: 'everyone',
     });
 
     // The typing sound is a per-room switch the agent receives with the dispatch.

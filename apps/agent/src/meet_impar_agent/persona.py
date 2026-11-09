@@ -16,6 +16,7 @@ from .bargein import Engagement, should_interrupt
 from .languages import guess_language, languages_note, main_language, pick_language, words
 from .listening import is_addressed
 from .moderation import KNOCK_PROMPT, Heard, ModerationClient, moderation_note, moderation_tools
+from .perception import Perception, perception_note, perception_tools
 from .profile import AgentProfile, MutePolicy
 from .providers import voice_options
 from .screen import SCREEN_INSTRUCTIONS, ScreenClient, Snapshot, screen_tools
@@ -51,6 +52,10 @@ PEERS_NOTE = (
     "Só responda quando chamarem o seu nome ou quando outro assistente passar a vez para você. "
     "Quando terminar a sua parte e for a vez de outro assistente (porque pediram ou porque "
     "combinaram uma ordem), chame passar_a_vez com o nome dele e o que ele deve fazer."
+)
+ACTIONS_OFF_NOTE = (
+    "\n\nOS MODERADORES DESLIGARAM AS AÇÕES DA IA NESTA SALA: não aja sobre pessoas, não use "
+    "ferramentas externas e não olhe o quadro, as enquetes nem as telas. Continue conversando."
 )
 HANDOFF_PROMPT = (
     "{giver} passou a vez para você e pediu: {request}. Faça isso agora, falando para a "
@@ -96,6 +101,8 @@ class VoiceAgent(Agent):
         moderation: ModerationClient | None = None,
         tools_client: ToolsClient | None = None,
         tool_specs: tuple[ToolSpec, ...] = (),
+        perception: Perception | None = None,
+        actions: bool = True,
     ) -> None:
         self._profile = profile
         self._speaker = speaker
@@ -113,6 +120,8 @@ class VoiceAgent(Agent):
         # Who spoke in the turn being heard, and in the turn the agent is answering.
         self._speaking: dict[str, Talker] = {}
         self._authors: tuple[Talker, ...] = ()
+        self._actions = actions
+        self.perception = perception
 
         tools: list[Any] = []
         if handoff is not None:
@@ -136,10 +145,13 @@ class VoiceAgent(Agent):
         if tools_client is not None and tool_specs:
             tools += external_tools(tools_client, self, tool_specs)
             parts.append(tools_note(tool_specs))
+        if perception is not None and perception.allowed:
+            tools += perception_tools(perception, self)
+            parts.append(perception_note(perception.allowed))
         self._base_instructions = "\n\n".join(p for p in parts if p)
         # Voice activity alone never cuts the agent off; see `_maybe_barge_in`.
         super().__init__(
-            instructions=self._base_instructions, tools=tools, allow_interruptions=False
+            instructions=self._current_instructions(), tools=tools, allow_interruptions=False
         )
 
     async def on_enter(self) -> None:
@@ -206,6 +218,16 @@ class VoiceAgent(Agent):
     def current_speaker(self) -> Talker | None:
         return self._speaker()
 
+    def actions_allowed(self) -> bool:
+        """False while the room's moderators have switched the AI's actions off."""
+        return self._actions
+
+    async def set_actions(self, allowed: bool) -> None:
+        if allowed == self._actions:
+            return
+        self._actions = allowed
+        await self.update_instructions(self._current_instructions())
+
     def turn_authors(self) -> tuple[Talker, ...]:
         """Everyone who spoke in the turn being answered (empty for replies nobody asked for)."""
         return self._authors
@@ -254,6 +276,8 @@ class VoiceAgent(Agent):
             text += PEERS_NOTE.format(peers=", ".join(self.peers))
         if self.muted:
             text += MUTED_NOTE
+        if not self._actions:
+            text += ACTIONS_OFF_NOTE
         return text
 
     async def set_peers(self, names: Iterable[str]) -> None:
@@ -381,15 +405,21 @@ class VoiceAgent(Agent):
 
     async def see(self, snapshot: Snapshot) -> None:
         """Puts the current screen image in the conversation, replacing the previous one."""
+        await self.show_image(
+            "[Imagem da tela que você está mostrando agora na reunião]", snapshot.image_b64
+        )
+
+    async def show_image(self, label: str, image_b64: str) -> None:
+        """One image in the conversation at a time: a new one replaces the last one."""
         chat_ctx = self.chat_ctx.copy()
         if self._view_id is not None:
             chat_ctx.items[:] = [item for item in chat_ctx.items if item.id != self._view_id]
         message = chat_ctx.add_message(
             role="user",
             content=[
-                "[Imagem da tela que você está mostrando agora na reunião]",
+                label,
                 llm.ImageContent(
-                    image=f"data:image/jpeg;base64,{snapshot.image_b64}", inference_detail="low"
+                    image=f"data:image/jpeg;base64,{image_b64}", inference_detail="low"
                 ),
             ],
         )

@@ -32,8 +32,9 @@ KNOWLEDGE_HEADER = (
     "aqui nem for conhecimento geral seguro, diga que não sabe):\n"
 )
 LOOKUP_TIMEOUT_S = 5.0
-MODERATION_TOOLS = ("remove", "mute", "lobby")
+MODERATION_TOOLS = ("remove", "mute", "lobby", "camera", "record")
 MAX_RULES_CHARS = 4000
+PERCEPTION = ("board", "polls", "screen")
 MAX_AGENT_ID_LENGTH = 64
 
 
@@ -63,6 +64,8 @@ class AgentProfile:
     # What it may do to other people (off unless an admin turned it on) and the admin's rules.
     moderation_tools: tuple[str, ...] = ()
     moderation_rules: str = ""
+    # What in the meeting it may look at when asked (off unless an admin turned it on).
+    perception: tuple[str, ...] = ()
 
     def secrets(self) -> list[str]:
         return [s for s in (self.llm_api_key, self.tts_api_key, self.stt_api_key) if s]
@@ -83,6 +86,16 @@ def agent_id_from_metadata(metadata: str | None) -> str | None:
     agent_id = _metadata(metadata).get("agentId")
     valid = isinstance(agent_id, str) and 0 < len(agent_id) <= MAX_AGENT_ID_LENGTH
     return agent_id if valid else None
+
+
+def agent_actions(metadata: str | None) -> bool:
+    """The room's switch for the AI acting and observing (on unless moderators turned it off)."""
+    return _metadata(metadata).get("agentActions") is not False
+
+
+def board_policy(metadata: str | None) -> str:
+    """Who may draw on the whiteboard; drawings from anyone else are ignored."""
+    return "moderators" if _metadata(metadata).get("boardPolicy") == "moderators" else "everyone"
 
 
 def thinking_sound(metadata: str | None) -> bool:
@@ -195,6 +208,7 @@ def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
         agent_id=str(remote.get("id") or ""),
         moderation_tools=clean_tools(remote.get("moderationTools")),
         moderation_rules=clean_rules(remote.get("moderationRules")),
+        perception=clean_perception(remote.get("perception")),
     )
 
 
@@ -203,6 +217,13 @@ def clean_tools(raw: object) -> tuple[str, ...]:
     if not isinstance(raw, list):
         return ()
     return tuple(t for t in MODERATION_TOOLS if t in raw)
+
+
+def clean_perception(raw: object) -> tuple[str, ...]:
+    """What an admin let the agent look at, in a fixed order; anything else is dropped."""
+    if not isinstance(raw, list):
+        return ()
+    return tuple(p for p in PERCEPTION if p in raw)
 
 
 def clean_rules(raw: object) -> str:

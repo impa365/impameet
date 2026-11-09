@@ -5,7 +5,7 @@ import type { SessionUser } from '../auth/session';
 import type { Sql } from '../db';
 import { AppError, badRequest, conflict, forbidden, notFound, tooManyRequests } from '../errors';
 import type { LiveKitAdmin } from '../livekit-admin';
-import { agentInRoom, identityUserId } from '../moderation/agent';
+import { agentInRoom, assertAgentActions, identityUserId } from '../moderation/agent';
 import { RateLimiter } from '../security/rate-limit';
 import { openSecret, sealSecret } from '../security/secrets';
 import {
@@ -447,6 +447,7 @@ export async function runAgentTool(
     }
   }
   if (!tool) throw notFound('Ferramenta não encontrada');
+  assertAgentActions(room);
 
   const who = await assertRequesters(deps.sql, lk, input.room, room, tool.access, input.requestedBy);
   if (!runsPerRoom.take(`${agent.id}:${input.room}`) || !runsPerTool.take(`${tool.id}:${input.room}`))

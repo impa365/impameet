@@ -33,6 +33,9 @@ const COLUMNS = (sql: Sql) => sql`
   r.ended_at as "endedAt"`;
 
 const ACTIVE: RecordingStatus[] = ['starting', 'recording'];
+const UNFINISHED: RecordingStatus[] = ['starting', 'recording', 'processing'];
+/** Egress registers a recording as soon as it accepts it; after this, "unknown" means lost. */
+export const RECORDING_GRACE_MS = 2 * 60_000;
 
 export interface RecordingDeps {
   sql: Sql;
@@ -64,12 +67,27 @@ export async function startRecording(
   ip: string | null,
 ): Promise<Recording> {
   const actor = await assertCanRecord(deps, room, user);
+  return beginRecording(deps, room, actor.id, ip);
+}
+
+/** Starts recording for `actorId` (already allowed to). `meta` says how (e.g. through an AI). */
+export async function beginRecording(
+  deps: RecordingDeps,
+  room: Room,
+  actorId: string | null,
+  ip: string | null,
+  meta?: Record<string, string>,
+): Promise<Recording> {
+  if (!(await tenantLimits(deps.sql, room.tenantId)).recording) {
+    throw forbidden('O plano atual não inclui gravação');
+  }
   const { sql } = deps;
+  await settleRoom(deps, room);
   let id: string;
   try {
     [{ id }] = await sql<{ id: string }[]>`
       insert into recordings (tenant_id, room_id, room_name, file_name, started_by)
-      values (${room.tenantId}, ${room.id}, ${room.name}, '', ${actor.id})
+      values (${room.tenantId}, ${room.id}, ${room.name}, '', ${actorId})
       returning id`;
   } catch (err) {
     if ((err as { code?: string }).code === '23505') throw conflict('A sala já está sendo gravada');
@@ -90,10 +108,11 @@ export async function startRecording(
   }
   await audit(sql, {
     tenantId: room.tenantId,
-    actorId: actor.id,
+    actorId,
     action: 'recording.started',
     target: room.slug,
     ip,
+    meta,
   });
   return (await activeRecording(sql, room))!;
 }
@@ -105,6 +124,17 @@ export async function stopRecording(
   ip: string | null,
 ): Promise<void> {
   const actor = await assertCanRecord(deps, room, user);
+  await endRecording(deps, room, actor.id, ip);
+}
+
+export async function endRecording(
+  deps: RecordingDeps,
+  room: Room,
+  actorId: string | null,
+  ip: string | null,
+  meta?: Record<string, string>,
+): Promise<void> {
+  await settleRoom(deps, room);
   const active = await activeRecording(deps.sql, room);
   if (!active) throw notFound('A sala não está sendo gravada');
   const [{ egressId }] = await deps.sql<{ egressId: string | null }[]>`
@@ -113,29 +143,90 @@ export async function stopRecording(
   await deps.sql`update recordings set status = 'processing' where id = ${active.id}`;
   await audit(deps.sql, {
     tenantId: room.tenantId,
-    actorId: actor.id,
+    actorId,
     action: 'recording.stopped',
     target: room.slug,
     ip,
+    meta,
   });
 }
 
-/** Pulls the final state of unfinished recordings from Egress (no webhook needed). */
-async function refresh(deps: Pick<RecordingDeps, 'sql' | 'egress'>, tenantId: string): Promise<void> {
-  const pending = await deps.sql<{ id: string; egressId: string | null }[]>`
-    select id, egress_id as "egressId" from recordings
-    where tenant_id = ${tenantId} and status in ('starting', 'recording', 'processing')`;
-  for (const row of pending) {
-    if (!row.egressId) continue;
-    const info = await deps.egress.info(row.egressId).catch(() => null);
-    if (!info) continue;
+interface Unfinished {
+  id: string;
+  egressId: string | null;
+  startedAt: Date;
+}
+
+async function markFailed(sql: Sql, id: string, error: string): Promise<void> {
+  await sql`
+    update recordings set status = 'failed', error = ${error}, ended_at = coalesce(ended_at, now())
+    where id = ${id} and status in ${sql(UNFINISHED)}`;
+}
+
+/**
+ * Brings unfinished recordings in line with Egress (no webhook needed). A recording Egress
+ * reports as failed, or no longer knows about, or that never got an Egress id, is marked
+ * failed with the reason, which frees the room for a new recording. When Egress cannot be
+ * reached nothing changes: an unreachable recorder may still be recording.
+ */
+async function settle(
+  deps: Pick<RecordingDeps, 'sql' | 'egress'>,
+  rows: Unfinished[],
+  now = Date.now(),
+): Promise<void> {
+  for (const row of rows) {
+    const old = now - new Date(row.startedAt).getTime() > RECORDING_GRACE_MS;
+    if (!row.egressId) {
+      if (old) await markFailed(deps.sql, row.id, 'start_timeout');
+      continue;
+    }
+    let info: Awaited<ReturnType<RecordingEgress['info']>>;
+    try {
+      info = await deps.egress.info(row.egressId);
+    } catch {
+      continue;
+    }
+    if (!info) {
+      if (old) await markFailed(deps.sql, row.id, 'egress_lost');
+      continue;
+    }
     const done = info.state === 'ready' || info.state === 'failed';
     await deps.sql`
       update recordings set status = ${info.state}, size_bytes = ${info.sizeBytes},
-        duration_s = ${info.durationS}, error = ${info.error},
+        duration_s = ${info.durationS},
+        error = ${info.state === 'failed' ? (info.error ?? 'egress_failed').slice(0, 500) : null},
         ended_at = case when ${done}::boolean then coalesce(ended_at, now()) else ended_at end
-      where id = ${row.id}`;
+      where id = ${row.id} and status in ${deps.sql(UNFINISHED)}`;
   }
+}
+
+async function refresh(deps: Pick<RecordingDeps, 'sql' | 'egress'>, tenantId: string): Promise<void> {
+  await settle(
+    deps,
+    await deps.sql<Unfinished[]>`
+      select id, egress_id as "egressId", started_at as "startedAt" from recordings
+      where tenant_id = ${tenantId} and status in ${deps.sql(UNFINISHED)}`,
+  );
+}
+
+/** Checks this room's unfinished recordings with Egress before deciding anything about it. */
+export async function settleRoom(deps: Pick<RecordingDeps, 'sql' | 'egress'>, room: Room, now?: number) {
+  await settle(
+    deps,
+    await deps.sql<Unfinished[]>`
+      select id, egress_id as "egressId", started_at as "startedAt" from recordings
+      where room_id = ${room.id} and status in ${deps.sql(UNFINISHED)}`,
+    now,
+  );
+}
+
+/** The room's last recording, if it failed in the last ten minutes (to tell the moderator why). */
+export async function recentFailure(sql: Sql, room: Room): Promise<Recording | null> {
+  const [row] = await sql<Recording[]>`
+    select ${COLUMNS(sql)} from recordings r left join users u on u.id = r.started_by
+    where r.room_id = ${room.id} order by r.started_at desc limit 1`;
+  const recent = row?.endedAt && Date.now() - new Date(row.endedAt).getTime() < 10 * 60_000;
+  return row?.status === 'failed' && recent ? row : null;
 }
 
 /** Admins and managers see the whole organization; everyone else, what they recorded. */

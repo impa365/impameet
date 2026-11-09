@@ -32,6 +32,8 @@ export interface Room {
   pollsPolicy: CollabPolicy;
   /** The AI plays a soft typing sound while it prepares an answer. */
   thinkingSound: boolean;
+  /** Moderators can stop the agents acting on people, using tools and looking at content. */
+  agentActions: boolean;
   /** True when at least one agent is in `agentIds`. */
   agentEnabled: boolean;
   /** The first of `agentIds` (kept for single-agent callers). */
@@ -49,7 +51,7 @@ const ROOM_COLUMNS = (sql: Sql) => sql`
   id, tenant_id as "tenantId", owner_id as "ownerId", slug, name,
   password_hash is not null as "hasPassword", allow_guests as "allowGuests",
   access, board_policy as "boardPolicy", polls_policy as "pollsPolicy",
-  thinking_sound as "thinkingSound",
+  thinking_sound as "thinkingSound", agent_actions as "agentActions",
   array(select ra.agent_id::text from room_agents ra where ra.room_id = rooms.id
         order by ra.added_at, ra.agent_id) as "agentIds",
   max_participants as "maxParticipants", created_at as "createdAt"`;
@@ -153,10 +155,11 @@ export async function createRoom(
     try {
       const [created] = await sql<{ id: string }[]>`
         insert into rooms (tenant_id, owner_id, slug, name, password_hash, allow_guests,
-                           access, board_policy, polls_policy, thinking_sound, max_participants)
+                           access, board_policy, polls_policy, thinking_sound, agent_actions,
+                           max_participants)
         values (${user.tenantId}, ${user.id}, ${slug}, ${input.name}, ${passwordHash},
                 ${input.allowGuests}, ${input.access}, ${input.boardPolicy}, ${input.pollsPolicy},
-                ${input.thinkingSound}, ${input.maxParticipants ?? null})
+                ${input.thinkingSound}, ${input.agentActions}, ${input.maxParticipants ?? null})
         returning id`;
       if (agentIds.length > 0)
         await writeRoomAgents(sql, { id: created.id, tenantId: user.tenantId }, agentIds);
@@ -224,6 +227,7 @@ export async function updateRoom(
       board_policy = coalesce(${patch.boardPolicy ?? null}::text, board_policy),
       polls_policy = coalesce(${patch.pollsPolicy ?? null}::text, polls_policy),
       thinking_sound = coalesce(${patch.thinkingSound ?? null}::boolean, thinking_sound),
+      agent_actions = coalesce(${patch.agentActions ?? null}::boolean, agent_actions),
       max_participants = case when ${patch.maxParticipants !== undefined}::boolean
                               then ${patch.maxParticipants ?? null}::int else max_participants end,
       password_hash = case when ${passwordHash !== undefined}::boolean

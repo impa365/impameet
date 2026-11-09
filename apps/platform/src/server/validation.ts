@@ -81,6 +81,7 @@ export const createRoomInput = z.object({
   boardPolicy: collabPolicy.default('everyone'),
   pollsPolicy: collabPolicy.default('everyone'),
   thinkingSound: z.boolean().default(true),
+  agentActions: z.boolean().default(true),
   agentEnabled: z.boolean().default(false),
   agentId: z.string().uuid().nullable().optional(),
   agentIds: roomAgentIds.optional(),
@@ -96,6 +97,7 @@ export const updateRoomInput = z
     boardPolicy: collabPolicy,
     pollsPolicy: collabPolicy,
     thinkingSound: z.boolean(),
+    agentActions: z.boolean(),
     agentEnabled: z.boolean(),
     agentId: z.string().uuid().nullable(),
     agentIds: roomAgentIds,
@@ -168,12 +170,14 @@ export const tenantAdminInput = z
   .strict()
   .refine((p) => Object.keys(p).length > 0, 'Nada para alterar');
 
-/** Remove people, mute microphones, answer the waiting room. */
-export const AGENT_MODERATION_TOOLS = ['remove', 'mute', 'lobby'] as const;
+/** Remove people, mute microphones, answer the waiting room, switch cameras off, record. */
+export const AGENT_MODERATION_TOOLS = ['remove', 'mute', 'lobby', 'camera', 'record'] as const;
+/** What in the meeting an agent may look at when asked. */
+export const AGENT_PERCEPTION = ['board', 'polls', 'screen'] as const;
 
 export const agentModerationInput = z.object({
   room: z.string().min(3).max(200),
-  action: z.enum(['remove', 'mute', 'admit', 'deny']),
+  action: z.enum(['remove', 'mute', 'camera', 'admit', 'deny', 'record_start', 'record_stop']),
   /** A participant identity (remove, mute) or a waiting-room request id (admit, deny). */
   target: z.string().min(1).max(200),
   /** The moderator who asked, when someone asked. */
@@ -226,6 +230,12 @@ export const agentInput = z.object({
   moderationTools: z
     .array(z.enum(AGENT_MODERATION_TOOLS))
     .max(AGENT_MODERATION_TOOLS.length)
+    .default([])
+    .transform((list) => [...new Set(list)]),
+  /** What in the meeting it may look at: the whiteboard, polls, shared screens. */
+  perception: z
+    .array(z.enum(AGENT_PERCEPTION))
+    .max(AGENT_PERCEPTION.length)
     .default([])
     .transform((list) => [...new Set(list)]),
   /** The admin's rules for when the agent acts on its own (e.g. who to let in). */

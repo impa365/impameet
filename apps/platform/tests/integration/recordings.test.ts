@@ -6,11 +6,14 @@ import { AppError } from '@/server/errors';
 import type { LiveKitAdmin, LiveParticipant } from '@/server/livekit-admin';
 import type { EgressResult, RecordingEgress } from '@/server/recordings/egress';
 import {
+  RECORDING_GRACE_MS,
   type RecordingDeps,
   activeRecording,
   deleteRecording,
   findVisibleRecording,
   listRecordings,
+  recentFailure,
+  settleRoom,
   startRecording,
   stopRecording,
 } from '@/server/recordings/service';
@@ -31,7 +34,7 @@ class FakeLiveKit implements LiveKitAdmin {
   async listRooms() {
     return [];
   }
-  async muteAudio() {}
+  async muteTrack() {}
   async remove() {}
   async setRole() {}
   async setAttributes() {}
@@ -170,6 +173,89 @@ describe('recordings', () => {
     await deleteRecording(db(), admin, rec.id, remove, null);
     expect(removed).toEqual([rec.fileName]);
     expect(await listRecordings(deps, admin)).toEqual([]);
+  });
+
+  it('frees the room when Egress fails while opening its browser (issue #16)', async () => {
+    const { admin, room, egress, deps } = await setup();
+    const first = await startRecording(deps, room, admin, null);
+    egress.states.set('EG_1', {
+      state: 'failed',
+      sizeBytes: null,
+      durationS: null,
+      error: 'page load error: websocket url timeout reached',
+    });
+    // The room shows "not recording" (LiveKit knows) and the server agrees right away.
+    await settleRoom(deps, room);
+    expect(await activeRecording(db(), room)).toBeNull();
+    expect(await recentFailure(db(), room)).toMatchObject({
+      id: first.id,
+      status: 'failed',
+      error: 'page load error: websocket url timeout reached',
+    });
+    await expectAppError(stopRecording(deps, room, admin, null), 404);
+
+    const second = await startRecording(deps, room, admin, null);
+    expect(second.status).toBe('recording');
+    expect(egress.started).toHaveLength(2);
+    expect(await recentFailure(db(), room)).toBeNull();
+    const [old] = await sql<{ status: string; endedAt: Date | null }[]>`
+      select status, ended_at as "endedAt" from recordings where id = ${first.id}`;
+    expect(old.status).toBe('failed');
+    expect(old.endedAt).toBeInstanceOf(Date);
+  });
+
+  it('times out orphans: unknown to Egress or never started, after a grace period', async () => {
+    const { admin, room, deps } = await setup();
+    const rec = await startRecording(deps, room, admin, null);
+    // Egress does not know it (lost), but it just started: give it time.
+    await settleRoom(deps, room);
+    expect((await activeRecording(db(), room))?.id).toBe(rec.id);
+    await settleRoom(deps, room, Date.now() + RECORDING_GRACE_MS + 1000);
+    expect(await activeRecording(db(), room)).toBeNull();
+    const [lost] = await sql<{ error: string }[]>`select error from recordings where id = ${rec.id}`;
+    expect(lost.error).toBe('egress_lost');
+
+    // A start that crashed before Egress answered (no Egress id), from long ago.
+    await sql`insert into recordings (tenant_id, room_id, room_name, file_name, status, started_at)
+              values (${admin.tenantId}, ${room.id}, 'Vendas', '', 'starting', now() - interval '10 minutes')`;
+    expect((await activeRecording(db(), room))?.status).toBe('starting');
+    expect((await startRecording(deps, room, admin, null)).status).toBe('recording');
+    const errors = await sql<{ error: string | null }[]>`select error from recordings order by started_at`;
+    expect(errors.map((e) => e.error)).toEqual(['start_timeout', 'egress_lost', null]);
+  });
+
+  it('leaves a recording alone while Egress cannot be reached (it may still be recording)', async () => {
+    const { admin, room, deps } = await setup();
+    const rec = await startRecording(deps, room, admin, null);
+    await sql`update recordings set egress_id = 'EG_boom', started_at = now() - interval '1 hour'
+              where id = ${rec.id}`;
+    await settleRoom(deps, room);
+    expect((await activeRecording(db(), room))?.id).toBe(rec.id);
+    await expectAppError(startRecording(deps, room, admin, null), 409);
+  });
+
+  it('never runs two recordings of one room, even when asked at the same time', async () => {
+    const { admin, room, egress, deps } = await setup();
+    const results = await Promise.allSettled([
+      startRecording(deps, room, admin, null),
+      startRecording(deps, room, admin, null),
+      startRecording(deps, room, admin, null),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    for (const r of results.filter((x) => x.status === 'rejected'))
+      expect(((r as PromiseRejectedResult).reason as AppError).status).toBe(409);
+    expect(egress.started).toHaveLength(1);
+  });
+
+  it('keeps a finished recording ready and downloadable', async () => {
+    const { admin, room, egress, deps } = await setup();
+    const rec = await startRecording(deps, room, admin, null);
+    await stopRecording(deps, room, admin, null);
+    egress.states.set('EG_1', { state: 'ready', sizeBytes: 10, durationS: 3, error: null });
+    await listRecordings(deps, admin);
+    egress.states.delete('EG_1'); // Egress forgets finished jobs after a while
+    await settleRoom(deps, room, Date.now() + RECORDING_GRACE_MS * 10);
+    expect(await findVisibleRecording(db(), admin, rec.id)).toMatchObject({ status: 'ready', error: null });
   });
 
   it('keeps listing when Egress cannot be reached', async () => {

@@ -20,7 +20,7 @@ export interface RoomPolicies {
 }
 
 export const POLICY_TOPIC = 'impa.policy';
-/** Settings the voice agents in the room apply live (e.g. `{"thinkingSound": false}`). */
+/** Settings the voice agents in the room apply live (`{"thinkingSound": false, "agentActions": true}`). */
 export const AGENT_SETTINGS_TOPIC = 'impa.agent';
 
 export function roomPolicies(room: Pick<Room, 'boardPolicy' | 'pollsPolicy'>): RoomPolicies {
@@ -46,7 +46,7 @@ export async function grantJoin(
     displayName: who.displayName,
     role: who.role,
     agentName: agents.length > 0 ? cfg.agentName : undefined,
-    agentMetadata: agents.map((a) => agentDispatchMetadata(room.tenantId, a, room.thinkingSound)),
+    agentMetadata: agents.map((a) => agentDispatchMetadata(room.tenantId, a, room)),
     maxParticipants: capParticipants(room.maxParticipants, limits.maxParticipants),
   });
   return {

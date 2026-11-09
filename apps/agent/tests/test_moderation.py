@@ -66,6 +66,10 @@ class Host:
     def __init__(self, speaker: Talker | None = None) -> None:
         self.speaker = speaker
         self.heard: Heard | None = None
+        self.actions = True
+
+    def actions_allowed(self) -> bool:
+        return self.actions
 
     def current_speaker(self) -> Talker | None:
         return self.speaker
@@ -145,8 +149,8 @@ def test_the_note_lists_the_tools_and_the_admin_rules() -> None:
 
 async def test_the_list_shows_roles_mics_protection_and_the_waiting_room() -> None:
     seen = await tools(Platform(), Host())["ver_participantes"]()
-    assert "- Ana (moderator, microfone ligado) [protegido]" in seen
-    assert "- João Lima (guest, microfone desligado)" in seen
+    assert "- Ana (moderator, microfone ligado, câmera desligada) [protegido]" in seen
+    assert "- João Lima (guest, microfone desligado, câmera desligada)" in seen
     assert "Na sala de espera:\n- Carla\n- Davi" in seen
     without_lobby = await tools(Platform(), Host(), ("mute",))["ver_participantes"]()
     assert "sala de espera" not in without_lobby
@@ -392,3 +396,45 @@ def test_the_agent_gets_a_moderation_client_only_with_the_platform_and_tools(
         session,
     )
     assert "ver_participantes" not in {t.info.name for t in no_platform.tools}
+
+
+async def test_cameras_and_the_recording_only_at_a_moderators_request() -> None:
+    platform = Platform()
+    host = Host(BIA)
+    made = tools(platform, host, ("camera", "record"), has_rules=True)
+    assert {"desligar_camera", "iniciar_gravacao", "parar_gravacao"} <= set(made)
+    # a rule never covers these, and a guest asking does not count
+    assert "Só um moderador" in await made["desligar_camera"]("José")
+    assert "Só um moderador" in await made["iniciar_gravacao"]()
+    assert "Só um moderador" in await made["parar_gravacao"]()
+    assert platform.posts == []
+
+    host.speaker = ANA
+    assert await made["desligar_camera"]("José") == "Feito: g-jose ok."
+    assert "não posso agir" in await made["desligar_camera"]("Ana")
+    assert await made["iniciar_gravacao"]() == "Feito: room ok."
+    assert await made["parar_gravacao"]() == "Feito: room ok."
+    assert [(p["action"], p["target"], p.get("requestedBy")) for p in platform.posts] == [
+        ("camera", "g-jose", "u-ana"),
+        ("record_start", "room", "u-ana"),
+        ("record_stop", "room", "u-ana"),
+    ]
+    seen = await made["ver_participantes"]()
+    assert "câmera desligada" in seen
+
+
+async def test_moderators_switching_the_ai_off_stops_every_action() -> None:
+    platform = Platform()
+    host = Host(ANA)
+    host.actions = False
+    made = tools(platform, host, ("remove", "mute", "lobby", "camera", "record"))
+    for name, args in (
+        ("remover_participante", ("José",)),
+        ("silenciar_participante", ("José",)),
+        ("desligar_camera", ("José",)),
+        ("iniciar_gravacao", ()),
+        ("responder_sala_de_espera", ("Carla", True)),
+    ):
+        assert "desligaram as ações da IA" in await made[name](*args)
+    assert platform.posts == []
+    assert "desligar_camera" in moderation_note(("camera",), "")

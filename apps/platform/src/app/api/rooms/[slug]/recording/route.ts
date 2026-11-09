@@ -6,7 +6,13 @@ import { lk } from '@/server/livekit-client';
 import { canModerate } from '@/server/moderation/service';
 import { tenantLimits } from '@/server/plans';
 import { recordingDeps } from '@/server/recordings/client';
-import { activeRecording, startRecording, stopRecording } from '@/server/recordings/service';
+import {
+  activeRecording,
+  recentFailure,
+  settleRoom,
+  startRecording,
+  stopRecording,
+} from '@/server/recordings/service';
 import { currentTenant, currentUser } from '@/server/request';
 import { findRoom } from '@/server/rooms/service';
 import { roomSlug } from '@/server/validation';
@@ -36,11 +42,16 @@ export async function GET(
     const user = await currentUser();
     if (!user) throw unauthorized();
     const room = await loadRoom(params);
-    const installed = recordingDeps() !== null;
-    const allowed = installed && (await tenantLimits(db(), room.tenantId)).recording;
+    const recorder = recordingDeps();
+    const allowed = recorder !== null && (await tenantLimits(db(), room.tenantId)).recording;
+    if (!allowed) return json({ canRecord: false, active: null, failure: null });
+    await settleRoom(recorder, room);
+    const canRecord = await canModerate(lk(), room, user);
+    const failure = canRecord ? await recentFailure(db(), room) : null;
     return json({
-      canRecord: allowed && (await canModerate(lk(), room, user)),
-      active: allowed ? await activeRecording(db(), room) : null,
+      canRecord,
+      active: await activeRecording(db(), room),
+      failure: failure && { error: failure.error, endedAt: failure.endedAt },
     });
   });
 }

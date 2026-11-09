@@ -118,6 +118,7 @@ async def test_entrypoint_wires_the_pipeline_into_the_room(
         "participant_disconnected",
         "participant_attributes_changed",
         "data_received",  # someone knocked on the waiting room
+        "data_received",  # moderators switching the AI's actions off or on
         "data_received",  # the room's typing-sound switch, applied live
     ]
     assert ctx.room.register_text_stream_handler.call_args.args[0] == main.HANDOFF_TOPIC
