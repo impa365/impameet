@@ -167,6 +167,38 @@ const EN: Record<string, string> = {
   'O servidor MCP não respondeu ao pedido': 'The MCP server did not answer the request',
   'O servidor MCP respondeu algo que não é JSON-RPC':
     'The MCP server answered something that is not JSON-RPC',
+  'Só administradores gerenciam a base de conhecimento': 'Only admins manage the knowledge base',
+  'A base de conhecimento não está instalada neste servidor':
+    'The knowledge base is not installed on this server',
+  'Base de conhecimento não encontrada': 'Knowledge base not found',
+  'Já existe uma base com esse nome': 'A base with this name already exists',
+  'Fonte não encontrada': 'Source not found',
+  'Escolha a integração de embeddings da base': "Choose the base's embedding integration",
+  'Escolha uma integração de embeddings': 'Choose an embedding integration',
+  'Tipo de arquivo não suportado (use PDF, DOCX, TXT, MD, CSV, HTML ou JSON)':
+    'File type not supported (use PDF, DOCX, TXT, MD, CSV, HTML or JSON)',
+  'Arquivo muito grande (máx. {n} MB)': 'File too large (max. {n} MB)',
+  'Não foi possível ler o arquivo': 'Could not read the file',
+  'O arquivo não tem texto que dê para ler (PDFs escaneados precisam de OCR)':
+    'The file has no readable text (scanned PDFs need OCR)',
+  'Envie um arquivo': 'Send a file',
+  'Até {n} bases de conhecimento por organização': 'Up to {n} knowledge bases per organization',
+  'Até {n} fontes por base': 'Up to {n} sources per base',
+  'Até {n} bases por agente': 'Up to {n} bases per agent',
+  'Ata não encontrada': 'Minutes not found',
+  'Exemplo não encontrado': 'Example not found',
+  'Até {n} exemplos por agente': 'Up to {n} examples per agent',
+  'Informe o nome da base': 'Enter the base name',
+  'Dê um título para a fonte': 'Give the source a title',
+  'Escreva o conteúdo': 'Write the content',
+  'Escreva a pergunta': 'Write the question',
+  'Escreva a resposta': 'Write the answer',
+  'Escreva a resposta aprovada': 'Write the approved answer',
+  'Inclua pelo menos uma pergunta e resposta': 'Include at least one question and answer',
+  'Escreva a busca': 'Write the search',
+  'A página respondeu HTTP {n}': 'The page answered HTTP {n}',
+  'A fonte não tem texto': 'The source has no text',
+  'A página não é HTML nem texto': 'The page is neither HTML nor text',
 };
 
 const ES: Record<string, string> = {
@@ -333,6 +365,39 @@ const ES: Record<string, string> = {
   'O servidor MCP respondeu HTTP {n}': 'El servidor MCP respondió HTTP {n}',
   'O servidor MCP não respondeu ao pedido': 'El servidor MCP no respondió a la solicitud',
   'O servidor MCP respondeu algo que não é JSON-RPC': 'El servidor MCP respondió algo que no es JSON-RPC',
+  'Só administradores gerenciam a base de conhecimento':
+    'Solo los administradores gestionan la base de conocimiento',
+  'A base de conhecimento não está instalada neste servidor':
+    'La base de conocimiento no está instalada en este servidor',
+  'Base de conhecimento não encontrada': 'Base de conocimiento no encontrada',
+  'Já existe uma base com esse nome': 'Ya existe una base con ese nombre',
+  'Fonte não encontrada': 'Fuente no encontrada',
+  'Escolha a integração de embeddings da base': 'Elige la integración de embeddings de la base',
+  'Escolha uma integração de embeddings': 'Elige una integración de embeddings',
+  'Tipo de arquivo não suportado (use PDF, DOCX, TXT, MD, CSV, HTML ou JSON)':
+    'Tipo de archivo no admitido (usa PDF, DOCX, TXT, MD, CSV, HTML o JSON)',
+  'Arquivo muito grande (máx. {n} MB)': 'Archivo demasiado grande (máx. {n} MB)',
+  'Não foi possível ler o arquivo': 'No se pudo leer el archivo',
+  'O arquivo não tem texto que dê para ler (PDFs escaneados precisam de OCR)':
+    'El archivo no tiene texto legible (los PDF escaneados necesitan OCR)',
+  'Envie um arquivo': 'Envía un archivo',
+  'Até {n} bases de conhecimento por organização': 'Hasta {n} bases de conocimiento por organización',
+  'Até {n} fontes por base': 'Hasta {n} fuentes por base',
+  'Até {n} bases por agente': 'Hasta {n} bases por agente',
+  'Ata não encontrada': 'Acta no encontrada',
+  'Exemplo não encontrado': 'Ejemplo no encontrado',
+  'Até {n} exemplos por agente': 'Hasta {n} ejemplos por agente',
+  'Informe o nome da base': 'Ingresa el nombre de la base',
+  'Dê um título para a fonte': 'Ponle un título a la fuente',
+  'Escreva o conteúdo': 'Escribe el contenido',
+  'Escreva a pergunta': 'Escribe la pregunta',
+  'Escreva a resposta': 'Escribe la respuesta',
+  'Escreva a resposta aprovada': 'Escribe la respuesta aprobada',
+  'Inclua pelo menos uma pergunta e resposta': 'Incluye al menos una pregunta y respuesta',
+  'Escreva a busca': 'Escribe la búsqueda',
+  'A página respondeu HTTP {n}': 'La página respondió HTTP {n}',
+  'A fonte não tem texto': 'La fuente no tiene texto',
+  'A página não é HTML nem texto': 'La página no es HTML ni texto',
 };
 
 export const SERVER_ERRORS: Record<Locale, Record<string, string>> = { 'pt-BR': {}, en: EN, es: ES };

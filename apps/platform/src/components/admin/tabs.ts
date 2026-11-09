@@ -1,10 +1,19 @@
 import type { MessageKey } from '@/i18n/keys';
 import type { IconName } from '../ui/Icon';
 
-export type AdminTab = 'agents' | 'integrations' | 'users' | 'live' | 'branding' | 'domains' | 'audit';
+export type AdminTab =
+  | 'agents'
+  | 'knowledge'
+  | 'integrations'
+  | 'users'
+  | 'live'
+  | 'branding'
+  | 'domains'
+  | 'audit';
 
 export const ADMIN_TABS: Record<AdminTab, { label: MessageKey; icon: IconName }> = {
   agents: { label: 'shell.nav.tabs.agents', icon: 'smart_toy' },
+  knowledge: { label: 'shell.nav.tabs.knowledge', icon: 'description' },
   integrations: { label: 'shell.nav.tabs.integrations', icon: 'hub' },
   users: { label: 'shell.nav.tabs.users', icon: 'group' },
   live: { label: 'shell.nav.tabs.live', icon: 'sensors' },
@@ -14,7 +23,8 @@ export const ADMIN_TABS: Record<AdminTab, { label: MessageKey; icon: IconName }>
 };
 
 export function adminTabsFor(role: 'admin' | 'manager' | 'member'): AdminTab[] {
-  if (role === 'admin') return ['agents', 'integrations', 'users', 'live', 'branding', 'domains', 'audit'];
+  if (role === 'admin')
+    return ['agents', 'knowledge', 'integrations', 'users', 'live', 'branding', 'domains', 'audit'];
   if (role === 'manager') return ['users', 'live'];
   return [];
 }

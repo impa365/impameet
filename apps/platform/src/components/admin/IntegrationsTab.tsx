@@ -13,7 +13,7 @@ import {
 import { api } from '../api';
 import { messageOf, useLoad } from './useLoad';
 
-export type IntegrationKind = 'llm' | SpeechProvider;
+export type IntegrationKind = 'llm' | 'embedding' | SpeechProvider;
 
 export interface Integration {
   id: string;
@@ -48,6 +48,7 @@ const NEW_LLM: Draft = {
   defaultModel: '',
   models: [],
 };
+const NEW_EMBEDDING: Draft = { ...NEW_LLM, kind: 'embedding', preset: '', baseUrl: '' };
 const newSpeech = (kind: SpeechProvider): Draft => ({
   ...NEW_LLM,
   kind,
@@ -58,6 +59,7 @@ const newSpeech = (kind: SpeechProvider): Draft => ({
 
 const KIND_LABEL = {
   llm: 'admin.integrations.kindLlm',
+  embedding: 'admin.integrations.kindEmbedding',
   fish: 'admin.integrations.kindFish',
   deepgram: 'admin.integrations.kindDeepgram',
   elevenlabs: 'admin.integrations.kindElevenlabs',
@@ -95,7 +97,7 @@ export function IntegrationsTab() {
     setNotice('');
     if (!i) {
       setEditing('new');
-      setDraft(kind === 'llm' ? NEW_LLM : newSpeech(kind));
+      setDraft(kind === 'llm' ? NEW_LLM : kind === 'embedding' ? NEW_EMBEDDING : newSpeech(kind));
       return;
     }
     setEditing(i.id);
@@ -123,14 +125,22 @@ export function IntegrationsTab() {
             defaultModel: draft.defaultModel,
             models: draft.models,
           }
-        : draft.kind === 'fish'
+        : draft.kind === 'embedding'
           ? {
-              kind: 'fish',
+              kind: 'embedding',
               name: draft.name,
+              baseUrl: draft.baseUrl,
               apiKey: draft.apiKey || undefined,
               defaultModel: draft.defaultModel,
             }
-          : { kind: draft.kind, name: draft.name, apiKey: draft.apiKey || undefined };
+          : draft.kind === 'fish'
+            ? {
+                kind: 'fish',
+                name: draft.name,
+                apiKey: draft.apiKey || undefined,
+                defaultModel: draft.defaultModel,
+              }
+            : { kind: draft.kind, name: draft.name, apiKey: draft.apiKey || undefined };
     try {
       if (editing === 'new') await api('/api/admin/integrations', { body });
       else await api(`/api/admin/integrations/${editing}`, { method: 'PUT', body });
@@ -226,7 +236,7 @@ export function IntegrationsTab() {
           {t('admin.integrations.nameLabel')}
           <input required maxLength={60} value={draft.name} onChange={(e) => set('name', e.target.value)} />
         </label>
-        {draft.kind === 'llm' && (
+        {(draft.kind === 'llm' || draft.kind === 'embedding') && (
           <label>
             {t('admin.integrations.baseUrlLabel')}
             <input
@@ -290,6 +300,18 @@ export function IntegrationsTab() {
             )}
             <span className="muted">{t('admin.integrations.testHint')}</span>
           </>
+        ) : draft.kind === 'embedding' ? (
+          <label>
+            {t('admin.integrations.embeddingModel')}
+            <input
+              required
+              maxLength={120}
+              placeholder="text-embedding-3-small"
+              value={draft.defaultModel}
+              onChange={(e) => set('defaultModel', e.target.value)}
+            />
+            <span className="muted">{t('admin.integrations.embeddingHint')}</span>
+          </label>
         ) : draft.kind !== 'fish' ? null : (
           <label>
             {t('admin.integrations.defaultVoiceModel')}
@@ -320,6 +342,11 @@ export function IntegrationsTab() {
       kind: 'llm',
       title: t('admin.integrations.llmTitle'),
       hint: t('admin.integrations.llmHint'),
+    },
+    {
+      kind: 'embedding',
+      title: t('admin.integrations.embeddingTitle'),
+      hint: t('admin.integrations.embeddingGroupHint'),
     },
     { kind: 'fish', title: 'Fish Audio', hint: t('admin.integrations.fishHint') },
     { kind: 'deepgram', title: 'Deepgram', hint: t('admin.integrations.deepgramHint') },
@@ -358,12 +385,20 @@ export function IntegrationsTab() {
                   <article key={i.id} className="int-card">
                     <header>
                       <span className="int-icon" aria-hidden>
-                        {preset ? preset.icon : i.kind !== 'llm' && SPEECH_CATALOG[i.kind].icon}
+                        {preset
+                          ? preset.icon
+                          : i.kind === 'embedding'
+                            ? '🧩'
+                            : i.kind !== 'llm' && SPEECH_CATALOG[i.kind].icon}
                       </span>
                       <div>
                         <strong>{i.name}</strong>
                         <div className="muted">
-                          {preset ? presetName(preset, t) : i.kind !== 'llm' && SPEECH_CATALOG[i.kind].name}
+                          {preset
+                            ? presetName(preset, t)
+                            : i.kind === 'embedding'
+                              ? t('admin.integrations.kindEmbedding')
+                              : i.kind !== 'llm' && SPEECH_CATALOG[i.kind].name}
                         </div>
                       </div>
                       <Status i={i} />

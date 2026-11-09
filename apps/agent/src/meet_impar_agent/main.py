@@ -25,6 +25,7 @@ from .insights import (
     llm_answer,
     send_report,
 )
+from .knowledge import KnowledgeClient
 from .listening import Speaker, next_linked, same_name
 from .moderation import ModerationClient
 from .perception import BOARD_TOPIC, POLICY_TOPIC, POLLS_TOPIC, Board, Perception
@@ -209,6 +210,7 @@ def _build_agent(
     tools: tuple[ToolsClient | None, tuple[ToolSpec, ...]] = (None, ()),
     *,
     record: MeetingRecord | None = None,
+    knowledge: KnowledgeClient | None = None,
 ) -> VoiceAgent:
     """Screen sharing tools exist only when the optional screen service is configured."""
 
@@ -247,6 +249,7 @@ def _build_agent(
             if record is not None
             else None
         ),
+        knowledge=knowledge,
     )
 
 
@@ -301,6 +304,10 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.add_shutdown_callback(_log_usage)
 
     record = meeting_record(profile)
+    knowledge = None
+    if settings.platform and profile.agent_id and profile.knowledge_bases > 0:
+        knowledge = KnowledgeClient(settings.platform, profile.agent_id, ctx.room.name)
+        ctx.add_shutdown_callback(knowledge.aclose)
     agent = _build_agent(
         ctx,
         settings,
@@ -308,6 +315,7 @@ async def entrypoint(ctx: JobContext) -> None:
         session,
         await load_tools(settings, profile, ctx.room.name),
         record=record,
+        knowledge=knowledge,
     )
     await session.start(agent=agent, room=ctx.room, record=False)
     # Lets the platform tell the voice agent apart from captions and the AI screen.
@@ -325,6 +333,7 @@ async def entrypoint(ctx: JobContext) -> None:
                     profile.insights,
                     profile.insights_access,
                     llm_answer(session.llm),  # type: ignore[arg-type]
+                    lookup=knowledge.lookup if knowledge is not None else None,
                 ),
             )
         if (

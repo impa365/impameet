@@ -72,6 +72,11 @@ if exists meet_screen_token; then
 else
   random 48 | store meet_screen_token
 fi
+if exists meet_qdrant_api_key; then
+  skip meet_qdrant_api_key
+else
+  random 48 | store meet_qdrant_api_key
+fi
 
 cat <<'EOF'
 

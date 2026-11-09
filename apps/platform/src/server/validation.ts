@@ -251,6 +251,10 @@ export const agentInput = z.object({
     .nullable()
     .default(null)
     .transform((v) => v || null),
+  /** Knowledge bases (RAG) it looks things up in. */
+  knowledgeBaseIds: z.array(z.string().uuid()).max(10, 'Até 10 bases por agente').default([]),
+  /** Style rules it always follows (part of its training, for any LLM). */
+  styleRules: z.string().trim().max(2000, 'Regras de estilo muito longas (máx. 2000 caracteres)').default(''),
   /** What in the meeting it may look at: the whiteboard, polls, shared screens. */
   perception: z
     .array(z.enum(AGENT_PERCEPTION))
@@ -293,6 +297,14 @@ export const integrationInput = z.discriminatedUnion('kind', [
   }),
   z.object({ kind: z.literal('deepgram'), name: integrationName, apiKey }),
   z.object({ kind: z.literal('elevenlabs'), name: integrationName, apiKey }),
+  /** OpenAI-compatible /embeddings (OpenAI, Mistral, Jina, Voyage, Together, Ollama behind https…). */
+  z.object({
+    kind: z.literal('embedding'),
+    name: integrationName,
+    baseUrl: z.string().trim().min(1, 'Informe a URL da API').max(300),
+    apiKey,
+    defaultModel: modelId,
+  }),
 ]);
 
 export const meetingInput = z.object({
@@ -479,4 +491,64 @@ export const meetingReportInput = z.object({
     )
     .max(20_000)
     .default([]),
+});
+
+export const knowledgeBaseInput = z.object({
+  name: z.string().trim().min(1, 'Informe o nome da base').max(80, 'Nome muito longo'),
+  description: z.string().trim().max(500).default(''),
+  embeddingIntegrationId: z.string({ error: 'Escolha a integração de embeddings da base' }).uuid(),
+});
+
+export const knowledgeRenameInput = knowledgeBaseInput.pick({ name: true, description: true });
+
+const sourceTitle = z.string().trim().min(1, 'Dê um título para a fonte').max(200, 'Título muito longo');
+
+export const knowledgeSourceInput = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('text'),
+    title: sourceTitle,
+    content: z.string().trim().min(1, 'Escreva o conteúdo').max(2_000_000, 'Texto muito longo'),
+  }),
+  z.object({
+    kind: z.literal('qa'),
+    title: sourceTitle,
+    pairs: z
+      .array(
+        z.object({
+          question: z.string().trim().min(1, 'Escreva a pergunta').max(1000),
+          answer: z.string().trim().min(1, 'Escreva a resposta').max(5000),
+        }),
+      )
+      .min(1, 'Inclua pelo menos uma pergunta e resposta')
+      .max(500),
+  }),
+  z.object({
+    kind: z.literal('url'),
+    url: z
+      .string()
+      .trim()
+      .max(2000, 'URL muito longa')
+      .refine((v) => /^https?:\/\/\S+$/.test(v), 'Use uma URL https://'),
+    title: z.string().trim().max(200).default(''),
+  }),
+]);
+
+export const knowledgeSourcePatch = z.object({
+  enabled: z.boolean().optional(),
+  reprocess: z.literal(true).optional(),
+});
+
+export const knowledgeSearchInput = z.object({
+  query: z.string().trim().min(1, 'Escreva a busca').max(1000),
+});
+
+export const agentKnowledgeInput = z.object({
+  room: z.string().min(3).max(200),
+  query: z.string().trim().min(1).max(1000),
+});
+
+export const agentExampleInput = z.object({
+  question: z.string().trim().min(1, 'Escreva a pergunta').max(1000),
+  answer: z.string().trim().min(1, 'Escreva a resposta aprovada').max(2000),
+  enabled: z.boolean().default(true),
 });

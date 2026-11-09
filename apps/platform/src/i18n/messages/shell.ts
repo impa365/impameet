@@ -18,6 +18,7 @@ export default defineMessages(
       },
       tabs: {
         agents: 'Agentes de IA',
+        knowledge: 'Base de conhecimento',
         integrations: 'Integrações',
         users: 'Usuários',
         live: 'Salas ao vivo',
@@ -91,6 +92,7 @@ export default defineMessages(
         },
         tabs: {
           agents: 'AI agents',
+          knowledge: 'Knowledge base',
           integrations: 'Integrations',
           users: 'Users',
           live: 'Live rooms',
@@ -163,6 +165,7 @@ export default defineMessages(
         },
         tabs: {
           agents: 'Agentes de IA',
+          knowledge: 'Base de conocimiento',
           integrations: 'Integraciones',
           users: 'Usuarios',
           live: 'Salas en vivo',

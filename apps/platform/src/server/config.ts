@@ -64,6 +64,12 @@ const schema = z.object({
    * network), over http or https. Every other tool URL must be https on the public internet.
    */
   toolsPrivateHosts: z.array(hostname).max(50).default([]),
+  /** Optional: the Qdrant server for knowledge bases (internal network). Unset disables them. */
+  qdrantUrl: z
+    .string()
+    .regex(/^https?:\/\/[^\s]+$/, 'must be an http(s):// URL')
+    .optional(),
+  qdrantApiKey: z.string().min(16).optional(),
   /** Master key (base64, 32 bytes) that encrypts provider API keys stored in the database. */
   encryptionKey: z
     .string()
@@ -91,6 +97,8 @@ export function loadConfig(env: Env = process.env): Config {
     smtpUrl: readSecret(env, 'SMTP_URL'),
     mailFrom: env.MAIL_FROM?.trim() || undefined,
     encryptionKey: readSecret(env, 'ENCRYPTION_KEY'),
+    qdrantUrl: env.QDRANT_URL?.trim() || undefined,
+    qdrantApiKey: readSecret(env, 'QDRANT_API_KEY'),
     toolsPrivateHosts: (env.AGENT_TOOLS_PRIVATE_HOSTS ?? '')
       .split(',')
       .map((h) => h.trim())

@@ -255,6 +255,8 @@ class Copilot:
     access: str
     answer: Answer
     allowed_now: Callable[[], bool] = lambda: True
+    #: The knowledge bases' search, when the agent has any (the copilot cites them too).
+    lookup: Callable[[str], Awaitable[str]] | None = None
     clock: Callable[[], float] = time.monotonic
     _asks: dict[str, list[float]] = field(default_factory=dict)
 
@@ -341,8 +343,9 @@ class Copilot:
         question = question.strip()[:MAX_QUESTION_CHARS]
         if not question:
             return {"type": "error", "code": "empty"}
+        found = f"\n\n{await self.lookup(question)}" if self.lookup is not None else ""
         prompt = (
-            f"Transcrição até agora:\n{self.record.transcript() or '(ainda vazia)'}\n\n"
+            f"Transcrição até agora:\n{self.record.transcript() or '(ainda vazia)'}{found}\n\n"
             f"Pergunta de {name}: {question}"
         )
         answer = await self.answer(COPILOT_PROMPT.format(name=name), prompt)

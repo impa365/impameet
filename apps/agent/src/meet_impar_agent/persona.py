@@ -13,6 +13,7 @@ from livekit import rtc
 from livekit.agents import Agent, ModelSettings, StopResponse, llm, stt
 
 from .bargein import Engagement, should_interrupt
+from .knowledge import KNOWLEDGE_NOTE, KnowledgeClient, knowledge_tools, training_note
 from .languages import guess_language, languages_note, main_language, pick_language, words
 from .listening import is_addressed
 from .moderation import KNOCK_PROMPT, Heard, ModerationClient, moderation_note, moderation_tools
@@ -104,6 +105,7 @@ class VoiceAgent(Agent):
         perception: Perception | None = None,
         actions: bool = True,
         hearing: Callable[[Talker, str], None] | None = None,
+        knowledge: KnowledgeClient | None = None,
     ) -> None:
         self._profile = profile
         self._speaker = speaker
@@ -128,7 +130,15 @@ class VoiceAgent(Agent):
         tools: list[Any] = []
         if handoff is not None:
             tools += self._handoff_tools()
-        parts = [profile.instructions, SPEAKER_INSTRUCTIONS, languages_note(profile.voices)]
+        parts = [
+            profile.instructions,
+            training_note(profile.style_rules, profile.examples),
+            SPEAKER_INSTRUCTIONS,
+            languages_note(profile.voices),
+        ]
+        if knowledge is not None:
+            tools += knowledge_tools(knowledge)
+            parts.append(KNOWLEDGE_NOTE)
         if screen is not None:
             tools += screen_tools(screen, self)
             parts.append(SCREEN_INSTRUCTIONS)

@@ -72,3 +72,34 @@ function verdict(res: Response | ProbeResult): ProbeResult {
   if (!(res instanceof Response)) return res;
   return res.ok ? { ok: true, models: [] } : failure(res.status);
 }
+
+/** OpenAI-compatible: one tiny embedding proves the key and the model, and tells the size. */
+export async function probeEmbedding(
+  fetchImpl: Fetch,
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+): Promise<ProbeResult> {
+  let res: Response;
+  try {
+    res = await fetchImpl(`${baseUrl}/embeddings`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+        accept: 'application/json',
+      },
+      body: JSON.stringify({ model, input: ['teste'] }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      redirect: 'error',
+    });
+  } catch {
+    return { ok: false, error: 'Não foi possível conectar ao provedor' };
+  }
+  if (!res.ok) return failure(res.status);
+  const body = (await res.json().catch(() => null)) as { data?: { embedding?: unknown }[] } | null;
+  const vector = body?.data?.[0]?.embedding;
+  if (!Array.isArray(vector) || vector.length === 0)
+    return { ok: false, error: 'O provedor não devolveu um embedding' };
+  return { ok: true, models: [`${model} (${vector.length})`] };
+}

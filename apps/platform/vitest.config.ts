@@ -29,6 +29,7 @@ export default defineConfig({
         'src/server/tools/http-tool.ts',
         'src/server/rooms/hand.ts',
         'src/lib/board-text.ts',
+        'src/server/knowledge/text.ts',
       ],
       thresholds: { lines: 95, branches: 85 },
     },

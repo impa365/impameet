@@ -6,6 +6,7 @@ import { AuditTab } from './AuditTab';
 import { BrandingTab } from './BrandingTab';
 import { DomainsTab } from './DomainsTab';
 import { IntegrationsTab } from './IntegrationsTab';
+import { KnowledgeTab } from './KnowledgeTab';
 import { LiveTab } from './LiveTab';
 import type { AdminTab } from './tabs';
 import { UsersTab } from './UsersTab';
@@ -21,6 +22,7 @@ export function AdminPanel(props: {
   return (
     <>
       {tab === 'agents' && <AgentsTab />}
+      {tab === 'knowledge' && <KnowledgeTab />}
       {tab === 'integrations' && <IntegrationsTab />}
       {tab === 'users' && <UsersTab role={props.role} selfId={props.selfId} />}
       {tab === 'live' && <LiveTab />}

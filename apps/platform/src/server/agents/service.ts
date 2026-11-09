@@ -5,6 +5,7 @@ import type { Sql } from '../db';
 import { badRequest, conflict, forbidden, notFound } from '../errors';
 import { SPEECH_CATALOG, type SpeechProvider } from '@/lib/providers';
 import { assertTenantIntegration, integrationSecret, speechIntegrationKind } from '../integrations/service';
+import { assertTenantBases, setAgentBases } from '../knowledge/service';
 import type { agentInput } from '../validation';
 
 export type AgentInput = z.infer<typeof agentInput>;
@@ -51,6 +52,8 @@ const AGENT_COLUMNS = (sql: Sql) => sql`
   respond_mode as "respondMode", mute_policy as "mutePolicy",
   moderation_tools as "moderationTools", moderation_rules as "moderationRules", perception,
   insights, insights_access as "insightsAccess", minutes_webhook as "minutesWebhook",
+  style_rules as "styleRules",
+  array(select ak.kb_id::text from agent_knowledge ak where ak.agent_id = agents.id) as "knowledgeBaseIds",
   llm_integration_id as "llmIntegrationId", tts_integration_id as "ttsIntegrationId",
   stt_integration_id as "sttIntegrationId",
   is_default as "isDefault", created_at as "createdAt", updated_at as "updatedAt",
@@ -120,17 +123,21 @@ export async function listAgents(sql: Sql, user: SessionUser): Promise<AgentConf
 export async function createAgent(sql: Sql, actor: SessionUser, input: AgentInput, ip: string | null) {
   assertAdmin(actor);
   await assertIntegrations(sql, actor.tenantId, input);
+  await assertTenantBases(sql, actor.tenantId, input.knowledgeBaseIds);
   try {
     const [agent] = await sql<AgentConfig[]>`
       insert into agents (tenant_id, name, description, instructions, knowledge, greeting, voice_id, voices, tts_model, stt_model,
                           llm_model, listen_mode, respond_mode, mute_policy, moderation_tools, moderation_rules,
-                          perception, insights, insights_access, minutes_webhook, llm_integration_id, tts_integration_id, stt_integration_id)
+                          perception, insights, insights_access, minutes_webhook, style_rules,
+                          llm_integration_id, tts_integration_id, stt_integration_id)
       values (${actor.tenantId}, ${input.name}, ${input.description}, ${input.instructions}, ${input.knowledge}, ${input.greeting},
               ${mainVoice(input)}, ${sql.json(input.voices)}, ${input.ttsModel}, ${input.sttModel}, ${input.llmModel}, ${input.listenMode}, ${input.respondMode},
               ${input.mutePolicy}, ${input.moderationTools}, ${input.moderationRules},
               ${input.perception}, ${input.insights}, ${input.insightsAccess}, ${input.minutesWebhook},
-              ${input.llmIntegrationId}, ${input.ttsIntegrationId}, ${input.sttIntegrationId})
+              ${input.styleRules}, ${input.llmIntegrationId}, ${input.ttsIntegrationId}, ${input.sttIntegrationId})
       returning ${AGENT_COLUMNS(sql)}`;
+    await setAgentBases(sql, actor.tenantId, agent.id, input.knowledgeBaseIds);
+    agent.knowledgeBaseIds = [...new Set(input.knowledgeBaseIds)];
     await audit(sql, {
       tenantId: actor.tenantId,
       actorId: actor.id,
@@ -154,6 +161,7 @@ export async function updateAgent(
 ): Promise<AgentConfig> {
   assertAdmin(actor);
   await assertIntegrations(sql, actor.tenantId, input);
+  await assertTenantBases(sql, actor.tenantId, input.knowledgeBaseIds);
   try {
     const [agent] = await sql<AgentConfig[]>`
       update agents set name = ${input.name}, description = ${input.description},
@@ -165,12 +173,15 @@ export async function updateAgent(
         moderation_tools = ${input.moderationTools}, moderation_rules = ${input.moderationRules},
         perception = ${input.perception}, insights = ${input.insights},
         insights_access = ${input.insightsAccess}, minutes_webhook = ${input.minutesWebhook},
+        style_rules = ${input.styleRules},
         llm_integration_id = ${input.llmIntegrationId}, tts_integration_id = ${input.ttsIntegrationId},
         stt_integration_id = ${input.sttIntegrationId},
         updated_at = now()
       where id = ${id} and tenant_id = ${actor.tenantId}
       returning ${AGENT_COLUMNS(sql)}`;
     if (!agent) throw notFound('Agente não encontrado');
+    await setAgentBases(sql, actor.tenantId, agent.id, input.knowledgeBaseIds);
+    agent.knowledgeBaseIds = [...new Set(input.knowledgeBaseIds)];
     await audit(sql, {
       tenantId: actor.tenantId,
       actorId: actor.id,
@@ -309,6 +320,11 @@ export interface WorkerAgent {
   perception: string[];
   insights: string[];
   insightsAccess: string;
+  styleRules: string;
+  /** Approved answers the agent follows as examples (its "training"). */
+  examples: { question: string; answer: string }[];
+  /** How many knowledge bases it can search (the worker offers the lookup tool when > 0). */
+  knowledgeBases: number;
   /** Present when the agent uses a saved LLM integration (decrypted, internal API only). */
   llm: { baseUrl: string; apiKey: string; model: string } | null;
   /** Speaking and listening providers, each with its own key (decrypted, internal API only). */
@@ -323,7 +339,7 @@ async function speechSecret(
   id: string,
 ): Promise<{ provider: SpeechProvider; apiKey: string } | null> {
   const s = await integrationSecret(sql, key, tenantId, id);
-  return s.kind === 'llm' ? null : { provider: s.kind, apiKey: s.apiKey };
+  return s.kind === 'llm' || s.kind === 'embedding' ? null : { provider: s.kind, apiKey: s.apiKey };
 }
 
 /** What the voice worker needs, looked up by id only (called with the internal token). */
@@ -361,6 +377,11 @@ export async function agentForWorker(sql: Sql, key: Buffer | null, id: string): 
     perception: row.perception,
     insights: row.insights,
     insightsAccess: row.insightsAccess,
+    styleRules: row.styleRules,
+    examples: await sql<{ question: string; answer: string }[]>`
+      select question, answer from agent_examples
+      where agent_id = ${row.id} and enabled order by created_at limit 30`,
+    knowledgeBases: row.knowledgeBaseIds.length,
     llm,
     tts,
     stt,

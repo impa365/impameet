@@ -17,6 +17,7 @@ import aiohttp
 from . import redaction
 from .config import Settings
 from .insights import clean_access, clean_insights
+from .knowledge import clean_examples
 from .languages import clean_voices
 from .providers import SpeechProvider, speech_provider
 
@@ -70,6 +71,10 @@ class AgentProfile:
     # Minutes, "what did I miss?", copilot, metrics; and who sees the copilot and the metrics.
     insights: tuple[str, ...] = ()
     insights_access: str = "moderators"
+    # Training (style rules, approved answers) and how many knowledge bases it can search.
+    style_rules: str = ""
+    examples: tuple[tuple[str, str], ...] = ()
+    knowledge_bases: int = 0
 
     def secrets(self) -> list[str]:
         return [s for s in (self.llm_api_key, self.tts_api_key, self.stt_api_key) if s]
@@ -215,6 +220,9 @@ def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
         perception=clean_perception(remote.get("perception")),
         insights=clean_insights(remote.get("insights")),
         insights_access=clean_access(remote.get("insightsAccess")),
+        style_rules=str(remote.get("styleRules") or "")[:2000],
+        examples=clean_examples(remote.get("examples")),
+        knowledge_bases=_count(remote.get("knowledgeBases")),
     )
 
 
@@ -230,6 +238,10 @@ def clean_perception(raw: object) -> tuple[str, ...]:
     if not isinstance(raw, list):
         return ()
     return tuple(p for p in PERCEPTION if p in raw)
+
+
+def _count(raw: object) -> int:
+    return raw if isinstance(raw, int) and not isinstance(raw, bool) and raw > 0 else 0
 
 
 def clean_rules(raw: object) -> str:

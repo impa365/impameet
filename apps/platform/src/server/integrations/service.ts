@@ -8,9 +8,17 @@ import { type Resolver, assertPublicHttpsUrl, systemResolver } from '../security
 import { openSecret, sealSecret, secretHint } from '../security/secrets';
 import type { integrationInput } from '../validation';
 import { type SpeechProvider, isSpeechProvider } from '@/lib/providers';
-import { type Fetch, type ProbeResult, probeDeepgram, probeElevenLabs, probeFish, probeLlm } from './probe';
+import {
+  type Fetch,
+  type ProbeResult,
+  probeDeepgram,
+  probeElevenLabs,
+  probeEmbedding,
+  probeFish,
+  probeLlm,
+} from './probe';
 
-export type IntegrationKind = 'llm' | SpeechProvider;
+export type IntegrationKind = 'llm' | 'embedding' | SpeechProvider;
 export type IntegrationInput = z.infer<typeof integrationInput>;
 
 export interface Integration {
@@ -71,6 +79,10 @@ async function findIntegration(sql: Sql, tenantId: string, id: string): Promise<
 async function fields(deps: IntegrationDeps, input: IntegrationInput) {
   if (input.kind === 'fish')
     return { baseUrl: null, defaultModel: input.defaultModel, models: [] as string[] };
+  if (input.kind === 'embedding') {
+    const baseUrl = await assertPublicHttpsUrl(input.baseUrl, deps.resolve ?? systemResolver);
+    return { baseUrl, defaultModel: input.defaultModel, models: [input.defaultModel] };
+  }
   if (input.kind !== 'llm') return { baseUrl: null, defaultModel: null, models: [] as string[] };
   const baseUrl = await assertPublicHttpsUrl(input.baseUrl, deps.resolve ?? systemResolver);
   const models = [...new Set([input.defaultModel, ...input.models])];
@@ -200,6 +212,9 @@ export async function testIntegration(
   if (secret.kind === 'llm') {
     const baseUrl = await assertPublicHttpsUrl(secret.baseUrl ?? '', deps.resolve ?? systemResolver);
     result = await probeLlm(fetchImpl, baseUrl, secret.apiKey);
+  } else if (secret.kind === 'embedding') {
+    const baseUrl = await assertPublicHttpsUrl(secret.baseUrl ?? '', deps.resolve ?? systemResolver);
+    result = await probeEmbedding(fetchImpl, baseUrl, secret.apiKey, secret.defaultModel ?? '');
   } else if (secret.kind === 'deepgram') {
     result = await probeDeepgram(fetchImpl, secret.apiKey);
   } else if (secret.kind === 'elevenlabs') {

@@ -5,6 +5,7 @@ import { useLocale, useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
 import { SPEECH_CATALOG, type SpeechProvider, VOICE_LANGUAGES, type VoiceLanguage } from '@/lib/providers';
 import { api } from '../api';
+import { AgentExamples } from './AgentExamples';
 import { AgentTools } from './AgentTools';
 import type { Integration } from './IntegrationsTab';
 import { messageOf, useLoad } from './useLoad';
@@ -29,6 +30,8 @@ interface Agent {
   insights: Insight[];
   insightsAccess: 'moderators' | 'managers';
   minutesWebhook: string | null;
+  knowledgeBaseIds: string[];
+  styleRules: string;
   llmIntegrationId: string | null;
   ttsIntegrationId: string | null;
   sttIntegrationId: string | null;
@@ -56,6 +59,8 @@ interface Draft {
   insights: Insight[];
   insightsAccess: 'moderators' | 'managers';
   minutesWebhook: string;
+  knowledgeBaseIds: string[];
+  styleRules: string;
   llmIntegrationId: string;
   ttsIntegrationId: string;
   sttIntegrationId: string;
@@ -107,6 +112,8 @@ const EMPTY: Draft = {
   insights: [],
   insightsAccess: 'moderators',
   minutesWebhook: '',
+  knowledgeBaseIds: [],
+  styleRules: '',
   llmIntegrationId: '',
   ttsIntegrationId: '',
   sttIntegrationId: '',
@@ -137,15 +144,18 @@ export function AgentsTab() {
   const { data, error, setError, reload } = useLoad<{ agents: Agent[] }>('/api/admin/agents');
   const integrations =
     useLoad<{ integrations: Integration[] }>('/api/admin/integrations').data?.integrations ?? [];
+  const bases = useLoad<{ bases: { id: string; name: string }[] }>('/api/admin/knowledge').data?.bases ?? [];
   const llms = integrations.filter((i) => i.kind === 'llm');
-  const speech = integrations.filter((i) => i.kind !== 'llm');
+  const speech = integrations.filter((i) => i.kind !== 'llm' && i.kind !== 'embedding');
   const nameOf = (id: string | null) => integrations.find((i) => i.id === id)?.name;
   const speechKind = (id: string | null): SpeechProvider | undefined => {
     const kind = integrations.find((i) => i.id === id)?.kind;
-    return kind && kind !== 'llm' ? kind : undefined;
+    return kind && kind !== 'llm' && kind !== 'embedding' ? kind : undefined;
   };
   const speechLabel = (i: Integration) =>
-    i.kind === 'llm' ? i.name : `${SPEECH_CATALOG[i.kind].icon} ${i.name} · ${SPEECH_CATALOG[i.kind].name}`;
+    i.kind === 'llm' || i.kind === 'embedding'
+      ? i.name
+      : `${SPEECH_CATALOG[i.kind].icon} ${i.name} · ${SPEECH_CATALOG[i.kind].name}`;
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -175,6 +185,8 @@ export function AgentsTab() {
       insights: agent.insights ?? [],
       insightsAccess: agent.insightsAccess ?? 'moderators',
       minutesWebhook: agent.minutesWebhook ?? '',
+      knowledgeBaseIds: agent.knowledgeBaseIds ?? [],
+      styleRules: agent.styleRules ?? '',
       llmIntegrationId: agent.llmIntegrationId ?? '',
       ttsIntegrationId: agent.ttsIntegrationId ?? '',
       sttIntegrationId: agent.sttIntegrationId ?? '',
@@ -380,6 +392,39 @@ export function AgentsTab() {
               />
               <span className="muted">{t('admin.agents.rulesHelp')}</span>
             </label>
+          </fieldset>
+          <fieldset className="group">
+            <legend>{t('admin.agents.trainingLegend')}</legend>
+            <p className="muted small-print">{t('admin.agents.trainingHint')}</p>
+            <label>
+              {t('admin.agents.styleRulesLabel')}
+              <textarea
+                rows={3}
+                maxLength={2000}
+                value={draft.styleRules}
+                onChange={(e) => set('styleRules', e.target.value)}
+                placeholder={t('admin.agents.styleRulesPlaceholder')}
+              />
+            </label>
+            <span className="muted small-print">{t('admin.agents.knowledgeBasesLabel')}</span>
+            {bases.length === 0 && <p className="muted small-print">{t('admin.agents.noKnowledgeBases')}</p>}
+            {bases.map((b) => (
+              <label key={b.id} className="switch">
+                <input
+                  type="checkbox"
+                  checked={draft.knowledgeBaseIds.includes(b.id)}
+                  onChange={(e) =>
+                    set(
+                      'knowledgeBaseIds',
+                      e.target.checked
+                        ? [...draft.knowledgeBaseIds, b.id]
+                        : draft.knowledgeBaseIds.filter((x) => x !== b.id),
+                    )
+                  }
+                />
+                <span>{b.name}</span>
+              </label>
+            ))}
           </fieldset>
           <fieldset className="group">
             <legend>{t('admin.agents.insightsLegend')}</legend>
@@ -612,7 +657,10 @@ export function AgentsTab() {
         {editing === 'new' ? (
           <p className="muted">{t('admin.tools.saveAgentFirst')}</p>
         ) : (
-          <AgentTools agentId={editing} />
+          <>
+            <AgentExamples agentId={editing} />
+            <AgentTools agentId={editing} />
+          </>
         )}
       </>
     );

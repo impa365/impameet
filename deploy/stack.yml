@@ -41,6 +41,9 @@ services:
       ENCRYPTION_KEY_FILE: /run/secrets/meet_platform_encryption_key
       RECORDINGS_DIR: /recordings
       EGRESS_OUTPUT_DIR: /out
+      # Knowledge bases (RAG) for the AI agents
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY_FILE: /run/secrets/meet_qdrant_api_key
       # Custom domains per organization (optional, see docs/deploy.md)
       TRAEFIK_SERVICE: impameet_platform@${TRAEFIK_PROVIDER:-swarm}
       TRAEFIK_CERT_RESOLVER: ${TRAEFIK_CERT_RESOLVER:-letsencryptresolver}
@@ -55,7 +58,8 @@ services:
       - {source: meet_livekit_api_secret, mode: 0400, uid: "10001"}
       - {source: meet_platform_internal_token, mode: 0400, uid: "10001"}
       - {source: meet_platform_encryption_key, mode: 0400, uid: "10001"}
-    networks: [meet, traefik]
+      - {source: meet_qdrant_api_key, mode: 0400, uid: "10001"}
+    networks: [meet, meet_qdrant, traefik]
     read_only: true
     cap_drop: [ALL]
     volumes:
@@ -265,6 +269,33 @@ services:
       resources:
         limits: {cpus: "0.5", memory: 192M}
 
+  # Vector search for the knowledge bases: only the platform reaches it, on an internal network
+  # with no internet access, and only with the API key.
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -euo pipefail
+        export QDRANT__SERVICE__API_KEY="$$(cat /run/secrets/meet_qdrant_api_key)"
+        exec ./entrypoint.sh
+    environment:
+      QDRANT__TELEMETRY_DISABLED: "true"
+      QDRANT__LOG_LEVEL: WARN
+    secrets:
+      - {source: meet_qdrant_api_key, mode: 0400}
+    networks: [meet_qdrant]
+    volumes:
+      - type: volume
+        source: qdrant
+        target: /qdrant/storage
+    deploy:
+      replicas: 1
+      restart_policy: {condition: any, delay: 5s}
+      resources:
+        limits: {cpus: "1", memory: 1G}
+
   postgres:
     image: postgres:17-alpine
     environment:
@@ -289,6 +320,7 @@ services:
 volumes:
   pgdata: {}
   recordings: {}
+  qdrant: {}
 
 networks:
   meet:
@@ -300,6 +332,10 @@ networks:
     driver_opts: {encrypted: "true"}
   meet_screen:
     driver: overlay
+    driver_opts: {encrypted: "true"}
+  meet_qdrant:
+    driver: overlay
+    internal: true
     driver_opts: {encrypted: "true"}
   traefik:
     external: true
@@ -314,4 +350,5 @@ secrets:
   meet_platform_database_url: {external: true}
   meet_platform_internal_token: {external: true}
   meet_platform_encryption_key: {external: true}
+  meet_qdrant_api_key: {external: true}
   meet_screen_token: {external: true}
