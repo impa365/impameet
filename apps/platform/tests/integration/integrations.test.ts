@@ -335,6 +335,44 @@ describe('integrations', () => {
     expect(seen).toHaveLength(1);
   });
 
+  it('finds embedding models that routers list apart, on /models/embedding', async () => {
+    const { admin } = await org('acme');
+    const router = (async (url: string) =>
+      url.endsWith('/models/embedding')
+        ? Response.json({ data: [{ id: 'openai/text-embedding-3-small' }, { id: 'voyage-ai/voyage-3' }] })
+        : Response.json({
+            data: [{ id: 'openai/gpt-5' }, { id: 'openai/text-embedding-3-small' }],
+          })) as unknown as Fetch;
+    const input = {
+      kind: 'embedding' as const,
+      baseUrl: 'https://9router.example/v1',
+      apiKey: 'sk-router-0123',
+    };
+    expect(await discoverModels(deps(router), admin, input)).toEqual({
+      ok: true,
+      models: ['openai/text-embedding-3-small', 'voyage-ai/voyage-3', 'openai/gpt-5'],
+      embeddings: ['openai/text-embedding-3-small', 'voyage-ai/voyage-3'],
+    });
+
+    // A plain provider has no such list: its /models is used as is.
+    const plain = (async (url: string) =>
+      url.endsWith('/models/embedding')
+        ? new Response('{}', { status: 404 })
+        : Response.json({ data: [{ id: 'text-embedding-3-small' }, { id: 'gpt-4o' }] })) as unknown as Fetch;
+    expect(await discoverModels(deps(plain), admin, input)).toEqual({
+      ok: true,
+      models: ['gpt-4o', 'text-embedding-3-small'],
+    });
+    // Chat integrations only read /models.
+    const seen: string[] = [];
+    const chat = (async (url: string) => {
+      seen.push(url);
+      return Response.json({ data: [{ id: 'gpt-4o' }] });
+    }) as unknown as Fetch;
+    await discoverModels(deps(chat), admin, { ...input, kind: 'llm' });
+    expect(seen).toEqual(['https://9router.example/v1/models']);
+  });
+
   it('asks for the key again when the API address moves to another host', async () => {
     const { admin, tenant } = await org('acme');
     const llm = await createIntegration(deps(), admin, LLM(), null);

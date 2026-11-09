@@ -253,7 +253,20 @@ export async function discoverModels(
     if (!sameOrigin(saved.baseUrl, baseUrl)) throw badRequest(NEW_HOST_NEEDS_KEY);
     apiKey = saved.apiKey;
   }
-  return probeLlm(deps.fetch ?? fetch, baseUrl, apiKey);
+  const fetchImpl = deps.fetch ?? fetch;
+  if (input.kind === 'llm') return probeLlm(fetchImpl, baseUrl, apiKey);
+  // Routers such as 9router keep embedding models out of /models, on /models/embedding.
+  const [listed, dedicated] = await Promise.all([
+    probeLlm(fetchImpl, baseUrl, apiKey),
+    probeLlm(fetchImpl, baseUrl, apiKey, '/models/embedding'),
+  ]);
+  if (!dedicated.ok || dedicated.models.length === 0) return listed;
+  const others = listed.ok ? listed.models : [];
+  return {
+    ok: true,
+    models: [...new Set([...dedicated.models, ...others])],
+    embeddings: dedicated.models,
+  };
 }
 
 /** The voices of a saved speech key (Fish Audio, Deepgram or ElevenLabs), for the agent form. */

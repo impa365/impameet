@@ -347,6 +347,9 @@ export default defineMessages(
       discovering: 'Buscando os modelos desta chave…',
       discovered: '{n} modelos encontrados nesta chave.',
       discoveredNone: 'O provedor não listou modelos; digite o nome do modelo.',
+      discoveredEmbeddings: '{n} modelos de embeddings encontrados nesta chave. Clique em um para usar.',
+      discoveredNoEmbeddings:
+        'O provedor listou {n} modelos, mas nenhum parece de embeddings; digite o nome do modelo.',
       discoverFailed: 'Não foi possível buscar os modelos: {error}',
       refreshModels: 'Buscar de novo',
       pickerLegend: 'Modelos que os agentes podem usar',
@@ -838,6 +841,9 @@ export default defineMessages(
         discovering: 'Fetching the models for this key…',
         discovered: '{n} models found for this key.',
         discoveredNone: 'The provider listed no models; type the model name.',
+        discoveredEmbeddings: '{n} embedding models found for this key. Click one to use it.',
+        discoveredNoEmbeddings:
+          'The provider listed {n} models, but none looks like an embedding model; type the model name.',
         discoverFailed: 'Could not fetch the models: {error}',
         refreshModels: 'Fetch again',
         pickerLegend: 'Models the agents can use',
@@ -1332,6 +1338,10 @@ export default defineMessages(
         discovering: 'Buscando los modelos de esta clave…',
         discovered: '{n} modelos encontrados con esta clave.',
         discoveredNone: 'El proveedor no listó modelos; escribe el nombre del modelo.',
+        discoveredEmbeddings:
+          '{n} modelos de embeddings encontrados con esta clave. Haz clic en uno para usarlo.',
+        discoveredNoEmbeddings:
+          'El proveedor listó {n} modelos, pero ninguno parece de embeddings; escribe el nombre del modelo.',
         discoverFailed: 'No se pudieron buscar los modelos: {error}',
         refreshModels: 'Buscar de nuevo',
         pickerLegend: 'Modelos que los agentes pueden usar',

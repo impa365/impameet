@@ -7,7 +7,14 @@ export const DEEPGRAM_API_URL = 'https://api.deepgram.com';
 export const ELEVENLABS_API_URL = 'https://api.elevenlabs.io';
 const TIMEOUT_MS = 10_000;
 
-export type ProbeResult = { ok: true; models: string[] } | { ok: false; error: string };
+export type ProbeResult =
+  | {
+      ok: true;
+      models: string[];
+      /** Models the provider lists as embedding models (routers such as 9router list them apart). */
+      embeddings?: string[];
+    }
+  | { ok: false; error: string };
 
 function failure(status: number): ProbeResult {
   if (status === 401 || status === 403) return { ok: false, error: 'A chave foi recusada pelo provedor' };
@@ -34,8 +41,13 @@ async function call(
 }
 
 /** OpenAI-compatible: GET {baseUrl}/models lists what this key can use. */
-export async function probeLlm(fetchImpl: Fetch, baseUrl: string, apiKey: string): Promise<ProbeResult> {
-  const res = await call(fetchImpl, `${baseUrl}/models`, { authorization: `Bearer ${apiKey}` });
+export async function probeLlm(
+  fetchImpl: Fetch,
+  baseUrl: string,
+  apiKey: string,
+  path = '/models',
+): Promise<ProbeResult> {
+  const res = await call(fetchImpl, `${baseUrl}${path}`, { authorization: `Bearer ${apiKey}` });
   if (!(res instanceof Response)) return res;
   if (!res.ok) return failure(res.status);
   const body = (await res.json().catch(() => null)) as { data?: unknown } | null;

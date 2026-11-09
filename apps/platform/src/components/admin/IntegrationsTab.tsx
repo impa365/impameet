@@ -70,7 +70,7 @@ const KIND_LABEL = {
 /** The live model list of the form, for the URL and key it was fetched with. */
 type Catalog = { key: string } & (
   | { state: 'loading' }
-  | { state: 'ok'; models: string[] }
+  | { state: 'ok'; models: string[]; embeddings?: string[] }
   | { state: 'error'; error: unknown }
 );
 
@@ -97,14 +97,14 @@ function useModelCatalog(editing: string | null, draft: Draft) {
     const timer = setTimeout(async () => {
       setCatalog({ key, state: 'loading' });
       try {
-        const res = await api<{ ok: boolean; error?: string; models?: string[] }>(
+        const res = await api<{ ok: boolean; error?: string; models?: string[]; embeddings?: string[] }>(
           '/api/admin/integrations/models',
           { body: { kind, baseUrl: url, apiKey: typedKey || undefined, integrationId: id } },
         );
         if (!live) return;
         setCatalog(
           res.ok
-            ? { key, state: 'ok', models: res.models ?? [] }
+            ? { key, state: 'ok', models: res.models ?? [], embeddings: res.embeddings }
             : { key, state: 'error', error: res.error ?? '' },
         );
       } catch (err) {
@@ -252,6 +252,9 @@ export function IntegrationsTab() {
 
   if (editing) {
     const preset = LLM_PRESETS.find((p) => p.id === draft.preset) ?? LLM_PRESETS[0];
+    const embeddingModels =
+      (catalog?.state === 'ok' ? catalog.embeddings : undefined) ??
+      found.filter((m) => modelCategory(m) === 'embedding');
     const catalogLine = !ready
       ? t('admin.integrations.discoverHint')
       : !catalog || catalog.state === 'loading'
@@ -263,9 +266,13 @@ export function IntegrationsTab() {
                   ? serverMessage(catalog.error)
                   : messageOf(catalog.error, t('admin.integrations.couldNotTest')),
             })
-          : catalog.models.length > 0
-            ? t('admin.integrations.discovered', { n: catalog.models.length })
-            : t('admin.integrations.discoveredNone');
+          : draft.kind === 'embedding' && catalog.models.length > 0
+            ? embeddingModels.length > 0
+              ? t('admin.integrations.discoveredEmbeddings', { n: embeddingModels.length })
+              : t('admin.integrations.discoveredNoEmbeddings', { n: catalog.models.length })
+            : catalog.models.length > 0
+              ? t('admin.integrations.discovered', { n: catalog.models.length })
+              : t('admin.integrations.discoveredNone');
     const catalogStatus = (
       <div className="row discover-status">
         <span className={catalog?.state === 'error' ? 'error' : 'muted'} role="status">
@@ -278,7 +285,7 @@ export function IntegrationsTab() {
         )}
       </div>
     );
-    const embeddingChoices = found.filter((m) => modelCategory(m) === 'embedding').slice(0, 24);
+    const embeddingChoices = embeddingModels.slice(0, 40);
     return (
       <form onSubmit={save} className="card form" style={{ maxWidth: 720, margin: 0 }}>
         <strong>
@@ -376,7 +383,7 @@ export function IntegrationsTab() {
                 onChange={(e) => set('defaultModel', e.target.value)}
               />
               <datalist id="embedding-models">
-                {embeddingsFirst(found).map((m) => (
+                {[...new Set([...embeddingModels, ...embeddingsFirst(found)])].map((m) => (
                   <option key={m} value={m} />
                 ))}
               </datalist>
