@@ -87,6 +87,36 @@ function verdict(res: Response | ProbeResult): ProbeResult {
   return res.ok ? { ok: true, models: [] } : failure(res.status);
 }
 
+/** Cohere / Jina / Voyage style: ranking two tiny documents proves the key and the model. */
+export async function probeRerank(
+  fetchImpl: Fetch,
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+): Promise<ProbeResult> {
+  let res: Response;
+  try {
+    res = await fetchImpl(`${baseUrl}/rerank`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+        accept: 'application/json',
+      },
+      body: JSON.stringify({ model, query: 'teste', documents: ['teste', 'outro'], top_n: 2 }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      redirect: 'error',
+    });
+  } catch {
+    return { ok: false, error: 'Não foi possível conectar ao provedor' };
+  }
+  if (!res.ok) return failure(res.status);
+  const body = (await res.json().catch(() => null)) as { results?: unknown[]; data?: unknown[] } | null;
+  if (!Array.isArray(body?.results) && !Array.isArray(body?.data))
+    return { ok: false, error: 'O provedor não devolveu uma classificação' };
+  return { ok: true, models: [model] };
+}
+
 /** OpenAI-compatible: one tiny embedding proves the key and the model, and tells the size. */
 export async function probeEmbedding(
   fetchImpl: Fetch,

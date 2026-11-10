@@ -16,10 +16,11 @@ import {
   probeEmbedding,
   probeFish,
   probeLlm,
+  probeRerank,
 } from './probe';
 import { type VoiceQuery, type VoicesResult, fetchVoices } from './voices';
 
-export type IntegrationKind = 'llm' | 'embedding' | SpeechProvider;
+export type IntegrationKind = 'llm' | 'embedding' | 'rerank' | SpeechProvider;
 export type IntegrationInput = z.infer<typeof integrationInput>;
 export type ModelDiscoveryInput = z.infer<typeof modelDiscoveryInput>;
 
@@ -84,7 +85,7 @@ async function findIntegration(sql: Sql, tenantId: string, id: string): Promise<
 }
 
 async function fields(deps: IntegrationDeps, input: IntegrationInput) {
-  if (input.kind === 'embedding') {
+  if (input.kind === 'embedding' || input.kind === 'rerank') {
     const baseUrl = await assertPublicHttpsUrl(input.baseUrl, deps.resolve ?? systemResolver);
     return { baseUrl, defaultModel: input.defaultModel, models: [input.defaultModel] };
   }
@@ -221,6 +222,9 @@ export async function testIntegration(
   } else if (secret.kind === 'embedding') {
     const baseUrl = await assertPublicHttpsUrl(secret.baseUrl ?? '', deps.resolve ?? systemResolver);
     result = await probeEmbedding(fetchImpl, baseUrl, secret.apiKey, secret.defaultModel ?? '');
+  } else if (secret.kind === 'rerank') {
+    const baseUrl = await assertPublicHttpsUrl(secret.baseUrl ?? '', deps.resolve ?? systemResolver);
+    result = await probeRerank(fetchImpl, baseUrl, secret.apiKey, secret.defaultModel ?? '');
   } else if (secret.kind === 'deepgram') {
     result = await probeDeepgram(fetchImpl, secret.apiKey);
   } else if (secret.kind === 'elevenlabs') {

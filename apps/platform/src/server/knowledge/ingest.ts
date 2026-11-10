@@ -1,5 +1,7 @@
 import { badRequest } from '../errors';
 import { type NetPolicy, ToolNetworkError, checkToolUrl, outbound } from '../tools/net';
+import type { Fetched, Get } from './crawl';
+import { pptxToText, xlsxToText } from './office';
 import { htmlToText } from './text';
 
 /** Texts to vectors, from the embedding integration the admin chose. */
@@ -38,15 +40,28 @@ export function openAiEmbedder(config: EmbeddingConfig, fetchImpl: typeof fetch 
 }
 
 /** Files people upload, and what we read from them. */
-export const MAX_FILE_BYTES = 20 * 1024 * 1024;
+export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 export const MAX_TEXT_CHARS = 2_000_000;
-const EXTENSIONS = ['pdf', 'docx', 'txt', 'md', 'markdown', 'csv', 'html', 'htm', 'json'] as const;
+const EXTENSIONS = [
+  'pdf',
+  'docx',
+  'xlsx',
+  'pptx',
+  'txt',
+  'md',
+  'markdown',
+  'csv',
+  'html',
+  'htm',
+  'json',
+] as const;
 export type FileKind = (typeof EXTENSIONS)[number];
 
 export function fileKind(name: string): FileKind {
   const ext = name.toLowerCase().split('.').pop() ?? '';
   const kind = (EXTENSIONS as readonly string[]).includes(ext) ? (ext as FileKind) : null;
-  if (!kind) throw badRequest('Tipo de arquivo não suportado (use PDF, DOCX, TXT, MD, CSV, HTML ou JSON)');
+  if (!kind)
+    throw badRequest('Tipo de arquivo não suportado (use PDF, DOCX, XLSX, PPTX, TXT, MD, CSV, HTML ou JSON)');
   return kind;
 }
 
@@ -54,7 +69,7 @@ const decode = (bytes: Uint8Array) => new TextDecoder('utf-8', { fatal: false })
 
 /** The text of an uploaded file, with headings kept where the format has them. */
 export async function extractFile(name: string, bytes: Uint8Array): Promise<string> {
-  if (bytes.byteLength > MAX_FILE_BYTES) throw badRequest('Arquivo muito grande (máx. 20 MB)');
+  if (bytes.byteLength > MAX_FILE_BYTES) throw badRequest('Arquivo muito grande (máx. 50 MB)');
   const kind = fileKind(name);
   let text: string;
   try {
@@ -67,6 +82,10 @@ export async function extractFile(name: string, bytes: Uint8Array): Promise<stri
       const mammoth = await import('mammoth');
       const { value } = await mammoth.convertToHtml({ buffer: Buffer.from(bytes) });
       text = htmlToText(value).text;
+    } else if (kind === 'xlsx') {
+      text = await xlsxToText(bytes);
+    } else if (kind === 'pptx') {
+      text = await pptxToText(bytes);
     } else if (kind === 'html' || kind === 'htm') {
       text = htmlToText(decode(bytes)).text;
     } else {
@@ -80,35 +99,68 @@ export async function extractFile(name: string, bytes: Uint8Array): Promise<stri
   return text.slice(0, MAX_TEXT_CHARS);
 }
 
-/** One web page's text (https on the public internet, like every tool URL). */
-export async function fetchPage(url: string, net: NetPolicy): Promise<{ title: string; text: string }> {
+/** One web page's text (https on the public internet, like every tool URL; redirects are followed). */
+export async function fetchPage(
+  url: string,
+  net: NetPolicy,
+  get: Get,
+): Promise<{ title: string; text: string; url: string }> {
   try {
     checkToolUrl(url, net);
-    const res = await outbound(
-      {
-        url,
-        method: 'GET',
-        headers: { accept: 'text/html,text/plain;q=0.9,*/*;q=0.1' },
-        timeoutMs: 20_000,
-        maxBytes: 5 * 1024 * 1024,
-      },
-      net,
-    );
-    if (res.status >= 300 && res.status < 400)
-      throw new Error(
-        `A página redireciona para ${res.headers.location ?? 'outro endereço'}; use o endereço final`,
-      );
+    const res = await get(url);
     if (res.status !== 200) throw new Error(`A página respondeu HTTP ${res.status}`);
     const type = res.headers['content-type'] ?? '';
     if (type.includes('html')) {
       const page = htmlToText(res.body);
-      return { title: page.title, text: page.text.slice(0, MAX_TEXT_CHARS) };
+      return { title: page.title, text: page.text.slice(0, MAX_TEXT_CHARS), url: res.url };
     }
     if (type.includes('text/') || type.includes('json'))
-      return { title: '', text: res.body.slice(0, MAX_TEXT_CHARS) };
+      return { title: '', text: res.body.slice(0, MAX_TEXT_CHARS), url: res.url };
     throw new Error('A página não é HTML nem texto');
   } catch (err) {
     if (err instanceof ToolNetworkError || err instanceof Error) throw new Error(err.message);
     throw err;
   }
+}
+
+const MAX_HOPS = 4;
+
+/**
+ * GET through the outbound guard, following redirects one hop at a time (each hop is checked
+ * again, so a redirect can never lead to a private address).
+ */
+export function webGet(net: NetPolicy): Get {
+  return async (start) => {
+    let url = start;
+    for (let hop = 0; hop <= MAX_HOPS; hop++) {
+      const youtube = /(^|\.)youtube\.com$/.test(new URL(url).hostname);
+      const res = await outbound(
+        {
+          url,
+          method: 'GET',
+          headers: {
+            accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.1',
+            'accept-language': 'pt-BR,pt;q=0.9,en;q=0.8,es;q=0.7',
+            ...(youtube
+              ? {
+                  'user-agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
+                  cookie: 'CONSENT=YES+',
+                }
+              : {}),
+          },
+          timeoutMs: 20_000,
+          maxBytes: 6 * 1024 * 1024,
+        },
+        net,
+      );
+      const location = res.headers.location;
+      if (res.status >= 300 && res.status < 400 && location) {
+        url = new URL(location, url).toString();
+        continue;
+      }
+      return { url, status: res.status, headers: res.headers, body: res.body } satisfies Fetched;
+    }
+    throw new Error('Redirecionamentos demais');
+  };
 }

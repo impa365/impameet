@@ -17,6 +17,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const actor = await writerUser(req);
     if (!limits.moderationPerUser.take(`kb-search:${actor.id}`)) throw tooManyRequests();
     const { query } = await readJson(req, knowledgeSearchInput);
-    return json({ hits: await testSearch(knowledgeDeps(), actor, id.parse((await params).id), query) });
+    return json(await testSearch(knowledgeDeps(), actor, id.parse((await params).id), query));
   });
 }

@@ -1,13 +1,16 @@
 /**
  * Qdrant over its REST API: one collection per knowledge base, with a named meaning vector
- * ("dense") and a keyword vector ("text", IDF applied by Qdrant) for hybrid search fused with
- * RRF on the server. Every point carries its organization, so searches always filter on it.
+ * ("dense") and a keyword vector ("text", IDF applied by Qdrant). The two are searched apart
+ * and fused by rank in the platform, so the admin can see what each one found. Every point
+ * carries its organization, so searches always filter on it.
  */
+
+export type SparseVector = { indices: number[]; values: number[] };
 
 export interface VectorPoint {
   id: string;
   dense: number[];
-  sparse: { indices: number[]; values: number[] };
+  sparse: SparseVector;
   payload: {
     tenant_id: string;
     kb_id: string;
@@ -17,6 +20,10 @@ export interface VectorPoint {
     idx: number;
     enabled: boolean;
     content: string;
+    /** Where the piece can be read (a page, or the moment of a video). */
+    url?: string;
+    /** False when the admin switched this one piece off. */
+    chunk_enabled?: boolean;
   };
 }
 
@@ -32,20 +39,23 @@ export interface VectorStore {
   upsert(name: string, points: VectorPoint[]): Promise<void>;
   deleteSource(name: string, sourceId: string): Promise<void>;
   setSourceEnabled(name: string, sourceId: string, enabled: boolean): Promise<void>;
-  search(
+  setChunkEnabled(name: string, pointId: string, enabled: boolean): Promise<void>;
+  /** By meaning; pieces scoring below minScore (cosine) are left out. */
+  searchDense(
     name: string,
     tenantId: string,
     dense: number[],
-    sparse: { indices: number[]; values: number[] },
     limit: number,
+    minScore: number,
   ): Promise<VectorHit[]>;
+  /** By keywords. */
+  searchSparse(name: string, tenantId: string, sparse: SparseVector, limit: number): Promise<VectorHit[]>;
 }
 
 export class QdrantError extends Error {}
 
 const BATCH = 64;
 const TIMEOUT_MS = 30_000;
-const CANDIDATES = 40;
 
 export function qdrantStore(url: string, apiKey: string, fetchImpl: typeof fetch = fetch): VectorStore {
   const base = url.replace(/\/+$/, '');
@@ -70,6 +80,22 @@ export function qdrantStore(url: string, apiKey: string, fetchImpl: typeof fetch
   }
   const filterSource = (sourceId: string) => ({ must: [{ key: 'source_id', match: { value: sourceId } }] });
 
+  async function query(name: string, tenantId: string, how: Record<string, unknown>, limit: number) {
+    const res = (await call('POST', `/collections/${name}/points/query`, {
+      ...how,
+      filter: {
+        must: [
+          { key: 'tenant_id', match: { value: tenantId } },
+          { key: 'enabled', match: { value: true } },
+        ],
+        must_not: [{ key: 'chunk_enabled', match: { value: false } }],
+      },
+      limit,
+      with_payload: true,
+    })) as { result?: { points?: { id: string; score: number; payload: VectorPoint['payload'] }[] } };
+    return (res?.result?.points ?? []).map((p) => ({ id: String(p.id), score: p.score, payload: p.payload }));
+  }
+
   return {
     async ensureCollection(name, dimensions) {
       const existing = (await call('GET', `/collections/${name}`, undefined, true)) as {
@@ -89,6 +115,7 @@ export function qdrantStore(url: string, apiKey: string, fetchImpl: typeof fetch
         ['tenant_id', 'keyword'],
         ['source_id', 'keyword'],
         ['enabled', 'bool'],
+        ['chunk_enabled', 'bool'],
       ])
         await call('PUT', `/collections/${name}/index?wait=true`, {
           field_name: field,
@@ -123,28 +150,23 @@ export function qdrantStore(url: string, apiKey: string, fetchImpl: typeof fetch
         filter: filterSource(sourceId),
       });
     },
-    async search(name, tenantId, dense, sparse, limit) {
-      const filter = {
-        must: [
-          { key: 'tenant_id', match: { value: tenantId } },
-          { key: 'enabled', match: { value: true } },
-        ],
-      };
-      const prefetch = [{ query: dense, using: 'dense', limit: CANDIDATES, filter }];
-      if (sparse.indices.length > 0)
-        prefetch.push({ query: sparse as never, using: 'text', limit: CANDIDATES, filter });
-      const res = (await call('POST', `/collections/${name}/points/query`, {
-        prefetch,
-        query: { fusion: 'rrf' },
-        filter,
+    async setChunkEnabled(name, pointId, enabled) {
+      await call('POST', `/collections/${name}/points/payload?wait=true`, {
+        payload: { chunk_enabled: enabled },
+        points: [pointId],
+      });
+    },
+    async searchDense(name, tenantId, dense, limit, minScore) {
+      return query(
+        name,
+        tenantId,
+        { query: dense, using: 'dense', ...(minScore > 0 ? { score_threshold: minScore } : {}) },
         limit,
-        with_payload: true,
-      })) as { result?: { points?: { id: string; score: number; payload: VectorPoint['payload'] }[] } };
-      return (res?.result?.points ?? []).map((p) => ({
-        id: String(p.id),
-        score: p.score,
-        payload: p.payload,
-      }));
+      );
+    },
+    async searchSparse(name, tenantId, sparse, limit) {
+      if (sparse.indices.length === 0) return [];
+      return query(name, tenantId, { query: sparse, using: 'text' }, limit);
     },
   };
 }

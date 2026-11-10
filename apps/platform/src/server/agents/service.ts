@@ -3,7 +3,7 @@ import { audit } from '../audit';
 import type { SessionUser } from '../auth/session';
 import type { Sql } from '../db';
 import { badRequest, conflict, forbidden, notFound } from '../errors';
-import { SPEECH_CATALOG, type SpeechProvider } from '@/lib/providers';
+import { SPEECH_CATALOG, type SpeechProvider, isSpeechProvider } from '@/lib/providers';
 import { assertTenantIntegration, integrationSecret, speechIntegrationKind } from '../integrations/service';
 import { assertTenantBases, setAgentBases } from '../knowledge/service';
 import type { agentInput } from '../validation';
@@ -339,7 +339,7 @@ async function speechSecret(
   id: string,
 ): Promise<{ provider: SpeechProvider; apiKey: string } | null> {
   const s = await integrationSecret(sql, key, tenantId, id);
-  return s.kind === 'llm' || s.kind === 'embedding' ? null : { provider: s.kind, apiKey: s.apiKey };
+  return isSpeechProvider(s.kind) ? { provider: s.kind, apiKey: s.apiKey } : null;
 }
 
 /** What the voice worker needs, looked up by id only (called with the internal token). */

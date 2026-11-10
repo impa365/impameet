@@ -16,7 +16,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!internalAuthorized(req, config().internalToken)) return hidden();
   return handle(async () => {
     const id = agentId.parse((await params).id);
-    const { room, query } = await readJson(req, agentKnowledgeInput);
-    return json({ hits: await agentSearch(knowledgeDeps(), id, room, query) });
+    const { room, query, language } = await readJson(req, agentKnowledgeInput);
+    return json({ hits: await agentSearch(knowledgeDeps(), id, room, query, language) });
   });
 }

@@ -1,24 +1,31 @@
 import { z } from 'zod';
-import { writerUser } from '@/server/guard';
+import { readerUser, writerUser } from '@/server/guard';
 import { clientIp, handle, json, readJson } from '@/server/http';
 import { knowledgeDeps } from '@/server/knowledge/client';
-import { deleteSource, reprocessSource, setSourceEnabled } from '@/server/knowledge/service';
-import { knowledgeSourcePatch } from '@/server/validation';
+import { deleteSource, sourceDetail, updateSource } from '@/server/knowledge/service';
+import { knowledgeSourceUpdate } from '@/server/validation';
 
 export const dynamic = 'force-dynamic';
 
 const id = z.string().uuid();
 type Params = { params: Promise<{ id: string; sourceId: string }> };
 
+/** One source with its pages (websites), activity and last indexing runs. */
+export async function GET(_req: Request, { params }: Params): Promise<Response> {
+  return handle(async () => {
+    const actor = await readerUser();
+    const p = await params;
+    return json({ source: await sourceDetail(knowledgeDeps(), actor, id.parse(p.id), id.parse(p.sourceId)) });
+  });
+}
+
+/** Title, text, Q&A pairs, re-sync, on/off or "index again". */
 export async function PATCH(req: Request, { params }: Params): Promise<Response> {
   return handle(async () => {
     const actor = await writerUser(req);
     const p = await params;
-    const input = await readJson(req, knowledgeSourcePatch);
-    const deps = knowledgeDeps();
-    if (input.enabled !== undefined)
-      await setSourceEnabled(deps, actor, id.parse(p.id), id.parse(p.sourceId), input.enabled);
-    if (input.reprocess) void reprocessSource(deps, actor, id.parse(p.id), id.parse(p.sourceId));
+    const input = await readJson(req, knowledgeSourceUpdate, 4 * 1024 * 1024);
+    await updateSource(knowledgeDeps(), actor, id.parse(p.id), id.parse(p.sourceId), input);
     return json({ ok: true });
   });
 }

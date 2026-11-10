@@ -297,6 +297,14 @@ export const integrationInput = z.discriminatedUnion('kind', [
     apiKey,
     defaultModel: modelId,
   }),
+  /** Cohere, Jina, Voyage or any /rerank API with the same shape. */
+  z.object({
+    kind: z.literal('rerank'),
+    name: integrationName,
+    baseUrl: z.string().trim().min(1, 'Informe a URL da API').max(300),
+    apiKey,
+    defaultModel: modelId,
+  }),
 ]);
 
 /** "Escolher voz" in the agent form: a search in the voices of a saved speech key. */
@@ -508,9 +516,28 @@ export const knowledgeBaseInput = z.object({
   embeddingIntegrationId: z.string({ error: 'Escolha a integração de embeddings da base' }).uuid(),
 });
 
-export const knowledgeRenameInput = knowledgeBaseInput.pick({ name: true, description: true });
+/** Everything about a base that can change after it exists (all optional). */
+export const knowledgeBaseSettings = z.object({
+  name: z.string().trim().min(1, 'Informe o nome da base').max(80, 'Nome muito longo').optional(),
+  description: z.string().trim().max(500).optional(),
+  embeddingIntegrationId: z.string().uuid().optional(),
+  chunkSize: z.number().int().min(200, 'Trechos de pelo menos 200 caracteres').max(4000).optional(),
+  chunkOverlap: z.number().int().min(0).max(1000).optional(),
+  retrievalMode: z.enum(['hybrid', 'semantic', 'keyword']).optional(),
+  topK: z.number().int().min(1).max(20).optional(),
+  minScore: z.number().min(0).max(1).optional(),
+  rerankIntegrationId: z.string().uuid().nullable().optional(),
+  expandQueries: z.boolean().optional(),
+});
+
+const syncInterval = z.enum(['off', 'daily', 'weekly']).default('off');
 
 const sourceTitle = z.string().trim().min(1, 'Dê um título para a fonte').max(200, 'Título muito longo');
+const webUrl = z
+  .string()
+  .trim()
+  .max(2000, 'URL muito longa')
+  .refine((v) => /^https?:\/\/\S+$/.test(v), 'Use uma URL https://');
 
 export const knowledgeSourceInput = z.discriminatedUnion('kind', [
   z.object({
@@ -533,18 +560,70 @@ export const knowledgeSourceInput = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('url'),
-    url: z
-      .string()
-      .trim()
-      .max(2000, 'URL muito longa')
-      .refine((v) => /^https?:\/\/\S+$/.test(v), 'Use uma URL https://'),
+    url: webUrl,
     title: z.string().trim().max(200).default(''),
+    syncInterval,
+  }),
+  /** A video, or every video of a playlist. */
+  z.object({
+    kind: z.literal('youtube'),
+    url: webUrl,
+    title: z.string().trim().max(200).default(''),
+    playlist: z.boolean().default(false),
+    syncInterval,
   }),
 ]);
 
-export const knowledgeSourcePatch = z.object({
+export const knowledgeSourceUpdate = z.object({
+  title: sourceTitle.optional(),
+  content: z.string().trim().min(1, 'Escreva o conteúdo').max(2_000_000, 'Texto muito longo').optional(),
+  pairs: z
+    .array(
+      z.object({
+        id: z.string().uuid().optional(),
+        question: z.string().trim().min(1, 'Escreva a pergunta').max(1000),
+        answer: z.string().trim().min(1, 'Escreva a resposta').max(5000),
+        active: z.boolean().default(true),
+      }),
+    )
+    .min(1, 'Inclua pelo menos uma pergunta e resposta')
+    .max(500)
+    .optional(),
+  syncInterval: z.enum(['off', 'daily', 'weekly']).optional(),
   enabled: z.boolean().optional(),
   reprocess: z.literal(true).optional(),
+});
+
+/** Finding a website's pages before importing them. */
+export const knowledgeCrawlInput = z.object({
+  url: webUrl,
+  maxDepth: z.number().int().min(0).max(5).default(2),
+  include: z.array(z.string().trim().max(200)).max(20).default([]),
+  exclude: z.array(z.string().trim().max(200)).max(20).default([]),
+  respectRobots: z.boolean().default(true),
+});
+
+export const knowledgeWebsiteInput = knowledgeCrawlInput.extend({
+  pages: z.array(webUrl).min(1, 'Escolha pelo menos uma página').max(100, 'Até 100 páginas por site'),
+  syncInterval,
+});
+
+export const knowledgeChunkPatch = z
+  .object({
+    enabled: z.boolean().optional(),
+    content: z
+      .string()
+      .trim()
+      .min(1, 'O trecho não pode ficar vazio')
+      .max(8000, 'Trecho muito longo')
+      .optional(),
+  })
+  .refine((v) => v.enabled !== undefined || v.content !== undefined, 'Nada para alterar');
+
+export const knowledgeChatInput = z.object({
+  question: z.string().trim().min(1, 'Escreva a pergunta').max(1000),
+  integrationId: z.string({ error: 'Escolha a integração de LLM' }).uuid('Escolha a integração de LLM'),
+  model: z.string().trim().min(1, 'Escolha o modelo').max(120),
 });
 
 export const knowledgeSearchInput = z.object({
@@ -554,6 +633,11 @@ export const knowledgeSearchInput = z.object({
 export const agentKnowledgeInput = z.object({
   room: z.string().min(3).max(200),
   query: z.string().trim().min(1).max(1000),
+  /** The language of the conversation, to complete very short questions in it. */
+  language: z
+    .string()
+    .regex(/^[a-z]{2}(-[A-Za-z]{2})?$/)
+    .optional(),
 });
 
 export const agentExampleInput = z.object({

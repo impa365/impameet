@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const kbId = id.parse((await params).id);
     if ((req.headers.get('content-type') ?? '').includes('multipart/form-data')) {
       if (Number(req.headers.get('content-length') ?? 0) > MAX_FILE_BYTES + 64 * 1024)
-        throw badRequest('Arquivo muito grande (máx. 20 MB)');
+        throw badRequest('Arquivo muito grande (máx. 50 MB)');
       const form = await req.formData().catch(() => null);
       const file = form?.get('file');
       if (!(file instanceof File)) throw badRequest('Envie um arquivo');
@@ -41,7 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return json({ id: sourceId }, 201);
     }
     const input = await readJson(req, knowledgeSourceInput, MAX_SOURCE_BYTES);
-    const { id: sourceId } = await addSource(knowledgeDeps(), actor, kbId, input, clientIp(req));
-    return json({ id: sourceId }, 201);
+    const { ids } = await addSource(knowledgeDeps(), actor, kbId, input, clientIp(req));
+    return json({ ids }, 201);
   });
 }

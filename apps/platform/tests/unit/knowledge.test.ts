@@ -114,7 +114,13 @@ describe('reading files', () => {
     await expect(extractFile('a.txt', enc('   '))).rejects.toThrow(/não tem texto/);
     await expect(extractFile('a.pdf', enc('não é pdf'))).rejects.toThrow(/Não foi possível ler/);
     await expect(extractFile('a.docx', enc('não é docx'))).rejects.toThrow(/Não foi possível ler/);
-    await expect(extractFile('big.txt', new Uint8Array(21 * 1024 * 1024))).rejects.toThrow(/muito grande/);
+    await expect(extractFile('a.xlsx', enc('não é planilha'))).rejects.toThrow(/Não foi possível ler/);
+    await expect(extractFile('big.txt', new Uint8Array(51 * 1024 * 1024))).rejects.toThrow(/muito grande/);
+  });
+
+  it('accepts spreadsheets and slide decks', () => {
+    expect(fileKind('Preços.XLSX')).toBe('xlsx');
+    expect(fileKind('aula.pptx')).toBe('pptx');
   });
 });
 
