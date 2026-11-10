@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { getT } from '@/i18n/server';
 import type { SessionUser } from '@/server/auth/session';
@@ -28,13 +29,15 @@ function NavLink(props: { href: string; icon: IconName; label: string; active: b
 /** The signed-in panel: side navigation, a top bar with language and theme, and the page. */
 export async function AppShell(props: {
   branding: Branding;
-  user: Pick<SessionUser, 'name' | 'role' | 'isSuperadmin'>;
+  user: Pick<SessionUser, 'name' | 'role' | 'isSuperadmin' | 'mfaSetupRequired'>;
   active: string;
   title: string;
   children: ReactNode;
 }) {
   const t = await getT();
   const { user, active } = props;
+  // The organization requires two-step verification: nothing else until it is set up.
+  if (user.mfaSetupRequired && active !== 'account') redirect('/account?setup=1');
   const adminTabs = adminTabsFor(user.role);
   return (
     <div className="shell">
@@ -90,13 +93,18 @@ export async function AppShell(props: {
           <div className="shell-tools">
             <LanguageSwitcher compact />
             <ThemeToggle />
-            <span className="shell-user">
+            <Link
+              href="/account"
+              className="shell-user"
+              aria-current={active === 'account' ? 'page' : undefined}
+              title={t('security.account.title')}
+            >
               <Avatar name={user.name} size={32} />
               <span>
                 {user.name}
                 <small>{t(`common.roles.${user.role}`)}</small>
               </span>
-            </span>
+            </Link>
             <LogoutButton />
           </div>
         </header>

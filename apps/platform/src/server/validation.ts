@@ -55,6 +55,77 @@ export const loginInput = z.object({
   password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
 });
 
+const challengeToken = z.string().min(20).max(100);
+const otpCode = z.string().trim().min(6, 'Digite o código').max(20);
+/** What the browser hands back from a passkey; the WebAuthn library checks the rest. */
+const passkeyResponse = z.looseObject({
+  id: z.string().min(16).max(1400),
+  rawId: z.string().min(16).max(1400),
+  type: z.literal('public-key'),
+  response: z.looseObject({}),
+});
+const passkeyName = z.string().trim().min(1, 'Dê um nome para a passkey').max(60);
+const reauthPassword = z.string().min(1, 'Digite sua senha').max(PASSWORD_MAX_LENGTH);
+
+/** The second step of signing in, and setting one up when the organization requires it. */
+export const mfaInput = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('send-email'), token: challengeToken }),
+  z.object({ action: z.literal('passkey-options'), token: challengeToken }),
+  z.object({
+    action: z.literal('verify-code'),
+    token: challengeToken,
+    method: z.enum(['totp', 'recovery', 'email']),
+    code: otpCode,
+  }),
+  z.object({ action: z.literal('verify-passkey'), token: challengeToken, response: passkeyResponse }),
+  z.object({ action: z.literal('enroll-totp'), token: challengeToken }),
+  z.object({ action: z.literal('enroll-totp-confirm'), token: challengeToken, code: otpCode }),
+  z.object({ action: z.literal('enroll-passkey-options'), token: challengeToken }),
+  z.object({
+    action: z.literal('enroll-passkey'),
+    token: challengeToken,
+    response: passkeyResponse,
+    name: passkeyName,
+  }),
+  z.object({ action: z.literal('enroll-email'), token: challengeToken }),
+  z.object({ action: z.literal('enroll-email-confirm'), token: challengeToken, code: otpCode }),
+]);
+
+export const passkeyLoginInput = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('options') }),
+  z.object({ action: z.literal('verify'), token: challengeToken, response: passkeyResponse }),
+]);
+
+/** "Minha conta" → security. */
+export const accountSecurityInput = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('totp-start') }),
+  z.object({ action: z.literal('totp-confirm'), code: otpCode }),
+  z.object({ action: z.literal('totp-disable'), password: reauthPassword }),
+  z.object({ action: z.literal('passkey-options') }),
+  z.object({
+    action: z.literal('passkey-add'),
+    token: challengeToken,
+    response: passkeyResponse,
+    name: passkeyName,
+  }),
+  z.object({ action: z.literal('passkey-rename'), id: z.string().min(16).max(1400), name: passkeyName }),
+  z.object({
+    action: z.literal('passkey-remove'),
+    id: z.string().min(16).max(1400),
+    password: reauthPassword,
+  }),
+  z.object({ action: z.literal('email-start') }),
+  z.object({ action: z.literal('email-confirm'), token: challengeToken, code: otpCode }),
+  z.object({ action: z.literal('email-disable'), password: reauthPassword }),
+  z.object({ action: z.literal('recovery-regenerate'), password: reauthPassword }),
+  z.object({
+    action: z.literal('session-revoke'),
+    id: z.union([z.literal('others'), z.string().regex(/^[0-9a-f]{16}$/)]),
+  }),
+]);
+
+export const requireMfaInput = z.object({ required: z.boolean() });
+
 const smtpServer = z.object({
   host: z
     .string()

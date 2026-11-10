@@ -16,6 +16,7 @@ interface User {
   role: Role;
   status: 'active' | 'disabled';
   lastLoginAt: string | null;
+  mfa: boolean;
 }
 
 const ROLE_LABEL = {
@@ -53,6 +54,17 @@ export function UsersTab({ role, selfId }: { role: 'admin' | 'manager'; selfId: 
     try {
       await api(`/api/admin/users/${id}`, { method: 'PATCH', body });
       await reload();
+    } catch (err) {
+      setError(messageOf(err, t('admin.couldNotSave')));
+    }
+  }
+
+  async function resetMfa(u: User) {
+    if (!window.confirm(t('security.admin.confirmReset', { name: u.name }))) return;
+    try {
+      await api(`/api/admin/users/${u.id}/mfa`, { method: 'DELETE', body: {} });
+      await reload();
+      window.alert(t('security.admin.resetDone'));
     } catch (err) {
       setError(messageOf(err, t('admin.couldNotSave')));
     }
@@ -150,7 +162,14 @@ export function UsersTab({ role, selfId }: { role: 'admin' | 'manager'; selfId: 
           <tbody>
             {data?.users.map((u) => (
               <tr key={u.id}>
-                <td className="strong">{u.name}</td>
+                <td className="strong">
+                  {u.name}
+                  {u.mfa && (
+                    <span className="badge primary" title={t('security.account.mfaTitle')}>
+                      {t('security.admin.mfaBadge')}
+                    </span>
+                  )}
+                </td>
                 <td className="muted">{u.email}</td>
                 <td>
                   {canEdit(u) ? (
@@ -188,6 +207,11 @@ export function UsersTab({ role, selfId }: { role: 'admin' | 'manager'; selfId: 
                       <button className="btn text small" onClick={() => resetPassword(u)}>
                         {t('admin.users.changePassword')}
                       </button>
+                      {role === 'admin' && u.mfa && (
+                        <button className="btn text small" onClick={() => resetMfa(u)}>
+                          {t('security.admin.resetMfa')}
+                        </button>
+                      )}
                       <button
                         className={u.status === 'active' ? 'btn text danger small' : 'btn text small'}
                         onClick={() => patch(u.id, { status: u.status === 'active' ? 'disabled' : 'active' })}

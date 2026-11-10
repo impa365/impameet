@@ -5172,3 +5172,208 @@ kbd {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Sign-in second step and account security. */
+.login-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.login-or::before,
+.login-or::after {
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+  content: '';
+}
+
+.mfa-step {
+  display: grid;
+  gap: 16px;
+}
+
+.mfa-step > header {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.mfa-step > header h3,
+.mfa-recovery h3 {
+  margin: 0;
+}
+
+.mfa-step > .btn.text {
+  justify-self: start;
+}
+
+.mfa-shield {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand-text);
+}
+
+.mfa-big {
+  min-height: 48px;
+  font-size: 15px;
+}
+
+.mfa-code-input {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+.mfa-others {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+
+.mfa-others .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mfa-choices {
+  display: grid;
+  gap: 8px;
+}
+
+.mfa-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, #f9ab00 45%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, #f9ab00 12%, transparent);
+  font-size: 13px;
+}
+
+.mfa-totp {
+  justify-items: start;
+}
+
+.mfa-qr {
+  padding: 10px;
+  border-radius: var(--radius-control);
+  background: #fff;
+}
+
+.mfa-secret {
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  word-break: break-all;
+}
+
+.mfa-recovery {
+  display: grid;
+  gap: 12px;
+}
+
+.mfa-recovery h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mfa-codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  list-style: none;
+}
+
+.mfa-codes code {
+  font-size: 15px;
+  letter-spacing: 0.08em;
+}
+
+.account .account-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.account .account-card-head h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+}
+
+.account .account-card-head .tile-avatar {
+  width: 38px;
+  height: 38px;
+}
+
+.account-action,
+.security-own,
+.kb-back,
+.mfa-step > .btn.text {
+  align-self: flex-start;
+  justify-self: start;
+}
+
+.account-inline,
+.account-reauth {
+  max-width: 420px;
+}
+
+.account-banner {
+  font-size: 14px;
+}
+
+.account .list-row-main > strong .badge {
+  margin-left: 0;
+}
+
+.account .list-row-main > strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+a.shell-user {
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-control);
+}
+
+a.shell-user:hover,
+a.shell-user[aria-current='page'] {
+  background: var(--hover);
+}
+
+.security-adoption {
+  display: grid;
+  grid-template-columns: minmax(120px, 240px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.security-own {
+  align-self: flex-start;
+}

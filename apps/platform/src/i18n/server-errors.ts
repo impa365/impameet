@@ -262,6 +262,36 @@ const EN: Record<string, string> = {
   'Servidor SMTP inválido': 'Invalid SMTP server',
   'Informe a porta': 'Enter the port',
   'Escolha a segurança da conexão': 'Choose the connection security',
+  'A verificação expirou. Entre de novo.': 'The verification expired. Sign in again.',
+  'Tentativas demais. Entre de novo.': 'Too many tries. Sign in again.',
+  'Código incorreto': 'Wrong code',
+  'O código por e-mail não está ligado nesta conta': 'Codes by e-mail are not on for this account',
+  'Espere um minuto para pedir outro código': 'Wait a minute before asking for another code',
+  'Esta organização não envia e-mails': 'This organization does not send e-mail',
+  'Nenhuma passkey desta conta neste endereço': 'This account has no passkey on this address',
+  'O app autenticador precisa da chave de criptografia do servidor':
+    'The authenticator app needs the server encryption key',
+  'O app autenticador já está ligado': 'The authenticator app is already on',
+  'Comece de novo: o QR code expirou': 'Start again: the QR code expired',
+  'Código incorreto. Confira se o horário do celular está certo.':
+    'Wrong code. Check that the phone clock is right.',
+  'Até {n} passkeys por conta': 'Up to {n} passkeys per account',
+  'Comece de novo': 'Start again',
+  'Esta passkey já está cadastrada': 'This passkey is already registered',
+  'O código por e-mail já está ligado': 'Codes by e-mail are already on',
+  'Senha incorreta': 'Wrong password',
+  'Sua organização exige a verificação em duas etapas: ligue outro método antes de tirar este':
+    'Your organization requires two-step verification: turn on another method before removing this one',
+  'Passkey não encontrada': 'Passkey not found',
+  'Ligue um método de verificação primeiro': 'Turn on a verification method first',
+  'Ligue a verificação em duas etapas na sua conta antes de exigir de todos':
+    'Turn on two-step verification on your account before requiring it from everyone',
+  'Para a sua conta, use a página Minha conta': 'For your own account, use the My account page',
+  'Sua organização exige a verificação em duas etapas. Configure em Minha conta.':
+    'Your organization requires two-step verification. Set it up in My account.',
+  'Digite o código': 'Type the code',
+  'Dê um nome para a passkey': 'Give the passkey a name',
+  'Digite sua senha': 'Type your password',
 };
 
 const ES: Record<string, string> = {
@@ -525,6 +555,36 @@ const ES: Record<string, string> = {
   'Servidor SMTP inválido': 'Servidor SMTP no válido',
   'Informe a porta': 'Escribe el puerto',
   'Escolha a segurança da conexão': 'Elige la seguridad de la conexión',
+  'A verificação expirou. Entre de novo.': 'La verificación expiró. Entra de nuevo.',
+  'Tentativas demais. Entre de novo.': 'Demasiados intentos. Entra de nuevo.',
+  'Código incorreto': 'Código incorrecto',
+  'O código por e-mail não está ligado nesta conta': 'El código por correo no está activado en esta cuenta',
+  'Espere um minuto para pedir outro código': 'Espera un minuto para pedir otro código',
+  'Esta organização não envia e-mails': 'Esta organización no envía correos',
+  'Nenhuma passkey desta conta neste endereço': 'Esta cuenta no tiene passkeys en esta dirección',
+  'O app autenticador precisa da chave de criptografia do servidor':
+    'La app de autenticación necesita la clave de cifrado del servidor',
+  'O app autenticador já está ligado': 'La app de autenticación ya está activada',
+  'Comece de novo: o QR code expirou': 'Empieza de nuevo: el código QR expiró',
+  'Código incorreto. Confira se o horário do celular está certo.':
+    'Código incorrecto. Revisa que la hora del teléfono sea correcta.',
+  'Até {n} passkeys por conta': 'Hasta {n} passkeys por cuenta',
+  'Comece de novo': 'Empieza de nuevo',
+  'Esta passkey já está cadastrada': 'Esta passkey ya está registrada',
+  'O código por e-mail já está ligado': 'El código por correo ya está activado',
+  'Senha incorreta': 'Contraseña incorrecta',
+  'Sua organização exige a verificação em duas etapas: ligue outro método antes de tirar este':
+    'Tu organización exige la verificación en dos pasos: activa otro método antes de quitar este',
+  'Passkey não encontrada': 'Passkey no encontrada',
+  'Ligue um método de verificação primeiro': 'Activa un método de verificación primero',
+  'Ligue a verificação em duas etapas na sua conta antes de exigir de todos':
+    'Activa la verificación en dos pasos en tu cuenta antes de exigirla a todos',
+  'Para a sua conta, use a página Minha conta': 'Para tu cuenta, usa la página Mi cuenta',
+  'Sua organização exige a verificação em duas etapas. Configure em Minha conta.':
+    'Tu organización exige la verificación en dos pasos. Configúrala en Mi cuenta.',
+  'Digite o código': 'Escribe el código',
+  'Dê um nome para a passkey': 'Ponle un nombre a la passkey',
+  'Digite sua senha': 'Escribe tu contraseña',
 };
 
 export const SERVER_ERRORS: Record<Locale, Record<string, string>> = { 'pt-BR': {}, en: EN, es: ES };

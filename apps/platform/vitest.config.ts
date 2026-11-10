@@ -37,6 +37,7 @@ export default defineConfig({
         'src/server/knowledge/office.ts',
         'src/server/knowledge/rerank.ts',
         'src/server/mail/smtp.ts',
+        'src/server/security/otp.ts',
       ],
       thresholds: { lines: 95, branches: 85 },
     },

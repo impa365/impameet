@@ -78,8 +78,18 @@ export async function login(
     throw unauthorized('E-mail ou senha incorretos');
   }
 
-  await sql`update users set last_login_at = now() where id = ${row.id}`;
-  await audit(sql, { tenantId: tenant.id, actorId: row.id, action: 'auth.login', ip });
   const { passwordHash: _hash, status: _status, ...user } = row;
   return { ...user, role: user.role as UserRole };
+}
+
+/** The moment a session really starts (after the second step, when there is one). */
+export async function recordLogin(sql: Sql, user: SessionUser, ip: string | null, mfaMethod: string | null) {
+  await sql`update users set last_login_at = now() where id = ${user.id}`;
+  await audit(sql, {
+    tenantId: user.tenantId,
+    actorId: user.id,
+    action: 'auth.login',
+    ...(mfaMethod ? { meta: { mfa: mfaMethod } } : {}),
+    ip,
+  });
 }

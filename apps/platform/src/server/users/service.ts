@@ -14,10 +14,15 @@ export interface ManagedUser {
   status: 'active' | 'disabled';
   createdAt: Date;
   lastLoginAt: Date | null;
+  /** Has at least one two-step verification method. */
+  mfa: boolean;
 }
 
 const USER_COLUMNS = (sql: Sql) => sql`
-  id, email, name, role, status, created_at as "createdAt", last_login_at as "lastLoginAt"`;
+  id, email, name, role, status, created_at as "createdAt", last_login_at as "lastLoginAt",
+  (exists (select 1 from user_mfa m where m.user_id = users.id
+            and (m.totp_enabled_at is not null or m.email_enabled_at is not null))
+   or exists (select 1 from webauthn_credentials w where w.user_id = users.id)) as mfa`;
 
 /** Admins manage everyone; managers manage plain users only. */
 export function canManageUser(actor: SessionUser, targetRole: UserRole): boolean {
