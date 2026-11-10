@@ -56,13 +56,11 @@ export function AgentExamples({ agentId }: { agentId: string }) {
   }
 
   return (
-    <section
-      className="card form"
-      style={{ maxWidth: 820, margin: '16px 0 0' }}
-      aria-labelledby="agent-examples"
-    >
-      <strong id="agent-examples">{t('admin.examples.legend')}</strong>
-      <p className="muted small-print">{t('admin.examples.intro')}</p>
+    <section id="agent-examples-section" className="settings-section" aria-labelledby="agent-examples">
+      <header className="section-head">
+        <h3 id="agent-examples">{t('admin.examples.legend')}</h3>
+        <p>{t('admin.examples.intro')}</p>
+      </header>
       <div className="error" role="alert">
         {error}
       </div>

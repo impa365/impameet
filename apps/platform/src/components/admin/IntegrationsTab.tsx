@@ -11,6 +11,7 @@ import {
   type SpeechProvider,
   presetFor,
 } from '@/lib/providers';
+import { Icon, type IconName } from '../ui/Icon';
 import { api } from '../api';
 import { ModelPicker } from './ModelPicker';
 import { messageOf, useLoad } from './useLoad';
@@ -127,16 +128,31 @@ function useModelCatalog(editing: string | null, draft: Draft) {
 const presetName = (p: LlmPreset, t: T) => p.name || t('admin.integrations.customProvider');
 const presetExample = (p: LlmPreset, t: T) => p.example || t('admin.integrations.customModelExample');
 
+const KIND_ICON = {
+  llm: 'psychology',
+  embedding: 'menu_book',
+  fish: 'graphic_eq',
+  deepgram: 'hearing',
+  elevenlabs: 'record_voice_over',
+} as const satisfies Record<IntegrationKind, IconName>;
+
 function Status({ i }: { i: Integration }) {
   const t = useT();
-  if (i.lastTestOk === true) return <span className="pill ok">{t('admin.integrations.connected')}</span>;
-  if (i.lastTestOk === false)
-    return (
-      <span className="pill bad" title={i.lastTestError ?? ''}>
-        {t('admin.integrations.failed')}
-      </span>
-    );
-  return <span className="pill">{t('admin.integrations.untested')}</span>;
+  const [dot, label] =
+    i.lastTestOk === true
+      ? ['status-dot', t('admin.integrations.connected')]
+      : i.lastTestOk === false
+        ? ['status-dot bad', t('admin.integrations.failed')]
+        : ['status-dot idle', t('admin.integrations.untested')];
+  return (
+    <span
+      className="status-line int-status"
+      title={i.lastTestOk === false ? (i.lastTestError ?? '') : undefined}
+    >
+      <span className={dot} aria-hidden />
+      {label}
+    </span>
+  );
 }
 
 export function IntegrationsTab() {
@@ -147,6 +163,7 @@ export function IntegrationsTab() {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(NEW_LLM);
   const [busy, setBusy] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const [notice, setNotice] = useState('');
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft({ ...draft, [k]: v });
   const { ready, catalog, refresh } = useModelCatalog(editing, draft);
@@ -287,147 +304,163 @@ export function IntegrationsTab() {
     );
     const embeddingChoices = embeddingModels.slice(0, 40);
     return (
-      <form onSubmit={save} className="card form" style={{ maxWidth: 720, margin: 0 }}>
-        <strong>
-          {editing === 'new' ? t('admin.integrations.newTitle') : t('admin.editNamed', { name: draft.name })}{' '}
-          · {t(KIND_LABEL[draft.kind])}
-        </strong>
-        {draft.kind === 'llm' && (
-          <div className="preset-grid" role="radiogroup" aria-label={t('admin.integrations.provider')}>
-            {LLM_PRESETS.map((p) => (
-              <button
-                type="button"
-                key={p.id}
-                role="radio"
-                aria-checked={draft.preset === p.id}
-                className={draft.preset === p.id ? 'preset active' : 'preset'}
-                onClick={() => setDraft({ ...draft, preset: p.id, baseUrl: p.baseUrl || draft.baseUrl })}
-              >
-                <span aria-hidden>{p.icon}</span> {presetName(p, t)}
-              </button>
-            ))}
-          </div>
-        )}
-        <label>
-          {t('admin.integrations.nameLabel')}
-          <input required maxLength={60} value={draft.name} onChange={(e) => set('name', e.target.value)} />
-        </label>
-        {(draft.kind === 'llm' || draft.kind === 'embedding') && (
-          <label>
-            {t('admin.integrations.baseUrlLabel')}
-            <input
-              required
-              type="url"
-              placeholder="https://…/v1"
-              value={draft.baseUrl}
-              onChange={(e) => set('baseUrl', e.target.value)}
-            />
-          </label>
-        )}
-        <label>
-          {t('admin.integrations.apiKey')}
-          <input
-            type="password"
-            autoComplete="off"
-            required={editing === 'new'}
-            placeholder={editing === 'new' ? '' : t('admin.integrations.keepKey')}
-            value={draft.apiKey}
-            onChange={(e) => set('apiKey', e.target.value)}
-          />
-          <span className="muted">{t('admin.integrations.keyHint')}</span>
-        </label>
-        {draft.kind === 'llm' ? (
-          <>
-            <label>
-              {t('admin.integrations.defaultModel')}
-              <input
-                required
-                list="integration-models"
-                placeholder={presetExample(preset, t)}
-                value={draft.defaultModel}
-                onChange={(e) => set('defaultModel', e.target.value)}
-              />
-              <datalist id="integration-models">
-                {[...new Set([...found, ...draft.models])].map((m) => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
-            </label>
-            {catalogStatus}
-            {(found.length > 0 || draft.models.length > 0) && (
-              <ModelPicker
-                available={found}
-                selected={draft.models}
-                principal={draft.defaultModel}
-                onSelected={(models) => set('models', models)}
-                onPrincipal={(m) =>
-                  setDraft({
-                    ...draft,
-                    defaultModel: m,
-                    models: draft.models.includes(m) ? draft.models : [...draft.models, m],
-                  })
-                }
-              />
-            )}
-          </>
-        ) : draft.kind === 'embedding' ? (
-          <>
-            <label>
-              {t('admin.integrations.embeddingModel')}
-              <input
-                required
-                maxLength={120}
-                list="embedding-models"
-                placeholder="text-embedding-3-small"
-                value={draft.defaultModel}
-                onChange={(e) => set('defaultModel', e.target.value)}
-              />
-              <datalist id="embedding-models">
-                {[...new Set([...embeddingModels, ...embeddingsFirst(found)])].map((m) => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
-              <span className="muted">{t('admin.integrations.embeddingHint')}</span>
-            </label>
-            {catalogStatus}
-            {embeddingChoices.length > 0 && (
-              <div className="chips" role="group" aria-label={t('admin.integrations.embeddingPick')}>
-                {embeddingChoices.map((m) => (
+      <div className="settings-body">
+        <div className="settings-head">
+          <button type="button" className="btn text small back-link" onClick={() => setEditing(null)}>
+            <Icon name="arrow_back" size={18} />
+            {t('admin.integrations.back')}
+          </button>
+          <h2>{editing === 'new' ? t('admin.integrations.newTitle') : draft.name}</h2>
+          <span className="status-line">
+            <Icon name={KIND_ICON[draft.kind]} size={18} />
+            {t(KIND_LABEL[draft.kind])}
+          </span>
+        </div>
+        <form onSubmit={save} className="form settings-form">
+          <section className="settings-section">
+            {draft.kind === 'llm' && (
+              <div className="preset-grid" role="radiogroup" aria-label={t('admin.integrations.provider')}>
+                {LLM_PRESETS.map((p) => (
                   <button
-                    key={m}
                     type="button"
-                    className={m === draft.defaultModel ? 'chip add accent' : 'chip add'}
-                    aria-pressed={m === draft.defaultModel}
-                    onClick={() => set('defaultModel', m)}
+                    key={p.id}
+                    role="radio"
+                    aria-checked={draft.preset === p.id}
+                    className={draft.preset === p.id ? 'preset active' : 'preset'}
+                    onClick={() => setDraft({ ...draft, preset: p.id, baseUrl: p.baseUrl || draft.baseUrl })}
                   >
-                    {m}
+                    {presetName(p, t)}
                   </button>
                 ))}
               </div>
             )}
-          </>
-        ) : draft.kind !== 'fish' ? null : (
-          <label>
-            {t('admin.integrations.defaultVoiceModel')}
-            <select value={draft.defaultModel} onChange={(e) => set('defaultModel', e.target.value)}>
-              {FISH_TTS_MODELS.map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        <div className="row">
-          <button className="btn" disabled={busy}>
-            {t('admin.integrations.saveIntegration')}
-          </button>
-          <button type="button" className="btn secondary" onClick={() => setEditing(null)}>
-            {t('common.cancel')}
-          </button>
-        </div>
-        <div className="error" role="alert">
-          {error}
-        </div>
-      </form>
+            <label>
+              {t('admin.integrations.nameLabel')}
+              <input
+                required
+                maxLength={60}
+                value={draft.name}
+                onChange={(e) => set('name', e.target.value)}
+              />
+            </label>
+            {(draft.kind === 'llm' || draft.kind === 'embedding') && (
+              <label>
+                {t('admin.integrations.baseUrlLabel')}
+                <input
+                  required
+                  type="url"
+                  placeholder="https://…/v1"
+                  value={draft.baseUrl}
+                  onChange={(e) => set('baseUrl', e.target.value)}
+                />
+              </label>
+            )}
+            <label>
+              {t('admin.integrations.apiKey')}
+              <input
+                type="password"
+                autoComplete="off"
+                required={editing === 'new'}
+                placeholder={editing === 'new' ? '' : t('admin.integrations.keepKey')}
+                value={draft.apiKey}
+                onChange={(e) => set('apiKey', e.target.value)}
+              />
+              <span className="field-help">{t('admin.integrations.keyHint')}</span>
+            </label>
+            {draft.kind === 'llm' ? (
+              <>
+                <label>
+                  {t('admin.integrations.defaultModel')}
+                  <input
+                    required
+                    list="integration-models"
+                    placeholder={presetExample(preset, t)}
+                    value={draft.defaultModel}
+                    onChange={(e) => set('defaultModel', e.target.value)}
+                  />
+                  <datalist id="integration-models">
+                    {[...new Set([...found, ...draft.models])].map((m) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
+                </label>
+                {catalogStatus}
+                {(found.length > 0 || draft.models.length > 0) && (
+                  <ModelPicker
+                    available={found}
+                    selected={draft.models}
+                    principal={draft.defaultModel}
+                    onSelected={(models) => set('models', models)}
+                    onPrincipal={(m) =>
+                      setDraft({
+                        ...draft,
+                        defaultModel: m,
+                        models: draft.models.includes(m) ? draft.models : [...draft.models, m],
+                      })
+                    }
+                  />
+                )}
+              </>
+            ) : draft.kind === 'embedding' ? (
+              <>
+                <label>
+                  {t('admin.integrations.embeddingModel')}
+                  <input
+                    required
+                    maxLength={120}
+                    list="embedding-models"
+                    placeholder="text-embedding-3-small"
+                    value={draft.defaultModel}
+                    onChange={(e) => set('defaultModel', e.target.value)}
+                  />
+                  <datalist id="embedding-models">
+                    {[...new Set([...embeddingModels, ...embeddingsFirst(found)])].map((m) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
+                  <span className="field-help">{t('admin.integrations.embeddingHint')}</span>
+                </label>
+                {catalogStatus}
+                {embeddingChoices.length > 0 && (
+                  <div className="chips" role="group" aria-label={t('admin.integrations.embeddingPick')}>
+                    {embeddingChoices.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        className={m === draft.defaultModel ? 'chip add accent' : 'chip add'}
+                        aria-pressed={m === draft.defaultModel}
+                        onClick={() => set('defaultModel', m)}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : draft.kind !== 'fish' ? null : (
+              <label>
+                {t('admin.integrations.defaultVoiceModel')}
+                <select value={draft.defaultModel} onChange={(e) => set('defaultModel', e.target.value)}>
+                  {FISH_TTS_MODELS.map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </section>
+          <div className="save-bar">
+            <button className="btn" disabled={busy}>
+              {t('admin.integrations.saveIntegration')}
+            </button>
+            <button type="button" className="btn secondary" onClick={() => setEditing(null)}>
+              {t('common.cancel')}
+            </button>
+            <div className="error" role="alert">
+              {error}
+            </div>
+          </div>
+        </form>
+      </div>
     );
   }
 
@@ -449,93 +482,112 @@ export function IntegrationsTab() {
 
   return (
     <>
-      <p className="muted" style={{ marginTop: 0 }}>
-        {t('admin.integrations.intro')}
-      </p>
+      <div className="page-head">
+        <p>{t('admin.integrations.intro')}</p>
+        <button className="btn" aria-expanded={choosing} onClick={() => setChoosing(!choosing)}>
+          <Icon name="add" size={18} />
+          {t('admin.integrations.newIntegration')}
+        </button>
+      </div>
+      {choosing && (
+        <div className="kind-chooser" role="group" aria-label={t('admin.integrations.chooseKind')}>
+          {groups.map((g) => (
+            <button
+              key={g.kind}
+              type="button"
+              className="kind-option"
+              onClick={() => {
+                setChoosing(false);
+                edit(null, g.kind);
+              }}
+            >
+              <span className="int-icon" aria-hidden>
+                <Icon name={KIND_ICON[g.kind]} size={20} />
+              </span>
+              <span>
+                <strong>{g.title}</strong>
+                <small>{g.hint}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="error" role="alert">
         {error}
       </div>
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p role="status" className="status-line">
+          {notice}
+        </p>
+      )}
       {groups.map((g) => {
         const items = data?.integrations.filter((i) => i.kind === g.kind) ?? [];
         return (
-          <section key={g.kind} style={{ marginBottom: 28 }}>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <div>
-                <h3 style={{ margin: 0 }}>{g.title}</h3>
-                <span className="muted">{g.hint}</span>
+          <section key={g.kind} className="int-group" aria-labelledby={`int-group-${g.kind}`}>
+            <div className="int-group-head">
+              <div className="section-head">
+                <h3 id={`int-group-${g.kind}`}>{g.title}</h3>
+                <p>{g.hint}</p>
               </div>
-              <button className="btn small" onClick={() => edit(null, g.kind)}>
+              <button className="btn text small" onClick={() => edit(null, g.kind)}>
+                <Icon name="add" size={18} />
                 {t('common.add')}
               </button>
             </div>
-            {items.length === 0 && (
-              <p className="muted">{data ? t('admin.integrations.empty') : t('common.loading')}</p>
-            )}
-            <div className="card-grid">
-              {items.map((i) => {
-                const preset = i.kind === 'llm' ? presetFor(i.baseUrl) : null;
-                return (
-                  <article key={i.id} className="int-card">
-                    <header>
+            {items.length === 0 ? (
+              <p className="int-empty">{data ? t('admin.integrations.empty') : t('common.loading')}</p>
+            ) : (
+              <ul className="item-list">
+                {items.map((i) => {
+                  const host = i.baseUrl ? new URL(i.baseUrl).host : '';
+                  const preset = i.kind === 'llm' || i.kind === 'embedding' ? presetFor(i.baseUrl) : null;
+                  const provider = preset
+                    ? preset.id === 'custom'
+                      ? host
+                      : `${presetName(preset, t)} · ${host}`
+                    : i.kind !== 'llm' && i.kind !== 'embedding' && SPEECH_CATALOG[i.kind].name;
+                  return (
+                    <li key={i.id} className="int-row">
                       <span className="int-icon" aria-hidden>
-                        {preset
-                          ? preset.icon
-                          : i.kind === 'embedding'
-                            ? '🧩'
-                            : i.kind !== 'llm' && SPEECH_CATALOG[i.kind].icon}
+                        <Icon name={KIND_ICON[i.kind]} size={20} />
                       </span>
-                      <div>
+                      <div className="agent-row-name">
                         <strong>{i.name}</strong>
-                        <div className="muted">
-                          {preset
-                            ? presetName(preset, t)
-                            : i.kind === 'embedding'
-                              ? t('admin.integrations.kindEmbedding')
-                              : i.kind !== 'llm' && SPEECH_CATALOG[i.kind].name}
+                        <span className="muted">{provider}</span>
+                      </div>
+                      <div className="meta-cols">
+                        <div className="meta">
+                          <span>{t('admin.integrations.key')}</span>
+                          <span>{i.secretHint}</span>
+                        </div>
+                        <div className="meta">
+                          <span>{t('admin.integrations.defaultModel')}</span>
+                          <span title={i.defaultModel ?? undefined}>
+                            {i.defaultModel ?? <span className="unset">—</span>}
+                          </span>
+                        </div>
+                        <div className="meta">
+                          <span>{t('admin.integrations.agents')}</span>
+                          <span>{i.usedBy}</span>
                         </div>
                       </div>
                       <Status i={i} />
-                    </header>
-                    <dl>
-                      {i.baseUrl && (
-                        <>
-                          <dt>{t('admin.integrations.url')}</dt>
-                          <dd>{new URL(i.baseUrl).host}</dd>
-                        </>
-                      )}
-                      <dt>{t('admin.integrations.key')}</dt>
-                      <dd>{i.secretHint}</dd>
-                      {i.defaultModel && (
-                        <>
-                          <dt>{t('admin.integrations.defaultModel')}</dt>
-                          <dd>{i.defaultModel}</dd>
-                        </>
-                      )}
-                      {i.kind === 'llm' && (
-                        <>
-                          <dt>{t('admin.integrations.models')}</dt>
-                          <dd>{i.models.length}</dd>
-                        </>
-                      )}
-                      <dt>{t('admin.integrations.agents')}</dt>
-                      <dd>{i.usedBy}</dd>
-                    </dl>
-                    <footer className="row">
-                      <button className="btn secondary small" onClick={() => test(i)}>
-                        {t('admin.integrations.testConnection')}
-                      </button>
-                      <button className="btn secondary small" onClick={() => edit(i)}>
-                        {t('common.edit')}
-                      </button>
-                      <button className="btn danger small" onClick={() => remove(i)}>
-                        {t('common.delete')}
-                      </button>
-                    </footer>
-                  </article>
-                );
-              })}
-            </div>
+                      <div className="row-actions">
+                        <button className="btn text small" onClick={() => test(i)}>
+                          {t('admin.integrations.testConnection')}
+                        </button>
+                        <button className="btn text danger small" onClick={() => remove(i)}>
+                          {t('common.delete')}
+                        </button>
+                        <button className="btn secondary small" onClick={() => edit(i)}>
+                          {t('common.edit')}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         );
       })}

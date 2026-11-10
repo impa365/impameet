@@ -1,9 +1,10 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { useLocale, useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
 import { SPEECH_CATALOG, type SpeechProvider, VOICE_LANGUAGES, type VoiceLanguage } from '@/lib/providers';
+import { Icon, type IconName } from '../ui/Icon';
 import { api } from '../api';
 import { AgentExamples } from './AgentExamples';
 import { AgentTools } from './AgentTools';
@@ -139,6 +140,92 @@ const MUTE = {
   moderators: 'admin.agents.mute.moderators',
   disabled: 'admin.agents.mute.disabled',
 } as const satisfies Record<Agent['mutePolicy'], MessageKey>;
+const AGENT_SECTIONS = [
+  ['agent-identity', 'admin.agents.sectionIdentity', 'badge'],
+  ['agent-brain', 'admin.agents.sectionBrainVoice', 'psychology'],
+  ['agent-instructions', 'admin.agents.sectionInstructions', 'description'],
+  ['agent-behavior', 'admin.agents.sectionBehavior', 'tune'],
+  ['agent-moderation', 'admin.agents.moderationLegend', 'shield'],
+  ['agent-insights', 'admin.agents.insightsLegend', 'summarize'],
+  ['agent-perception', 'admin.agents.perceptionLegend', 'visibility'],
+  ['agent-training', 'admin.agents.trainingLegend', 'school'],
+  ['agent-examples-section', 'admin.agents.sectionExamples', 'chat'],
+  ['agent-tools-section', 'admin.agents.sectionTools', 'extension'],
+] as const satisfies readonly (readonly [string, MessageKey, IconName])[];
+const SECTION_IDS = AGENT_SECTIONS.map(([id]) => id);
+
+type Choices = Record<
+  'llmIntegrationId' | 'llmModel' | 'ttsIntegrationId' | 'ttsModel' | 'sttIntegrationId' | 'sttModel',
+  string | null
+> & { voices: Partial<Record<VoiceLanguage, string>> };
+
+/** What still has to be chosen before the agent can join meetings (nothing has a preset). */
+function missingParts(c: Choices): MessageKey[] {
+  const parts: (MessageKey | false)[] = [
+    !c.llmIntegrationId && 'admin.agents.missingBrain',
+    !!c.llmIntegrationId && !c.llmModel?.trim() && 'admin.agents.missingModel',
+    !c.ttsIntegrationId && 'admin.agents.missingVoice',
+    !!c.ttsIntegrationId && !c.ttsModel && 'admin.agents.missingVoiceModel',
+    !VOICE_LANGUAGES.some((l) => c.voices[l]?.trim()) && 'admin.agents.missingVoiceId',
+    !c.sttIntegrationId && 'admin.agents.missingEar',
+    !!c.sttIntegrationId && !c.sttModel && 'admin.agents.missingEarModel',
+  ];
+  return parts.filter((p): p is MessageKey => p !== false);
+}
+
+function AgentStatus({ missing }: { missing: MessageKey[] }) {
+  const t = useT();
+  return (
+    <span className="status-line" role="status">
+      <span className={missing.length ? 'status-dot warn' : 'status-dot'} aria-hidden />
+      {missing.length
+        ? t('admin.agents.missing', { items: missing.map((m) => t(m)).join(', ') })
+        : t('admin.agents.ready')}
+    </span>
+  );
+}
+
+function SectionHead({ id, title, hint }: { id: string; title: string; hint?: ReactNode }) {
+  return (
+    <header className="section-head">
+      <h3 id={id}>{title}</h3>
+      {hint && <p>{hint}</p>}
+    </header>
+  );
+}
+
+/** The section on screen, so the side navigation can show where the admin is. */
+function useActiveSection(ids: readonly string[], on: boolean): string {
+  const [active, setActive] = useState(ids[0]);
+  useEffect(() => {
+    if (!on) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      let current = ids[0];
+      for (const id of ids) {
+        const top = document.getElementById(id)?.getBoundingClientRect().top;
+        if (top !== undefined && top <= 120) current = id;
+      }
+      // At the very bottom the last sections never reach the top: they are the ones being read.
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
+        current = ids.filter((id) => document.getElementById(id)).at(-1) ?? current;
+      }
+      setActive(current);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [ids, on]);
+  return active;
+}
+
 export function AgentsTab() {
   const t = useT();
   const locale = useLocale();
@@ -154,15 +241,14 @@ export function AgentsTab() {
     return kind && kind !== 'llm' && kind !== 'embedding' ? kind : undefined;
   };
   const speechLabel = (i: Integration) =>
-    i.kind === 'llm' || i.kind === 'embedding'
-      ? i.name
-      : `${SPEECH_CATALOG[i.kind].icon} ${i.name} · ${SPEECH_CATALOG[i.kind].name}`;
+    i.kind === 'llm' || i.kind === 'embedding' ? i.name : `${i.name} · ${SPEECH_CATALOG[i.kind].name}`;
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState<VoiceLanguage | null>(null);
   /** Names of the voices picked from the list, to show next to their ids. */
   const [voiceNames, setVoiceNames] = useState<Record<string, string>>({});
+  const activeSection = useActiveSection(SECTION_IDS, editing !== null);
 
   function edit(agent: Agent | null) {
     setPicking(null);
@@ -268,332 +354,163 @@ export function AgentsTab() {
   };
 
   if (editing) {
+    const isNew = editing === 'new';
+    const missing = missingParts(draft);
+    const switchList = <K extends string>(
+      list: K[],
+      key: 'moderationTools' | 'perception' | 'insights',
+      labels: Record<K, readonly [MessageKey, MessageKey]>,
+    ) =>
+      (Object.keys(labels) as K[]).map((item) => (
+        <label key={item} className="switch">
+          <input
+            type="checkbox"
+            checked={list.includes(item)}
+            onChange={(e) =>
+              set(key, (e.target.checked ? [...list, item] : list.filter((x) => x !== item)) as never)
+            }
+          />
+          <span>
+            {t(labels[item][0])}
+            <small>{t(labels[item][1])}</small>
+          </span>
+        </label>
+      ));
     return (
-      <>
-        <form onSubmit={save} className="card form" style={{ maxWidth: 820, margin: 0 }}>
-          <strong>
-            {editing === 'new' ? t('admin.agents.newTitle') : t('admin.editNamed', { name: draft.name })}
-          </strong>
-          <label>
-            {t('admin.agents.nameLabel')}
-            <input required maxLength={60} value={draft.name} onChange={(e) => set('name', e.target.value)} />
-          </label>
-          <label>
-            {t('admin.agents.descriptionLabel')}
-            <input
-              maxLength={160}
-              value={draft.description}
-              onChange={(e) => set('description', e.target.value)}
-              placeholder={t('admin.agents.descriptionPlaceholder')}
-            />
-          </label>
-          <label>
-            {t('admin.agents.instructionsLabel')}
-            <textarea
-              required
-              rows={7}
-              maxLength={20000}
-              value={draft.instructions}
-              onChange={(e) => set('instructions', e.target.value)}
-              placeholder={t('admin.agents.instructionsPlaceholder')}
-            />
-          </label>
-          <label>
-            {t('admin.agents.knowledgeLabel')}
-            <textarea
-              rows={12}
-              maxLength={KNOWLEDGE_MAX}
-              value={draft.knowledge}
-              onChange={(e) => set('knowledge', e.target.value)}
-              placeholder={t('admin.agents.knowledgePlaceholder')}
-            />
-            <span className="muted">
-              {t('admin.agents.knowledgeCount', {
-                length: draft.knowledge.length.toLocaleString(locale),
-                max: KNOWLEDGE_MAX.toLocaleString(locale),
-              })}
-            </span>
-          </label>
-          <label>
-            {t('admin.agents.greetingLabel')}
-            <input maxLength={500} value={draft.greeting} onChange={(e) => set('greeting', e.target.value)} />
-          </label>
-          <div className="row">
-            <label style={{ flex: 1 }}>
-              {t('admin.agents.listenLabel')}
-              <select
-                value={draft.listenMode}
-                onChange={(e) => set('listenMode', e.target.value as Draft['listenMode'])}
-              >
-                {Object.entries(LISTEN).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {t(l)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={{ flex: 1 }}>
-              {t('admin.agents.respondLabel')}
-              <select
-                value={draft.respondMode}
-                onChange={(e) => set('respondMode', e.target.value as Draft['respondMode'])}
-              >
-                {Object.entries(RESPOND).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {t(l)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={{ flex: 1 }}>
-              {t('admin.agents.muteLabel')}
-              <select
-                value={draft.mutePolicy}
-                onChange={(e) => set('mutePolicy', e.target.value as Draft['mutePolicy'])}
-              >
-                {Object.entries(MUTE).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {t(l)}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <div className="settings">
+        <nav className="settings-nav" aria-label={t('admin.agents.sections')}>
+          {AGENT_SECTIONS.filter(([id]) => !(isNew && id === 'agent-tools-section')).map(
+            ([id, label, icon]) => (
+              <a key={id} href={`#${id}`} aria-current={activeSection === id ? 'true' : undefined}>
+                <Icon name={icon} size={18} />
+                {t(label)}
+              </a>
+            ),
+          )}
+        </nav>
+        <div className="settings-body">
+          <div className="settings-head">
+            <button type="button" className="btn text small back-link" onClick={() => setEditing(null)}>
+              <Icon name="arrow_back" size={18} />
+              {t('admin.agents.backToAgents')}
+            </button>
+            <h2>{isNew ? t('admin.agents.newTitle') : draft.name.trim() || t('admin.agents.newTitle')}</h2>
+            <AgentStatus missing={missing} />
           </div>
-          <p className="muted" style={{ margin: 0 }}>
-            {t('admin.agents.muteHint')}
-          </p>
-          <fieldset className="group">
-            <legend>{t('admin.agents.moderationLegend')}</legend>
-            <p className="muted small-print">{t('admin.agents.moderationHint')}</p>
-            {(Object.keys(MODERATION) as ModerationTool[]).map((tool) => (
-              <label key={tool} className="switch">
-                <input
-                  type="checkbox"
-                  checked={draft.moderationTools.includes(tool)}
-                  onChange={(e) =>
-                    set(
-                      'moderationTools',
-                      e.target.checked
-                        ? [...draft.moderationTools, tool]
-                        : draft.moderationTools.filter((x) => x !== tool),
-                    )
-                  }
-                />
-                <span>
-                  {t(MODERATION[tool][0])}
-                  <small>{t(MODERATION[tool][1])}</small>
-                </span>
-              </label>
-            ))}
-            <label>
-              {t('admin.agents.rulesLabel')}
-              <textarea
-                rows={5}
-                maxLength={RULES_MAX}
-                value={draft.moderationRules}
-                disabled={draft.moderationTools.length === 0}
-                onChange={(e) => set('moderationRules', e.target.value)}
-                placeholder={t('admin.agents.rulesPlaceholder')}
-              />
-              <span className="muted">{t('admin.agents.rulesHelp')}</span>
-            </label>
-          </fieldset>
-          <fieldset className="group">
-            <legend>{t('admin.agents.trainingLegend')}</legend>
-            <p className="muted small-print">{t('admin.agents.trainingHint')}</p>
-            <label>
-              {t('admin.agents.styleRulesLabel')}
-              <textarea
-                rows={3}
-                maxLength={2000}
-                value={draft.styleRules}
-                onChange={(e) => set('styleRules', e.target.value)}
-                placeholder={t('admin.agents.styleRulesPlaceholder')}
-              />
-            </label>
-            <span className="muted small-print">{t('admin.agents.knowledgeBasesLabel')}</span>
-            {bases.length === 0 && <p className="muted small-print">{t('admin.agents.noKnowledgeBases')}</p>}
-            {bases.map((b) => (
-              <label key={b.id} className="switch">
-                <input
-                  type="checkbox"
-                  checked={draft.knowledgeBaseIds.includes(b.id)}
-                  onChange={(e) =>
-                    set(
-                      'knowledgeBaseIds',
-                      e.target.checked
-                        ? [...draft.knowledgeBaseIds, b.id]
-                        : draft.knowledgeBaseIds.filter((x) => x !== b.id),
-                    )
-                  }
-                />
-                <span>{b.name}</span>
-              </label>
-            ))}
-          </fieldset>
-          <fieldset className="group">
-            <legend>{t('admin.agents.insightsLegend')}</legend>
-            <p className="muted small-print">{t('admin.agents.insightsHint')}</p>
-            {(Object.keys(INSIGHTS) as Insight[]).map((what) => (
-              <label key={what} className="switch">
-                <input
-                  type="checkbox"
-                  checked={draft.insights.includes(what)}
-                  onChange={(e) =>
-                    set(
-                      'insights',
-                      e.target.checked ? [...draft.insights, what] : draft.insights.filter((x) => x !== what),
-                    )
-                  }
-                />
-                <span>
-                  {t(INSIGHTS[what][0])}
-                  <small>{t(INSIGHTS[what][1])}</small>
-                </span>
-              </label>
-            ))}
-            {(draft.insights.includes('copilot') || draft.insights.includes('metrics')) && (
-              <fieldset className="group">
-                <legend>{t('admin.agents.insightsAccessLegend')}</legend>
-                {(['moderators', 'managers'] as const).map((access) => (
-                  <label key={access} className="radio-row">
-                    <input
-                      type="radio"
-                      name="insights-access"
-                      checked={draft.insightsAccess === access}
-                      onChange={() => set('insightsAccess', access)}
-                    />
-                    <span>
-                      {t(
-                        access === 'moderators'
-                          ? 'admin.agents.insightsAccessModerators'
-                          : 'admin.agents.insightsAccessManagers',
-                      )}
-                    </span>
-                  </label>
-                ))}
-              </fieldset>
-            )}
-            {draft.insights.includes('minutes') && (
+          <form onSubmit={save} className="form settings-form">
+            <section id="agent-identity" className="settings-section" aria-labelledby="agent-identity-h">
+              <SectionHead id="agent-identity-h" title={t('admin.agents.sectionIdentity')} />
               <label>
-                {t('admin.agents.minutesWebhookLabel')}
+                {t('admin.agents.nameLabel')}
                 <input
-                  type="text"
-                  inputMode="url"
-                  maxLength={2000}
-                  value={draft.minutesWebhook}
-                  onChange={(e) => set('minutesWebhook', e.target.value)}
-                  placeholder="https://n8n.suaempresa.com/webhook/ata"
-                />
-                <span className="muted small-print">{t('admin.agents.minutesWebhookHelp')}</span>
-              </label>
-            )}
-          </fieldset>
-          <fieldset className="group">
-            <legend>{t('admin.agents.perceptionLegend')}</legend>
-            <p className="muted small-print">{t('admin.agents.perceptionHint')}</p>
-            {(Object.keys(PERCEPTION) as Perception[]).map((what) => (
-              <label key={what} className="switch">
-                <input
-                  type="checkbox"
-                  checked={draft.perception.includes(what)}
-                  onChange={(e) =>
-                    set(
-                      'perception',
-                      e.target.checked
-                        ? [...draft.perception, what]
-                        : draft.perception.filter((x) => x !== what),
-                    )
-                  }
-                />
-                <span>
-                  {t(PERCEPTION[what][0])}
-                  <small>{t(PERCEPTION[what][1])}</small>
-                </span>
-              </label>
-            ))}
-          </fieldset>
-          <fieldset className="group">
-            <legend>{t('admin.agents.brainLegend')}</legend>
-            <div className="row">
-              <label style={{ flex: 1 }}>
-                {t('admin.agents.integration')}
-                <select
                   required
-                  value={draft.llmIntegrationId}
-                  onChange={(e) => setDraft({ ...draft, llmIntegrationId: e.target.value, llmModel: '' })}
-                >
-                  <option value="" disabled>
-                    {t('admin.agents.choose')}
-                  </option>
-                  {llms.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name}
+                  maxLength={60}
+                  value={draft.name}
+                  onChange={(e) => set('name', e.target.value)}
+                />
+                <span className="field-help">{t('admin.agents.nameHelp')}</span>
+              </label>
+              <label>
+                {t('admin.agents.descriptionLabel')}
+                <input
+                  maxLength={160}
+                  value={draft.description}
+                  onChange={(e) => set('description', e.target.value)}
+                  placeholder={t('admin.agents.descriptionPlaceholder')}
+                />
+                <span className="field-help">{t('admin.agents.descriptionHelp')}</span>
+              </label>
+              <label>
+                {t('admin.agents.greetingLabel')}
+                <input
+                  maxLength={500}
+                  value={draft.greeting}
+                  onChange={(e) => set('greeting', e.target.value)}
+                />
+                <span className="field-help">{t('admin.agents.greetingHelp')}</span>
+              </label>
+            </section>
+
+            <section id="agent-brain" className="settings-section" aria-labelledby="agent-brain-h">
+              <SectionHead
+                id="agent-brain-h"
+                title={t('admin.agents.sectionBrainVoice')}
+                hint={t('admin.agents.speechMixHint')}
+              />
+              <h4>{t('admin.agents.brainLegend')}</h4>
+              <div className="fields">
+                <label>
+                  {t('admin.agents.integration')}
+                  <select
+                    required
+                    value={draft.llmIntegrationId}
+                    onChange={(e) => setDraft({ ...draft, llmIntegrationId: e.target.value, llmModel: '' })}
+                  >
+                    <option value="" disabled>
+                      {t('admin.agents.choose')}
                     </option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ flex: 1 }}>
-                {t('admin.agents.model')}
-                <input
-                  required
-                  list="agent-llm-models"
-                  value={draft.llmModel}
-                  onChange={(e) => set('llmModel', e.target.value)}
-                  placeholder={t('admin.agents.modelPlaceholder')}
-                />
-                <datalist id="agent-llm-models">
-                  {(llmIntegration?.models ?? []).map((m) => (
-                    <option key={m} value={m} />
-                  ))}
-                </datalist>
-              </label>
-            </div>
-            {llms.length === 0 && <span className="muted">{t('admin.agents.noLlm')}</span>}
-          </fieldset>
-          <p className="muted" style={{ margin: 0 }}>
-            {t('admin.agents.speechMixHint')}
-          </p>
-          <fieldset className="group">
-            <legend>{t('admin.agents.voiceLegend')}</legend>
-            <div className="row">
-              <label style={{ flex: 1 }}>
-                {t('admin.agents.integration')}
-                <select required value={draft.ttsIntegrationId} onChange={(e) => chooseTts(e.target.value)}>
-                  <option value="" disabled>
-                    {t('admin.agents.choose')}
-                  </option>
-                  {speech.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {speechLabel(i)}
+                    {llms.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {t('admin.agents.model')}
+                  <input
+                    required
+                    list="agent-llm-models"
+                    value={draft.llmModel}
+                    onChange={(e) => set('llmModel', e.target.value)}
+                    placeholder={t('admin.agents.modelPlaceholder')}
+                  />
+                  <datalist id="agent-llm-models">
+                    {(llmIntegration?.models ?? []).map((m) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
+                </label>
+              </div>
+              {llms.length === 0 && <span className="field-help">{t('admin.agents.noLlm')}</span>}
+
+              <h4>{t('admin.agents.voiceLegend')}</h4>
+              <div className="fields">
+                <label>
+                  {t('admin.agents.integration')}
+                  <select required value={draft.ttsIntegrationId} onChange={(e) => chooseTts(e.target.value)}>
+                    <option value="" disabled>
+                      {t('admin.agents.choose')}
                     </option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ flex: 1 }}>
-                {t('admin.agents.voiceModel')}
-                <select
-                  required
-                  disabled={!ttsKind}
-                  value={draft.ttsModel}
-                  onChange={(e) => set('ttsModel', e.target.value)}
-                >
-                  <option value="" disabled>
-                    {t('admin.agents.choose')}
-                  </option>
-                  {ttsModels.map((m) => (
-                    <option key={m}>{m}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <fieldset className="group">
-              <legend>{t('admin.agents.voicesLegend')}</legend>
-              <p className="muted small-print">{t('admin.agents.voicesHint')}</p>
-              {ttsKind === 'deepgram' && (
-                <p className="muted small-print">{t('admin.agents.deepgramVoiceHint')}</p>
-              )}
-              <div className="row">
+                    {speech.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {speechLabel(i)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {t('admin.agents.voiceModel')}
+                  <select
+                    required
+                    disabled={!ttsKind}
+                    value={draft.ttsModel}
+                    onChange={(e) => set('ttsModel', e.target.value)}
+                  >
+                    <option value="" disabled>
+                      {t('admin.agents.choose')}
+                    </option>
+                    {ttsModels.map((m) => (
+                      <option key={m}>{m}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <span className="field-help">
+                {t('admin.agents.voicesHint')}
+                {ttsKind === 'deepgram' && <> {t('admin.agents.deepgramVoiceHint')}</>}
+              </span>
+              <div className="fields">
                 {VOICE_LANGUAGES.map((lang) => (
                   <div key={lang} className="voice-field">
                     <label>
@@ -618,10 +535,11 @@ export function AgentsTab() {
                         aria-expanded={picking === lang}
                         onClick={() => setPicking(picking === lang ? null : lang)}
                       >
+                        <Icon name="graphic_eq" size={18} />
                         {t('admin.agents.pickVoice')}
                       </button>
                       {voiceNames[draft.voices[lang]] && (
-                        <span className="muted small-print">🔊 {voiceNames[draft.voices[lang]]}</span>
+                        <span className="field-help">{voiceNames[draft.voices[lang]]}</span>
                       )}
                     </div>
                   </div>
@@ -643,74 +561,276 @@ export function AgentsTab() {
                   onClose={() => setPicking(null)}
                 />
               )}
-            </fieldset>
-          </fieldset>
-          <fieldset className="group">
-            <legend>{t('admin.agents.listenLegend')}</legend>
-            <div className="row">
-              <label style={{ flex: 1 }}>
-                {t('admin.agents.integration')}
-                <select required value={draft.sttIntegrationId} onChange={(e) => chooseStt(e.target.value)}>
-                  <option value="" disabled>
-                    {t('admin.agents.choose')}
-                  </option>
-                  {speech.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {speechLabel(i)}
+
+              <h4>{t('admin.agents.listenLegend')}</h4>
+              <div className="fields">
+                <label>
+                  {t('admin.agents.integration')}
+                  <select required value={draft.sttIntegrationId} onChange={(e) => chooseStt(e.target.value)}>
+                    <option value="" disabled>
+                      {t('admin.agents.choose')}
                     </option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ flex: 1 }}>
-                {t('admin.agents.sttModel')}
-                <select
+                    {speech.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {speechLabel(i)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {t('admin.agents.sttModel')}
+                  <select
+                    required
+                    disabled={!sttKind}
+                    value={draft.sttModel}
+                    onChange={(e) => set('sttModel', e.target.value)}
+                  >
+                    <option value="" disabled>
+                      {t('admin.agents.choose')}
+                    </option>
+                    {sttModels.map((m) => (
+                      <option key={m}>{m}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {speech.length === 0 && <span className="field-help">{t('admin.agents.noSpeech')}</span>}
+            </section>
+
+            <section
+              id="agent-instructions"
+              className="settings-section"
+              aria-labelledby="agent-instructions-h"
+            >
+              <SectionHead id="agent-instructions-h" title={t('admin.agents.sectionInstructions')} />
+              <label>
+                {t('admin.agents.instructionsLabel')}
+                <textarea
                   required
-                  disabled={!sttKind}
-                  value={draft.sttModel}
-                  onChange={(e) => set('sttModel', e.target.value)}
-                >
-                  <option value="" disabled>
-                    {t('admin.agents.choose')}
-                  </option>
-                  {sttModels.map((m) => (
-                    <option key={m}>{m}</option>
-                  ))}
-                </select>
+                  rows={7}
+                  maxLength={20000}
+                  value={draft.instructions}
+                  onChange={(e) => set('instructions', e.target.value)}
+                  placeholder={t('admin.agents.instructionsPlaceholder')}
+                />
+                <span className="field-help">{t('admin.agents.instructionsHelp')}</span>
               </label>
+              <label>
+                {t('admin.agents.knowledgeLabel')}
+                <textarea
+                  rows={8}
+                  maxLength={KNOWLEDGE_MAX}
+                  value={draft.knowledge}
+                  onChange={(e) => set('knowledge', e.target.value)}
+                  placeholder={t('admin.agents.knowledgePlaceholder')}
+                />
+                <span className="field-help">
+                  {t('admin.agents.knowledgeHelp')}{' '}
+                  {t('admin.agents.knowledgeCount', {
+                    length: draft.knowledge.length.toLocaleString(locale),
+                    max: KNOWLEDGE_MAX.toLocaleString(locale),
+                  })}
+                </span>
+              </label>
+            </section>
+
+            <section id="agent-behavior" className="settings-section" aria-labelledby="agent-behavior-h">
+              <SectionHead id="agent-behavior-h" title={t('admin.agents.sectionBehavior')} />
+              <div className="fields">
+                <label>
+                  {t('admin.agents.listenLabel')}
+                  <select
+                    value={draft.listenMode}
+                    onChange={(e) => set('listenMode', e.target.value as Draft['listenMode'])}
+                  >
+                    {Object.entries(LISTEN).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {t(l)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {t('admin.agents.respondLabel')}
+                  <select
+                    value={draft.respondMode}
+                    onChange={(e) => set('respondMode', e.target.value as Draft['respondMode'])}
+                  >
+                    {Object.entries(RESPOND).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {t(l)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {t('admin.agents.muteLabel')}
+                  <select
+                    value={draft.mutePolicy}
+                    onChange={(e) => set('mutePolicy', e.target.value as Draft['mutePolicy'])}
+                  >
+                    {Object.entries(MUTE).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {t(l)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <span className="field-help">{t('admin.agents.muteHint')}</span>
+            </section>
+
+            <section id="agent-moderation" className="settings-section" aria-labelledby="agent-moderation-h">
+              <SectionHead
+                id="agent-moderation-h"
+                title={t('admin.agents.moderationLegend')}
+                hint={t('admin.agents.moderationHint')}
+              />
+              <div>{switchList(draft.moderationTools, 'moderationTools', MODERATION)}</div>
+              <label>
+                {t('admin.agents.rulesLabel')}
+                <textarea
+                  rows={5}
+                  maxLength={RULES_MAX}
+                  value={draft.moderationRules}
+                  disabled={draft.moderationTools.length === 0}
+                  onChange={(e) => set('moderationRules', e.target.value)}
+                  placeholder={t('admin.agents.rulesPlaceholder')}
+                />
+                <span className="field-help">{t('admin.agents.rulesHelp')}</span>
+              </label>
+            </section>
+
+            <section id="agent-insights" className="settings-section" aria-labelledby="agent-insights-h">
+              <SectionHead
+                id="agent-insights-h"
+                title={t('admin.agents.insightsLegend')}
+                hint={t('admin.agents.insightsHint')}
+              />
+              <div>{switchList(draft.insights, 'insights', INSIGHTS)}</div>
+              {(draft.insights.includes('copilot') || draft.insights.includes('metrics')) && (
+                <fieldset className="plain">
+                  <legend>{t('admin.agents.insightsAccessLegend')}</legend>
+                  {(['moderators', 'managers'] as const).map((access) => (
+                    <label key={access} className="radio-row">
+                      <input
+                        type="radio"
+                        name="insights-access"
+                        checked={draft.insightsAccess === access}
+                        onChange={() => set('insightsAccess', access)}
+                      />
+                      <span>
+                        {t(
+                          access === 'moderators'
+                            ? 'admin.agents.insightsAccessModerators'
+                            : 'admin.agents.insightsAccessManagers',
+                        )}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+              {draft.insights.includes('minutes') && (
+                <label>
+                  {t('admin.agents.minutesWebhookLabel')}
+                  <input
+                    type="text"
+                    inputMode="url"
+                    maxLength={2000}
+                    value={draft.minutesWebhook}
+                    onChange={(e) => set('minutesWebhook', e.target.value)}
+                    placeholder="https://n8n.suaempresa.com/webhook/ata"
+                  />
+                  <span className="field-help">{t('admin.agents.minutesWebhookHelp')}</span>
+                </label>
+              )}
+            </section>
+
+            <section id="agent-perception" className="settings-section" aria-labelledby="agent-perception-h">
+              <SectionHead
+                id="agent-perception-h"
+                title={t('admin.agents.perceptionLegend')}
+                hint={t('admin.agents.perceptionHint')}
+              />
+              <div>{switchList(draft.perception, 'perception', PERCEPTION)}</div>
+            </section>
+
+            <section id="agent-training" className="settings-section" aria-labelledby="agent-training-h">
+              <SectionHead
+                id="agent-training-h"
+                title={t('admin.agents.trainingLegend')}
+                hint={t('admin.agents.trainingHint')}
+              />
+              <label>
+                {t('admin.agents.styleRulesLabel')}
+                <textarea
+                  rows={3}
+                  maxLength={2000}
+                  value={draft.styleRules}
+                  onChange={(e) => set('styleRules', e.target.value)}
+                  placeholder={t('admin.agents.styleRulesPlaceholder')}
+                />
+              </label>
+              <h4>{t('admin.agents.knowledgeBasesLabel')}</h4>
+              {bases.length === 0 && <span className="field-help">{t('admin.agents.noKnowledgeBases')}</span>}
+              <div>
+                {bases.map((b) => (
+                  <label key={b.id} className="switch">
+                    <input
+                      type="checkbox"
+                      checked={draft.knowledgeBaseIds.includes(b.id)}
+                      onChange={(e) =>
+                        set(
+                          'knowledgeBaseIds',
+                          e.target.checked
+                            ? [...draft.knowledgeBaseIds, b.id]
+                            : draft.knowledgeBaseIds.filter((x) => x !== b.id),
+                        )
+                      }
+                    />
+                    <span>{b.name}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <div className="save-bar">
+              <button className="btn" disabled={busy}>
+                {t('admin.agents.saveAgent')}
+              </button>
+              <button type="button" className="btn secondary" onClick={() => setEditing(null)}>
+                {t('common.cancel')}
+              </button>
+              <div className="error" role="alert">
+                {error}
+              </div>
             </div>
-            {speech.length === 0 && <span className="muted">{t('admin.agents.noSpeech')}</span>}
-          </fieldset>{' '}
-          <div className="row">
-            <button className="btn" disabled={busy}>
-              {t('admin.agents.saveAgent')}
-            </button>
-            <button type="button" className="btn secondary" onClick={() => setEditing(null)}>
-              {t('common.cancel')}
-            </button>
-          </div>
-          <div className="error" role="alert">
-            {error}
-          </div>
-        </form>
-        {editing === 'new' ? (
-          <p className="muted">{t('admin.tools.saveAgentFirst')}</p>
-        ) : (
-          <>
-            <AgentExamples agentId={editing} />
-            <AgentTools agentId={editing} />
-          </>
-        )}
-      </>
+          </form>
+          {isNew ? (
+            <section id="agent-examples-section" className="settings-section">
+              <span className="field-help">{t('admin.agents.saveFirstHint')}</span>
+            </section>
+          ) : (
+            <>
+              <span className="field-help">{t('admin.agents.afterSaveHint')}</span>
+              <AgentExamples agentId={editing} />
+              <AgentTools agentId={editing} />
+            </>
+          )}
+        </div>
+      </div>
     );
   }
 
+  const unset = (value: string | null | undefined, text?: string | null) =>
+    value ? (text ?? value) : <span className="unset">{t('admin.agents.notChosen')}</span>;
+
   return (
     <>
-      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
-        <p className="muted" style={{ margin: 0 }}>
-          {t('admin.agents.intro')}
-        </p>
+      <div className="page-head">
+        <p>{t('admin.agents.intro')}</p>
         <button className="btn" onClick={() => edit(null)}>
+          <Icon name="add" size={18} />
           {t('admin.agents.newAgent')}
         </button>
       </div>
@@ -718,80 +838,71 @@ export function AgentsTab() {
         {error}
       </div>
       {data?.agents.length === 0 && <p className="muted">{t('admin.agents.empty')}</p>}
-      <ul className="rooms">
-        {data?.agents.map((a) => (
-          <li key={a.id}>
-            <div>
-              <strong>{a.name}</strong>
-              {a.isDefault && <span className="badge primary">{t('admin.agents.defaultBadge')}</span>}
-              {!a.ready && (
-                <span className="badge warn" title={t('admin.agents.incompleteHint')}>
-                  {t('admin.agents.incomplete')}
-                </span>
-              )}
-              <span className="badge">
-                🧠 {nameOf(a.llmIntegrationId) ?? t('admin.agents.notChosen')}
-                {a.llmModel ? ` · ${a.llmModel}` : ''}
-              </span>
-              <span className="badge" title={t('admin.agents.voiceLegend')}>
-                🗣️ {nameOf(a.ttsIntegrationId) ?? t('admin.agents.notChosen')} ·{' '}
-                {a.ttsModel ?? t('admin.agents.notChosen')}
-                {' · '}
-                {VOICE_LANGUAGES.filter((l) => a.voices[l])
-                  .map((l) => l.toUpperCase())
-                  .join('/') || t('admin.agents.notChosen')}
-              </span>
-              <span className="badge" title={t('admin.agents.listenLegend')}>
-                👂 {nameOf(a.sttIntegrationId) ?? t('admin.agents.notChosen')} ·{' '}
-                {a.sttModel ?? t('admin.agents.notChosen')}
-              </span>
-              <span className="badge">
-                {t('admin.agents.listensBadge', { mode: t(LISTEN[a.listenMode]).toLowerCase() })}
-              </span>
-              <span className="badge">
-                {a.respondMode === 'when_named'
-                  ? t('admin.agents.respondsWhenNamed')
-                  : t('admin.agents.respondsAlways')}
-              </span>
-              <span className="badge">
-                {t('admin.agents.muteBadge', { mode: t(MUTE[a.mutePolicy]).toLowerCase() })}
-              </span>
-              {(a.moderationTools ?? []).length > 0 && (
-                <span className="badge">
-                  🛡️{' '}
-                  {(a.moderationTools ?? []).map((tool) => t(MODERATION[tool][0]).toLowerCase()).join(', ')}
-                </span>
-              )}
-              {(a.perception ?? []).length > 0 && (
-                <span className="badge">
-                  👁️ {(a.perception ?? []).map((what) => t(PERCEPTION[what][0]).toLowerCase()).join(', ')}
-                </span>
-              )}
-              {a.description && <div className="agent-about">{a.description}</div>}
-              <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-                {a.instructions.slice(0, 140)}
-                {a.instructions.length > 140 ? '…' : ''} ·{' '}
-                {t('admin.agents.knowledgeSummary', { length: a.knowledge.length.toLocaleString(locale) })}
-              </div>
-            </div>
-            <div className="row">
-              <button className="btn secondary small" onClick={() => edit(a)}>
-                {t('common.edit')}
-              </button>
-              {!a.isDefault && (
-                <>
-                  <button className="btn secondary small" onClick={() => makeDefault(a)}>
-                    {t('admin.agents.makeDefault')}
+      {(data?.agents.length ?? 0) > 0 && (
+        <ul className="item-list">
+          {data?.agents.map((a) => {
+            const voices = VOICE_LANGUAGES.filter((l) => a.voices[l])
+              .map((l) => l.toUpperCase())
+              .join(' · ');
+            return (
+              <li key={a.id} className="agent-row">
+                <div className="agent-row-name">
+                  <strong>
+                    {a.name}
+                    {a.isDefault && <span className="pill">{t('admin.agents.defaultBadge')}</span>}
+                  </strong>
+                  {a.description && <span className="muted">{a.description}</span>}
+                  <AgentStatus missing={a.ready ? [] : missingParts(a)} />
+                </div>
+                <div className="meta-cols">
+                  <div className="meta">
+                    <span>{t('admin.agents.brainColumn')}</span>
+                    <span>
+                      {unset(
+                        a.llmIntegrationId,
+                        [nameOf(a.llmIntegrationId), a.llmModel].filter(Boolean).join(' · '),
+                      )}
+                    </span>
+                  </div>
+                  <div className="meta">
+                    <span>{t('admin.agents.voiceColumn')}</span>
+                    <span>
+                      {unset(
+                        a.ttsIntegrationId,
+                        [nameOf(a.ttsIntegrationId), a.ttsModel, voices].filter(Boolean).join(' · '),
+                      )}
+                    </span>
+                  </div>
+                  <div className="meta">
+                    <span>{t('admin.agents.earColumn')}</span>
+                    <span>
+                      {unset(
+                        a.sttIntegrationId,
+                        [nameOf(a.sttIntegrationId), a.sttModel].filter(Boolean).join(' · '),
+                      )}
+                    </span>
+                  </div>
+                </div>
+                <div className="row-actions">
+                  {!a.isDefault && (
+                    <>
+                      <button className="btn text small" onClick={() => makeDefault(a)}>
+                        {t('admin.agents.makeDefault')}
+                      </button>
+                      <button className="btn text danger small" onClick={() => remove(a)}>
+                        {t('common.delete')}
+                      </button>
+                    </>
+                  )}
+                  <button className="btn secondary small" onClick={() => edit(a)}>
+                    {t('common.edit')}
                   </button>
-                  <button className="btn danger small" onClick={() => remove(a)}>
-                    {t('common.delete')}
-                  </button>
-                </>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </>
   );
 }

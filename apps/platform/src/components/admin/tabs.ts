@@ -13,7 +13,7 @@ export type AdminTab =
 
 export const ADMIN_TABS: Record<AdminTab, { label: MessageKey; icon: IconName }> = {
   agents: { label: 'shell.nav.tabs.agents', icon: 'smart_toy' },
-  knowledge: { label: 'shell.nav.tabs.knowledge', icon: 'description' },
+  knowledge: { label: 'shell.nav.tabs.knowledge', icon: 'menu_book' },
   integrations: { label: 'shell.nav.tabs.integrations', icon: 'hub' },
   users: { label: 'shell.nav.tabs.users', icon: 'group' },
   live: { label: 'shell.nav.tabs.live', icon: 'sensors' },
@@ -41,7 +41,7 @@ export const DASHBOARD_VIEWS: Record<DashboardView, { label: MessageKey; icon: I
   meetings: { label: 'shell.nav.views.meetings', icon: 'calendar_month' },
   recordings: { label: 'shell.nav.views.recordings', icon: 'video_library' },
   transcripts: { label: 'shell.nav.views.transcripts', icon: 'description' },
-  reports: { label: 'shell.nav.views.reports', icon: 'auto_awesome' },
+  reports: { label: 'shell.nav.views.reports', icon: 'summarize' },
 };
 
 export function pickDashboardView(requested: string | undefined): DashboardView {

@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from 'react';
 import { useT } from '@/i18n/client';
+import { Icon } from '../ui/Icon';
 import { api } from '../api';
 import { messageOf, useLoad } from './useLoad';
 
@@ -193,13 +194,11 @@ export function AgentTools({ agentId }: { agentId: string }) {
   const tools = data?.tools ?? [];
 
   return (
-    <section
-      className="card form"
-      style={{ maxWidth: 820, margin: '16px 0 0' }}
-      aria-labelledby="agent-tools"
-    >
-      <strong id="agent-tools">{t('admin.tools.legend')}</strong>
-      <p className="muted small-print">{t('admin.tools.intro')}</p>
+    <section id="agent-tools-section" className="settings-section" aria-labelledby="agent-tools">
+      <header className="section-head">
+        <h3 id="agent-tools">{t('admin.tools.legend')}</h3>
+        <p>{t('admin.tools.intro')}</p>
+      </header>
       <div className="error" role="alert">
         {error}
       </div>
@@ -211,10 +210,9 @@ export function AgentTools({ agentId }: { agentId: string }) {
               <strong>{tool.name}</strong>
               <span className="badge">{tool.kind === 'http' ? `HTTP ${tool.method}` : 'MCP'}</span>
               <span className="badge">
-                🔒{' '}
                 {tool.access === 'members' ? t('admin.tools.membersBadge') : t('admin.tools.moderatorsBadge')}
               </span>
-              {tool.confirm && <span className="badge">✋ {t('admin.tools.confirmBadge')}</span>}
+              {tool.confirm && <span className="badge">{t('admin.tools.confirmBadge')}</span>}
               {tool.kind === 'mcp' && (
                 <span className="badge">
                   {t('admin.tools.mcpCount', { count: String(tool.mcpTools.length) })}
@@ -245,8 +243,9 @@ export function AgentTools({ agentId }: { agentId: string }) {
                   </button>
                   {result && (
                     <div role="status">
-                      <strong>
-                        {result.ok ? `✅ ${t('admin.tools.testOk')}` : `⚠️ ${t('admin.tools.testFailed')}`}
+                      <strong className={result.ok ? 'status-line' : 'status-line warn-text'}>
+                        <Icon name={result.ok ? 'check_circle' : 'warning'} size={18} />
+                        {result.ok ? t('admin.tools.testOk') : t('admin.tools.testFailed')}
                       </strong>
                       {result.output && <pre className="tool-output">{result.output}</pre>}
                       {result.tools && (

@@ -1,4 +1,4 @@
-import { ICON_PATHS, ICON_VIEW_BOX, type IconName } from './icon-paths';
+import { ICON_PATHS, ICON_VIEW_BOX, ICON_VIEW_BOXES, type IconName } from './icon-paths';
 
 export type { IconName };
 
@@ -6,7 +6,7 @@ export function Icon({ name, size = 24, className }: { name: IconName; size?: nu
   return (
     <svg
       className={className}
-      viewBox={ICON_VIEW_BOX}
+      viewBox={ICON_VIEW_BOXES[name] ?? ICON_VIEW_BOX}
       width={size}
       height={size}
       fill="currentColor"
