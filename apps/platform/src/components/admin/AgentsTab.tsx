@@ -203,9 +203,10 @@ function useActiveSection(ids: readonly string[], on: boolean): string {
     const update = () => {
       frame = 0;
       let current = ids[0];
+      const line = Math.min(window.innerHeight * 0.35, 320);
       for (const id of ids) {
         const top = document.getElementById(id)?.getBoundingClientRect().top;
-        if (top !== undefined && top <= 120) current = id;
+        if (top !== undefined && top <= line) current = id;
       }
       // At the very bottom the last sections never reach the top: they are the ones being read.
       if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {

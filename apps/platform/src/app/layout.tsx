@@ -1,4 +1,4 @@
-import '@fontsource-variable/roboto/wght.css';
+import '@fontsource-variable/inter/wght.css';
 import '@livekit/components-styles';
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
