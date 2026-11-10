@@ -62,7 +62,7 @@ function previewSlug(text: string): string {
 
 /**
  * A short guided flow to create a room: name, who gets in, which assistants join, then a
- * review. Lives in a native <dialog> (focus trap, Escape and the modal role for free).
+ * review. It is a page of its own in the rooms view, not a modal.
  */
 export function CreateRoomWizard(props: {
   agents: AgentChoice[];
@@ -70,7 +70,6 @@ export function CreateRoomWizard(props: {
   onClose: () => void;
 }) {
   const t = useT();
-  const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const [step, setStep] = useState<Step>('name');
   const [name, setName] = useState('');
@@ -87,9 +86,6 @@ export function CreateRoomWizard(props: {
 
   useEffect(() => {
     setOrigin(window.location.host);
-    const d = dialog.current;
-    d?.showModal();
-    return () => d?.close();
   }, []);
 
   useEffect(() => {
@@ -154,15 +150,7 @@ export function CreateRoomWizard(props: {
   const accessCard = ACCESS_CARDS.find((c) => c.id === access)!;
 
   return (
-    <dialog
-      ref={dialog}
-      className="wizard"
-      aria-labelledby="wizard-title"
-      onClose={props.onClose}
-      onCancel={(e) => {
-        if (busy) e.preventDefault();
-      }}
-    >
+    <section className="wizard wizard-page" aria-labelledby="wizard-title">
       <form onSubmit={next} className="wizard-frame">
         <header className="wizard-top">
           {step !== 'done' ? (
@@ -470,6 +458,6 @@ export function CreateRoomWizard(props: {
           )}
         </footer>
       </form>
-    </dialog>
+    </section>
   );
 }

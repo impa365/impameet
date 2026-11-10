@@ -1,15 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
-import { type AgentChoice, MAX_ROOM_AGENTS, type RoomAccess, RoomSettingsEditor } from './RoomSettings';
+import { type AgentChoice, type RoomAccess, RoomSettingsEditor } from './RoomSettings';
 import { CreateRoomWizard } from './CreateRoomWizard';
 import { ApiError, api } from './api';
 import { EmptyState } from './ui/EmptyState';
 import { Icon } from './ui/Icon';
-import { useDismiss } from './ui/useDismiss';
 
 export interface RoomSummary {
   slug: string;
@@ -28,71 +27,141 @@ const ACCESS_CHIP: Record<RoomAccess, MessageKey> = {
   restricted: 'dashboard.rooms.chipAccess.restricted',
 };
 
+/** What the rooms view shows, mirrored in the address so Back and reload keep the place. */
+type View = { kind: 'list' } | { kind: 'new' } | { kind: 'room'; slug: string };
+
+function viewFromUrl(): View {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('new') === '1') return { kind: 'new' };
+  const slug = params.get('room');
+  return slug ? { kind: 'room', slug } : { kind: 'list' };
+}
+
+const urlFor = (view: View) =>
+  view.kind === 'new'
+    ? '/dashboard?new=1'
+    : view.kind === 'room'
+      ? `/dashboard?room=${encodeURIComponent(view.slug)}`
+      : '/dashboard';
+
 export function RoomsPanel({
   initialRooms,
   agents,
   startCreating = false,
+  startRoom,
 }: {
   initialRooms: RoomSummary[];
   agents: AgentOption[];
   startCreating?: boolean;
+  startRoom?: string;
 }) {
   const t = useT();
   const [rooms, setRooms] = useState(initialRooms);
-  const [creating, setCreating] = useState(startCreating);
-  const [settingsFor, setSettingsFor] = useState<RoomSummary | null>(null);
+  const [view, setView] = useState<View>(
+    startCreating ? { kind: 'new' } : startRoom ? { kind: 'room', slug: startRoom } : { kind: 'list' },
+  );
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [copied, setCopied] = useState('');
   const agentName = (id: string) =>
     agents.find((a) => a.id === id)?.name ?? t('dashboard.rooms.agentFallback');
 
-  async function remove(slug: string) {
+  useEffect(() => {
+    const onPop = () => setView(viewFromUrl());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  function go(next: View) {
+    window.history.pushState(null, '', urlFor(next));
+    setView(next);
+    window.scrollTo({ top: 0 });
+  }
+
+  async function remove(room: RoomSummary) {
     if (!window.confirm(t('dashboard.rooms.confirmDelete'))) return;
     try {
-      await api(`/api/rooms/${encodeURIComponent(slug)}`, { method: 'DELETE', body: {} });
-      setRooms(rooms.filter((r) => r.slug !== slug));
+      await api(`/api/rooms/${encodeURIComponent(room.slug)}`, { method: 'DELETE', body: {} });
+      setRooms((list) => list.filter((r) => r.slug !== room.slug));
+      if (view.kind === 'room') go({ kind: 'list' });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('dashboard.rooms.deleteFailed'));
     }
   }
 
-  async function setRoomAgents(slug: string, ids: string[], changed: string, on: boolean) {
-    try {
-      setError('');
-      const { room, live } = await api<{
-        room: RoomSummary;
-        live: { removed: number; dispatched: number } | null;
-      }>(`/api/rooms/${encodeURIComponent(slug)}`, { method: 'PATCH', body: { agentIds: ids } });
-      setRooms((list) => list.map((r) => (r.slug === slug ? room : r)));
-      const inMeeting = Boolean(live && (live.dispatched > 0 || live.removed > 0));
-      const key: MessageKey = on
-        ? inMeeting
-          ? 'dashboard.rooms.agentJoinedMeeting'
-          : 'dashboard.rooms.agentJoinedRoom'
-        : inMeeting
-          ? 'dashboard.rooms.agentLeftMeeting'
-          : 'dashboard.rooms.agentLeftRoom';
-      setNotice(t(key, { name: changed }));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('dashboard.rooms.updateFailed'));
-    }
-  }
-
   async function copyLink(slug: string) {
-    await navigator.clipboard.writeText(`${window.location.origin}/r/${slug}`);
+    await navigator.clipboard.writeText(`${window.location.origin}/r/${slug}`).catch(() => undefined);
     setCopied(slug);
     setTimeout(() => setCopied(''), 2000);
   }
 
+  if (view.kind === 'new') {
+    return (
+      <CreateRoomWizard
+        agents={agents}
+        onCreated={(room) => setRooms((list) => [room, ...list])}
+        onClose={() => go({ kind: 'list' })}
+      />
+    );
+  }
+
+  const open = view.kind === 'room' ? rooms.find((r) => r.slug === view.slug) : undefined;
+  if (open) {
+    return (
+      <div className="settings-body room-page">
+        <div className="settings-head">
+          <button type="button" className="btn text small back-link" onClick={() => go({ kind: 'list' })}>
+            <Icon name="arrow_back" size={18} />
+            {t('dashboard.rooms.backToRooms')}
+          </button>
+          <h2>{open.name}</h2>
+          <span className="status-line">
+            <Icon name="link" size={16} />
+            /r/{open.slug}
+          </span>
+          <div className="row add-row">
+            <Link className="btn small" href={`/r/${open.slug}`}>
+              <Icon name="video_call" size={18} />
+              {t('common.join')}
+            </Link>
+            <button type="button" className="btn secondary small" onClick={() => void copyLink(open.slug)}>
+              <Icon name={copied === open.slug ? 'check' : 'content_copy'} size={18} />
+              {copied === open.slug ? t('common.copied') : t('dashboard.rooms.copyLink')}
+            </button>
+            <button type="button" className="btn text danger small" onClick={() => void remove(open)}>
+              <Icon name="delete" size={18} />
+              {t('dashboard.rooms.menuDelete')}
+            </button>
+          </div>
+        </div>
+        <div className="error" role="alert">
+          {error}
+        </div>
+        <RoomSettingsEditor
+          slug={open.slug}
+          showAgent
+          onChanged={(change) => {
+            const { access, agentIds } = change;
+            setRooms((list) =>
+              list.map((r) =>
+                r.slug === open.slug
+                  ? { ...r, ...(access ? { access } : {}), ...(agentIds ? { agentIds } : {}) }
+                  : r,
+              ),
+            );
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <>
-      <div className="page-toolbar">
-        <p className="muted" role="status" aria-live="polite">
-          {notice || error || t('dashboard.rooms.count', { count: rooms.length })}
+      <div className="page-head">
+        <p role="status" aria-live="polite">
+          {error || t('dashboard.rooms.count', { count: rooms.length })}
         </p>
-        <button className="btn large" onClick={() => setCreating(true)}>
-          <Icon name="add" size={22} />
+        <button className="btn" onClick={() => go({ kind: 'new' })}>
+          <Icon name="add" size={18} />
           {t('dashboard.rooms.newRoom')}
         </button>
       </div>
@@ -101,7 +170,7 @@ export function RoomsPanel({
           icon="video_call"
           title={t('dashboard.rooms.emptyTitle')}
           action={
-            <button className="btn tonal" onClick={() => setCreating(true)}>
+            <button className="btn tonal" onClick={() => go({ kind: 'new' })}>
               {t('dashboard.rooms.createFirst')}
             </button>
           }
@@ -109,186 +178,72 @@ export function RoomsPanel({
           {t('dashboard.rooms.emptyBody')}
         </EmptyState>
       ) : (
-        <ul className="room-list">
+        <ul className="card-list">
           {rooms.map((room) => (
-            <li key={room.slug} className="room-card">
-              <span className="room-icon" aria-hidden>
-                <Icon name={room.agentIds.length > 0 ? 'smart_toy' : 'videocam'} />
-              </span>
-              <div className="room-info">
-                <strong>{room.name}</strong>
-                <span className="room-link">/r/{room.slug}</span>
+            <li key={room.slug} className="tile">
+              <div className="tile-body">
+                <div className="tile-head">
+                  <span className="tile-avatar" aria-hidden>
+                    <Icon name={room.agentIds.length > 0 ? 'smart_toy' : 'videocam'} size={22} />
+                  </span>
+                  <div className="tile-title">
+                    <strong>{room.name}</strong>
+                    <span className="muted">/r/{room.slug}</span>
+                  </div>
+                </div>
                 <span className="chips">
-                  {room.hasPassword && (
-                    <span className="chip">
-                      <Icon name="lock" size={14} /> {t('dashboard.rooms.chipPassword')}
-                    </span>
-                  )}
-                  {!room.allowGuests && <span className="chip">{t('dashboard.rooms.chipMembersOnly')}</span>}
                   <span className="chip">
                     <Icon name={room.access === 'open' ? 'link' : 'lock'} size={14} />{' '}
                     {t(ACCESS_CHIP[room.access])}
                   </span>
-                  {room.agentIds.map((id) => (
-                    <span key={id} className="chip accent">
-                      {t('dashboard.rooms.chipAgent', { name: agentName(id) })}
+                  {room.hasPassword && (
+                    <span className="chip">
+                      <Icon name="key" size={14} /> {t('dashboard.rooms.chipPassword')}
                     </span>
-                  ))}
+                  )}
+                  {!room.allowGuests && <span className="chip">{t('dashboard.rooms.chipMembersOnly')}</span>}
                 </span>
+                <dl className="tile-facts">
+                  <div>
+                    <dt>
+                      <Icon name="smart_toy" size={16} />
+                      {t('dashboard.rooms.agentsFact')}
+                    </dt>
+                    <dd>
+                      {room.agentIds.length > 0 ? (
+                        room.agentIds.map(agentName).join(', ')
+                      ) : (
+                        <span className="unset">{t('dashboard.rooms.noAgent')}</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
               </div>
-              <div className="room-actions">
-                <button
-                  className="icon-btn"
-                  aria-label={t('dashboard.rooms.copyLinkLabel')}
-                  data-tip={copied === room.slug ? t('common.copied') : t('dashboard.rooms.copyLink')}
-                  onClick={() => copyLink(room.slug)}
-                >
-                  <Icon name={copied === room.slug ? 'check' : 'content_copy'} />
-                </button>
-                <RoomMenu
-                  room={room}
-                  agents={agents}
-                  onAgents={(ids, changed, on) => setRoomAgents(room.slug, ids, changed, on)}
-                  onSettings={() => setSettingsFor(room)}
-                  onRemove={() => remove(room.slug)}
-                />
+              <div className="tile-actions">
                 <Link className="btn small" href={`/r/${room.slug}`}>
                   {t('common.join')}
                 </Link>
+                <button className="btn text small" onClick={() => void copyLink(room.slug)}>
+                  <Icon name={copied === room.slug ? 'check' : 'content_copy'} size={16} />
+                  {copied === room.slug ? t('common.copied') : t('dashboard.rooms.copyLink')}
+                </button>
+                <button className="btn text small" onClick={() => go({ kind: 'room', slug: room.slug })}>
+                  <Icon name="edit" size={16} />
+                  {t('common.edit')}
+                </button>
+                <button
+                  className="btn text danger small icon-only"
+                  aria-label={t('dashboard.rooms.deleteRoom', { name: room.name })}
+                  data-tip={t('dashboard.rooms.menuDelete')}
+                  onClick={() => void remove(room)}
+                >
+                  <Icon name="delete" size={16} />
+                </button>
               </div>
             </li>
           ))}
         </ul>
       )}
-      {creating && (
-        <CreateRoomWizard
-          agents={agents}
-          onCreated={(room) => setRooms((list) => [room, ...list])}
-          onClose={() => {
-            setCreating(false);
-            if (startCreating) window.history.replaceState(null, '', '/dashboard');
-          }}
-        />
-      )}
-      {settingsFor && (
-        <SettingsDialog
-          room={settingsFor}
-          onClose={() => setSettingsFor(null)}
-          onChanged={(change) =>
-            setRooms((list) => list.map((r) => (r.slug === settingsFor.slug ? { ...r, ...change } : r)))
-          }
-        />
-      )}
     </>
-  );
-}
-
-/** Native <dialog>: the browser traps focus, closes on Escape and announces it as modal. */
-function SettingsDialog(props: {
-  room: RoomSummary;
-  onClose: () => void;
-  onChanged: (change: Partial<RoomSummary>) => void;
-}) {
-  const t = useT();
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    dialog?.showModal();
-    return () => dialog?.close();
-  }, []);
-  return (
-    <dialog ref={ref} className="dialog" aria-labelledby="room-settings-title" onClose={props.onClose}>
-      <header className="dialog-head">
-        <h2 id="room-settings-title">{t('dashboard.rooms.settingsTitle', { name: props.room.name })}</h2>
-        <button className="icon-btn" aria-label={t('common.close')} onClick={props.onClose}>
-          <Icon name="close" />
-        </button>
-      </header>
-      <RoomSettingsEditor
-        slug={props.room.slug}
-        showAgent
-        onChanged={(change) => {
-          const { access, agentIds } = change;
-          props.onChanged({ ...(access ? { access } : {}), ...(agentIds ? { agentIds } : {}) });
-        }}
-      />
-    </dialog>
-  );
-}
-
-function RoomMenu(props: {
-  room: RoomSummary;
-  agents: AgentOption[];
-  onAgents: (agentIds: string[], changed: string, on: boolean) => void;
-  onSettings: () => void;
-  onRemove: () => void;
-}) {
-  const { room } = props;
-  const t = useT();
-  const [open, setOpen] = useState(false);
-  const anchor = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(anchor, open, close);
-  const run = (fn: () => void) => () => {
-    setOpen(false);
-    fn();
-  };
-  const full = room.agentIds.length >= MAX_ROOM_AGENTS;
-  return (
-    <div ref={anchor} className="popover-anchor">
-      <button
-        className="icon-btn"
-        aria-label={t('dashboard.rooms.moreOptionsFor', { name: room.name })}
-        aria-expanded={open}
-        data-tip={t('common.moreOptions')}
-        onClick={() => setOpen(!open)}
-      >
-        <Icon name="more_vert" />
-      </button>
-      {open && (
-        <div className="menu down end" role="menu">
-          {props.agents.length > 0 && <p className="menu-label">{t('dashboard.rooms.menuAgents')}</p>}
-          {props.agents.map((a) => {
-            const on = room.agentIds.includes(a.id);
-            return (
-              <button
-                key={a.id}
-                className="menu-item"
-                role="menuitemcheckbox"
-                aria-checked={on}
-                disabled={!on && (full || !a.ready)}
-                onClick={() =>
-                  props.onAgents(
-                    on ? room.agentIds.filter((id) => id !== a.id) : [...room.agentIds, a.id],
-                    a.name,
-                    !on,
-                  )
-                }
-              >
-                <span className="menu-check">
-                  <Icon name={on ? 'check_box' : 'check_box_outline_blank'} size={20} />
-                </span>
-                <span className="menu-text">
-                  {a.name}
-                  {a.description && <small className="menu-sub">{a.description}</small>}
-                </span>
-              </button>
-            );
-          })}
-          <button className="menu-item divided" role="menuitem" onClick={run(props.onSettings)}>
-            <span className="menu-check">
-              <Icon name="how_to_reg" size={20} />
-            </span>
-            <span className="menu-text">{t('dashboard.rooms.menuSettings')}</span>
-          </button>
-          <button className="menu-item divided danger" role="menuitem" onClick={run(props.onRemove)}>
-            <span className="menu-check">
-              <Icon name="delete" size={20} />
-            </span>
-            <span className="menu-text">{t('dashboard.rooms.menuDelete')}</span>
-          </button>
-        </div>
-      )}
-    </div>
   );
 }

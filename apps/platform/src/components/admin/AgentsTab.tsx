@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, type ReactNode, useState } from 'react';
 import { useLocale, useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
 import { SPEECH_CATALOG, type SpeechProvider, VOICE_LANGUAGES, type VoiceLanguage } from '@/lib/providers';
@@ -141,18 +141,18 @@ const MUTE = {
   disabled: 'admin.agents.mute.disabled',
 } as const satisfies Record<Agent['mutePolicy'], MessageKey>;
 const AGENT_SECTIONS = [
-  ['agent-identity', 'admin.agents.sectionIdentity', 'badge'],
-  ['agent-brain', 'admin.agents.sectionBrainVoice', 'psychology'],
-  ['agent-instructions', 'admin.agents.sectionInstructions', 'description'],
-  ['agent-behavior', 'admin.agents.sectionBehavior', 'tune'],
-  ['agent-moderation', 'admin.agents.moderationLegend', 'shield'],
-  ['agent-insights', 'admin.agents.insightsLegend', 'summarize'],
-  ['agent-perception', 'admin.agents.perceptionLegend', 'visibility'],
-  ['agent-training', 'admin.agents.trainingLegend', 'school'],
-  ['agent-examples-section', 'admin.agents.sectionExamples', 'chat'],
-  ['agent-tools-section', 'admin.agents.sectionTools', 'extension'],
-] as const satisfies readonly (readonly [string, MessageKey, IconName])[];
-const SECTION_IDS = AGENT_SECTIONS.map(([id]) => id);
+  ['agent-identity', 'admin.agents.sectionIdentity', 'badge', 'admin.agents.hintIdentity'],
+  ['agent-brain', 'admin.agents.sectionBrainVoice', 'psychology', 'admin.agents.hintBrain'],
+  ['agent-instructions', 'admin.agents.sectionInstructions', 'description', 'admin.agents.hintInstructions'],
+  ['agent-behavior', 'admin.agents.sectionBehavior', 'tune', 'admin.agents.hintBehavior'],
+  ['agent-moderation', 'admin.agents.moderationLegend', 'shield', 'admin.agents.hintModeration'],
+  ['agent-insights', 'admin.agents.insightsLegend', 'summarize', 'admin.agents.hintInsights'],
+  ['agent-perception', 'admin.agents.perceptionLegend', 'visibility', 'admin.agents.hintPerception'],
+  ['agent-training', 'admin.agents.trainingLegend', 'school', 'admin.agents.hintTraining'],
+  ['agent-examples-section', 'admin.agents.sectionExamples', 'chat', 'admin.agents.hintExamples'],
+  ['agent-tools-section', 'admin.agents.sectionTools', 'extension', 'admin.agents.hintTools'],
+] as const satisfies readonly (readonly [string, MessageKey, IconName, MessageKey])[];
+type SectionId = (typeof AGENT_SECTIONS)[number][0];
 
 type Choices = Record<
   'llmIntegrationId' | 'llmModel' | 'ttsIntegrationId' | 'ttsModel' | 'sttIntegrationId' | 'sttModel',
@@ -194,39 +194,6 @@ function SectionHead({ id, title, hint }: { id: string; title: string; hint?: Re
   );
 }
 
-/** The section on screen, so the side navigation can show where the admin is. */
-function useActiveSection(ids: readonly string[], on: boolean): string {
-  const [active, setActive] = useState(ids[0]);
-  useEffect(() => {
-    if (!on) return;
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      let current = ids[0];
-      const line = Math.min(window.innerHeight * 0.35, 320);
-      for (const id of ids) {
-        const top = document.getElementById(id)?.getBoundingClientRect().top;
-        if (top !== undefined && top <= line) current = id;
-      }
-      // At the very bottom the last sections never reach the top: they are the ones being read.
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
-        current = ids.filter((id) => document.getElementById(id)).at(-1) ?? current;
-      }
-      setActive(current);
-    };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      cancelAnimationFrame(frame);
-    };
-  }, [ids, on]);
-  return active;
-}
-
 export function AgentsTab() {
   const t = useT();
   const locale = useLocale();
@@ -249,10 +216,11 @@ export function AgentsTab() {
   const [picking, setPicking] = useState<VoiceLanguage | null>(null);
   /** Names of the voices picked from the list, to show next to their ids. */
   const [voiceNames, setVoiceNames] = useState<Record<string, string>>({});
-  const activeSection = useActiveSection(SECTION_IDS, editing !== null);
+  const [section, setSection] = useState<SectionId>('agent-identity');
 
   function edit(agent: Agent | null) {
     setPicking(null);
+    setSection('agent-identity');
     setEditing(agent?.id ?? 'new');
     if (!agent) {
       setDraft(EMPTY);
@@ -381,11 +349,22 @@ export function AgentsTab() {
       <div className="settings">
         <nav className="settings-nav" aria-label={t('admin.agents.sections')}>
           {AGENT_SECTIONS.filter(([id]) => !(isNew && id === 'agent-tools-section')).map(
-            ([id, label, icon]) => (
-              <a key={id} href={`#${id}`} aria-current={activeSection === id ? 'true' : undefined}>
+            ([id, label, icon, hint]) => (
+              <button
+                key={id}
+                type="button"
+                aria-current={section === id ? 'page' : undefined}
+                onClick={() => {
+                  setSection(id);
+                  window.scrollTo({ top: 0 });
+                }}
+              >
                 <Icon name={icon} size={18} />
-                {t(label)}
-              </a>
+                <span>
+                  {t(label)}
+                  <small>{t(hint)}</small>
+                </span>
+              </button>
             ),
           )}
         </nav>
@@ -398,8 +377,13 @@ export function AgentsTab() {
             <h2>{isNew ? t('admin.agents.newTitle') : draft.name.trim() || t('admin.agents.newTitle')}</h2>
             <AgentStatus missing={missing} />
           </div>
-          <form onSubmit={save} className="form settings-form">
-            <section id="agent-identity" className="settings-section" aria-labelledby="agent-identity-h">
+          <form onSubmit={save} className="form settings-form" noValidate>
+            <section
+              id="agent-identity"
+              hidden={section !== 'agent-identity'}
+              className="settings-section"
+              aria-labelledby="agent-identity-h"
+            >
               <SectionHead id="agent-identity-h" title={t('admin.agents.sectionIdentity')} />
               <label>
                 {t('admin.agents.nameLabel')}
@@ -432,7 +416,12 @@ export function AgentsTab() {
               </label>
             </section>
 
-            <section id="agent-brain" className="settings-section" aria-labelledby="agent-brain-h">
+            <section
+              id="agent-brain"
+              hidden={section !== 'agent-brain'}
+              className="settings-section"
+              aria-labelledby="agent-brain-h"
+            >
               <SectionHead
                 id="agent-brain-h"
                 title={t('admin.agents.sectionBrainVoice')}
@@ -600,6 +589,7 @@ export function AgentsTab() {
 
             <section
               id="agent-instructions"
+              hidden={section !== 'agent-instructions'}
               className="settings-section"
               aria-labelledby="agent-instructions-h"
             >
@@ -635,7 +625,12 @@ export function AgentsTab() {
               </label>
             </section>
 
-            <section id="agent-behavior" className="settings-section" aria-labelledby="agent-behavior-h">
+            <section
+              id="agent-behavior"
+              hidden={section !== 'agent-behavior'}
+              className="settings-section"
+              aria-labelledby="agent-behavior-h"
+            >
               <SectionHead id="agent-behavior-h" title={t('admin.agents.sectionBehavior')} />
               <div className="fields">
                 <label>
@@ -681,7 +676,12 @@ export function AgentsTab() {
               <span className="field-help">{t('admin.agents.muteHint')}</span>
             </section>
 
-            <section id="agent-moderation" className="settings-section" aria-labelledby="agent-moderation-h">
+            <section
+              id="agent-moderation"
+              hidden={section !== 'agent-moderation'}
+              className="settings-section"
+              aria-labelledby="agent-moderation-h"
+            >
               <SectionHead
                 id="agent-moderation-h"
                 title={t('admin.agents.moderationLegend')}
@@ -702,7 +702,12 @@ export function AgentsTab() {
               </label>
             </section>
 
-            <section id="agent-insights" className="settings-section" aria-labelledby="agent-insights-h">
+            <section
+              id="agent-insights"
+              hidden={section !== 'agent-insights'}
+              className="settings-section"
+              aria-labelledby="agent-insights-h"
+            >
               <SectionHead
                 id="agent-insights-h"
                 title={t('admin.agents.insightsLegend')}
@@ -747,7 +752,12 @@ export function AgentsTab() {
               )}
             </section>
 
-            <section id="agent-perception" className="settings-section" aria-labelledby="agent-perception-h">
+            <section
+              id="agent-perception"
+              hidden={section !== 'agent-perception'}
+              className="settings-section"
+              aria-labelledby="agent-perception-h"
+            >
               <SectionHead
                 id="agent-perception-h"
                 title={t('admin.agents.perceptionLegend')}
@@ -756,7 +766,12 @@ export function AgentsTab() {
               <div>{switchList(draft.perception, 'perception', PERCEPTION)}</div>
             </section>
 
-            <section id="agent-training" className="settings-section" aria-labelledby="agent-training-h">
+            <section
+              id="agent-training"
+              hidden={section !== 'agent-training'}
+              className="settings-section"
+              aria-labelledby="agent-training-h"
+            >
               <SectionHead
                 id="agent-training-h"
                 title={t('admin.agents.trainingLegend')}
@@ -795,7 +810,10 @@ export function AgentsTab() {
               </div>
             </section>
 
-            <div className="save-bar">
+            <div
+              className="save-bar"
+              hidden={section === 'agent-examples-section' || section === 'agent-tools-section'}
+            >
               <button className="btn" disabled={busy}>
                 {t('admin.agents.saveAgent')}
               </button>
@@ -808,14 +826,21 @@ export function AgentsTab() {
             </div>
           </form>
           {isNew ? (
-            <section id="agent-examples-section" className="settings-section">
+            <section
+              id="agent-examples-section"
+              hidden={section !== 'agent-examples-section'}
+              className="settings-section"
+            >
               <span className="field-help">{t('admin.agents.saveFirstHint')}</span>
             </section>
           ) : (
             <>
-              <span className="field-help">{t('admin.agents.afterSaveHint')}</span>
-              <AgentExamples agentId={editing} />
-              <AgentTools agentId={editing} />
+              <div hidden={section !== 'agent-examples-section'}>
+                <AgentExamples agentId={editing} />
+              </div>
+              <div hidden={section !== 'agent-tools-section'}>
+                <AgentTools agentId={editing} />
+              </div>
             </>
           )}
         </div>
@@ -840,64 +865,85 @@ export function AgentsTab() {
       </div>
       {data?.agents.length === 0 && <p className="muted">{t('admin.agents.empty')}</p>}
       {(data?.agents.length ?? 0) > 0 && (
-        <ul className="item-list">
+        <ul className="card-list">
           {data?.agents.map((a) => {
             const voices = VOICE_LANGUAGES.filter((l) => a.voices[l])
               .map((l) => l.toUpperCase())
               .join(' · ');
+            const missing = a.ready ? [] : missingParts(a);
             return (
-              <li key={a.id} className="agent-row">
-                <div className="agent-row-name">
-                  <strong>
-                    {a.name}
-                    {a.isDefault && <span className="pill">{t('admin.agents.defaultBadge')}</span>}
-                  </strong>
-                  {a.description && <span className="muted">{a.description}</span>}
-                  <AgentStatus missing={a.ready ? [] : missingParts(a)} />
+              <li key={a.id} className="tile">
+                <div className="tile-body">
+                  <div className="tile-head">
+                    <span className="tile-avatar" aria-hidden>
+                      {a.name.trim().charAt(0).toUpperCase()}
+                    </span>
+                    <div className="tile-title">
+                      <strong>
+                        {a.name}
+                        {a.isDefault && (
+                          <span className="badge primary">{t('admin.agents.defaultBadge')}</span>
+                        )}
+                      </strong>
+                      <AgentStatus missing={missing} />
+                    </div>
+                  </div>
+                  {a.description && <p className="tile-text">{a.description}</p>}
+                  <dl className="tile-facts">
+                    <div>
+                      <dt>
+                        <Icon name="psychology" size={16} />
+                        {t('admin.agents.brainColumn')}
+                      </dt>
+                      <dd>
+                        {unset(
+                          a.llmIntegrationId,
+                          [nameOf(a.llmIntegrationId), a.llmModel].filter(Boolean).join(' · '),
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <Icon name="record_voice_over" size={16} />
+                        {t('admin.agents.voiceColumn')}
+                      </dt>
+                      <dd>
+                        {unset(
+                          a.ttsIntegrationId,
+                          [nameOf(a.ttsIntegrationId), a.ttsModel, voices].filter(Boolean).join(' · '),
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <Icon name="hearing" size={16} />
+                        {t('admin.agents.earColumn')}
+                      </dt>
+                      <dd>
+                        {unset(
+                          a.sttIntegrationId,
+                          [nameOf(a.sttIntegrationId), a.sttModel].filter(Boolean).join(' · '),
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
-                <div className="meta-cols">
-                  <div className="meta">
-                    <span>{t('admin.agents.brainColumn')}</span>
-                    <span>
-                      {unset(
-                        a.llmIntegrationId,
-                        [nameOf(a.llmIntegrationId), a.llmModel].filter(Boolean).join(' · '),
-                      )}
-                    </span>
-                  </div>
-                  <div className="meta">
-                    <span>{t('admin.agents.voiceColumn')}</span>
-                    <span>
-                      {unset(
-                        a.ttsIntegrationId,
-                        [nameOf(a.ttsIntegrationId), a.ttsModel, voices].filter(Boolean).join(' · '),
-                      )}
-                    </span>
-                  </div>
-                  <div className="meta">
-                    <span>{t('admin.agents.earColumn')}</span>
-                    <span>
-                      {unset(
-                        a.sttIntegrationId,
-                        [nameOf(a.sttIntegrationId), a.sttModel].filter(Boolean).join(' · '),
-                      )}
-                    </span>
-                  </div>
-                </div>
-                <div className="row-actions">
+                <div className="tile-actions">
+                  <button className="btn text small" onClick={() => edit(a)}>
+                    <Icon name="edit" size={16} />
+                    {t('common.edit')}
+                  </button>
                   {!a.isDefault && (
                     <>
                       <button className="btn text small" onClick={() => makeDefault(a)}>
                         {t('admin.agents.makeDefault')}
                       </button>
                       <button className="btn text danger small" onClick={() => remove(a)}>
+                        <Icon name="delete" size={16} />
                         {t('common.delete')}
                       </button>
                     </>
                   )}
-                  <button className="btn secondary small" onClick={() => edit(a)}>
-                    {t('common.edit')}
-                  </button>
                 </div>
               </li>
             );

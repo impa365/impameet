@@ -174,33 +174,58 @@ export function KnowledgeTab() {
       )}
       {data?.bases.length === 0 && !creating && <p className="int-empty">{t('admin.knowledge.empty')}</p>}
       {(data?.bases.length ?? 0) > 0 && (
-        <ul className="item-list">
+        <ul className="card-list">
           {data?.bases.map((b) => (
-            <li key={b.id} className="agent-row">
-              <div className="agent-row-name">
-                <strong>{b.name}</strong>
-                <span className="muted">{b.description || `${b.embeddingModel} · ${b.dimensions}d`}</span>
+            <li key={b.id} className="tile">
+              <div className="tile-body">
+                <div className="tile-head">
+                  <span className="tile-avatar" aria-hidden>
+                    <Icon name="menu_book" size={22} />
+                  </span>
+                  <div className="tile-title">
+                    <strong>{b.name}</strong>
+                    <span className="muted">
+                      {b.embeddingModel} · {b.dimensions}d
+                    </span>
+                  </div>
+                </div>
+                {b.description && <p className="tile-text">{b.description}</p>}
+                <dl className="tile-facts">
+                  <div>
+                    <dt>
+                      <Icon name="description" size={16} />
+                      {t('admin.knowledge.sourcesColumn')}
+                    </dt>
+                    <dd>{b.sources}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      <Icon name="category" size={16} />
+                      {t('admin.knowledge.chunksColumn')}
+                    </dt>
+                    <dd>{b.chunks}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      <Icon name="smart_toy" size={16} />
+                      {t('admin.knowledge.agentsColumn')}
+                    </dt>
+                    <dd>{b.agents}</dd>
+                  </div>
+                </dl>
               </div>
-              <div className="meta-cols">
-                <div className="meta">
-                  <span>{t('admin.knowledge.sourcesColumn')}</span>
-                  <span>{b.sources}</span>
-                </div>
-                <div className="meta">
-                  <span>{t('admin.knowledge.chunksColumn')}</span>
-                  <span>{b.chunks}</span>
-                </div>
-                <div className="meta">
-                  <span>{t('admin.knowledge.agentsColumn')}</span>
-                  <span>{b.agents}</span>
-                </div>
-              </div>
-              <div className="row-actions">
-                <button className="btn text danger small" onClick={() => remove(b)}>
-                  {t('common.delete')}
-                </button>
-                <button className="btn secondary small" onClick={() => setOpen(b)}>
+              <div className="tile-actions">
+                <button className="btn text small" onClick={() => setOpen(b)}>
+                  <Icon name="open_in_new" size={16} />
                   {t('admin.knowledge.open')}
+                </button>
+                <button
+                  className="btn text danger small icon-only"
+                  aria-label={t('admin.knowledge.deleteNamed', { name: b.name })}
+                  data-tip={t('common.delete')}
+                  onClick={() => remove(b)}
+                >
+                  <Icon name="delete" size={16} />
                 </button>
               </div>
             </li>

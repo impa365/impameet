@@ -508,7 +508,7 @@ export function IntegrationsTab() {
             {items.length === 0 ? (
               <p className="int-empty">{data ? t('admin.integrations.empty') : t('common.loading')}</p>
             ) : (
-              <ul className="item-list">
+              <ul className="card-list">
                 {items.map((i) => {
                   const host = i.baseUrl ? new URL(i.baseUrl).host : '';
                   const preset = i.kind === 'llm' || i.kind === 'embedding' ? presetFor(i.baseUrl) : null;
@@ -518,40 +518,71 @@ export function IntegrationsTab() {
                       : `${presetName(preset, t)} · ${host}`
                     : i.kind !== 'llm' && i.kind !== 'embedding' && SPEECH_CATALOG[i.kind].name;
                   return (
-                    <li key={i.id} className="int-row">
-                      <span className="int-icon" aria-hidden>
-                        <Icon name={KIND_ICON[i.kind]} size={20} />
-                      </span>
-                      <div className="agent-row-name">
-                        <strong>{i.name}</strong>
-                        <span className="muted">{provider}</span>
-                      </div>
-                      <div className="meta-cols">
-                        <div className="meta">
-                          <span>{t('admin.integrations.key')}</span>
-                          <span>{i.secretHint}</span>
-                        </div>
-                        <div className="meta">
-                          <span>{t('admin.integrations.defaultModel')}</span>
-                          <span title={i.defaultModel ?? undefined}>
-                            {i.defaultModel ?? <span className="unset">—</span>}
+                    <li key={i.id} className="tile">
+                      <div className="tile-body">
+                        <div className="tile-head">
+                          <span className="tile-avatar" aria-hidden>
+                            <Icon name={KIND_ICON[i.kind]} size={22} />
                           </span>
+                          <div className="tile-title">
+                            <strong>{i.name}</strong>
+                            <span className="muted">{provider}</span>
+                          </div>
                         </div>
-                        <div className="meta">
-                          <span>{t('admin.integrations.agents')}</span>
-                          <span>{i.usedBy}</span>
-                        </div>
+                        <span className="tile-status">
+                          <Status i={i} />
+                        </span>
+                        <dl className="tile-facts">
+                          <div>
+                            <dt>
+                              <Icon name="key" size={16} />
+                              {t('admin.integrations.key')}
+                            </dt>
+                            <dd>{i.secretHint}</dd>
+                          </div>
+                          <div>
+                            <dt>
+                              <Icon name="psychology" size={16} />
+                              {t('admin.integrations.defaultModel')}
+                            </dt>
+                            <dd title={i.defaultModel ?? undefined}>
+                              {i.defaultModel ?? <span className="unset">—</span>}
+                            </dd>
+                          </div>
+                          {i.kind === 'llm' && (
+                            <div>
+                              <dt>
+                                <Icon name="category" size={16} />
+                                {t('admin.integrations.models')}
+                              </dt>
+                              <dd>{i.models.length}</dd>
+                            </div>
+                          )}
+                          <div>
+                            <dt>
+                              <Icon name="smart_toy" size={16} />
+                              {t('admin.integrations.agents')}
+                            </dt>
+                            <dd>{i.usedBy}</dd>
+                          </div>
+                        </dl>
                       </div>
-                      <Status i={i} />
-                      <div className="row-actions">
+                      <div className="tile-actions">
                         <button className="btn text small" onClick={() => test(i)}>
+                          <Icon name="refresh" size={16} />
                           {t('admin.integrations.testConnection')}
                         </button>
-                        <button className="btn text danger small" onClick={() => remove(i)}>
-                          {t('common.delete')}
-                        </button>
-                        <button className="btn secondary small" onClick={() => edit(i)}>
+                        <button className="btn text small" onClick={() => edit(i)}>
+                          <Icon name="edit" size={16} />
                           {t('common.edit')}
+                        </button>
+                        <button
+                          className="btn text danger small icon-only"
+                          aria-label={t('admin.integrations.deleteNamed', { name: i.name })}
+                          data-tip={t('common.delete')}
+                          onClick={() => remove(i)}
+                        >
+                          <Icon name="delete" size={16} />
                         </button>
                       </div>
                     </li>

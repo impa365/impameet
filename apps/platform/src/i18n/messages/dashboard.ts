@@ -8,6 +8,10 @@ export default defineMessages(
     columns: { room: 'Sala', when: 'Quando', duration: 'Duração' },
     rooms: {
       agentFallback: 'Agente',
+      backToRooms: 'Salas',
+      agentsFact: 'Assistentes',
+      noAgent: 'nenhum',
+      deleteRoom: 'Apagar a sala {name}',
       createFailed: 'Não foi possível criar a sala',
       confirmDelete: 'Apagar esta sala? O link deixará de funcionar.',
       deleteFailed: 'Não foi possível apagar a sala',
@@ -246,6 +250,10 @@ export default defineMessages(
       columns: { room: 'Room', when: 'When', duration: 'Duration' },
       rooms: {
         agentFallback: 'Agent',
+        backToRooms: 'Rooms',
+        agentsFact: 'Assistants',
+        noAgent: 'none',
+        deleteRoom: 'Delete the room {name}',
         createFailed: 'Could not create the room',
         confirmDelete: 'Delete this room? Its link will stop working.',
         deleteFailed: 'Could not delete the room',
@@ -484,6 +492,10 @@ export default defineMessages(
       columns: { room: 'Sala', when: 'Cuándo', duration: 'Duración' },
       rooms: {
         agentFallback: 'Agente',
+        backToRooms: 'Salas',
+        agentsFact: 'Asistentes',
+        noAgent: 'ninguno',
+        deleteRoom: 'Eliminar la sala {name}',
         createFailed: 'No se pudo crear la sala',
         confirmDelete: '¿Eliminar esta sala? El enlace dejará de funcionar.',
         deleteFailed: 'No se pudo eliminar la sala',

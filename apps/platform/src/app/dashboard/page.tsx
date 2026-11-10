@@ -13,7 +13,7 @@ import { db } from '@/server/db';
 import { currentTenant, currentUser } from '@/server/request';
 import { listRooms } from '@/server/rooms/service';
 
-type Props = { searchParams: Promise<{ view?: string; new?: string }> };
+type Props = { searchParams: Promise<{ view?: string; new?: string; room?: string }> };
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const t = await getT();
@@ -51,6 +51,7 @@ export default async function Dashboard({ searchParams }: Props) {
           }))}
           agents={agents}
           startCreating={params.new === '1'}
+          startRoom={params.room}
         />
       )}
       {view === 'meetings' && <MeetingsPanel rooms={rooms.map((r) => ({ slug: r.slug, name: r.name }))} />}

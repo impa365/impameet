@@ -2967,6 +2967,49 @@ kbd {
   backdrop-filter: blur(2px);
 }
 
+/* The room wizard as a page of the rooms view. */
+.wizard.wizard-page {
+  width: 100%;
+  max-width: 800px;
+  max-height: none;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.wizard-page .wizard-frame {
+  max-height: none;
+}
+
+/* The room page: each settings group of the room is a card. */
+.room-page .room-settings {
+  display: grid;
+  gap: 16px;
+}
+
+.room-page .room-settings > fieldset.group,
+.room-page .room-settings > .group-form {
+  margin: 0;
+  padding: 24px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.room-page .room-settings > fieldset.group > legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.btn.icon-only {
+  padding: 0 8px;
+}
+
 @keyframes wizard-in {
   from {
     opacity: 0;
@@ -3641,7 +3684,7 @@ kbd {
 
 .settings {
   display: grid;
-  grid-template-columns: 208px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   gap: 32px;
   align-items: start;
 }
@@ -3654,36 +3697,56 @@ kbd {
   gap: 2px;
 }
 
-.settings-nav a {
+.settings-nav button {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  min-height: 38px;
-  padding: 0 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
   border-radius: var(--radius-control);
-  color: var(--muted);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
   font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
   transition: background-color 0.15s ease;
 }
 
-.settings-nav a svg {
+.settings-nav button > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-nav button small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.settings-nav button svg {
   flex: none;
+  margin-top: 1px;
   color: var(--muted);
 }
 
-.settings-nav a:hover {
+.settings-nav button:hover {
   background: var(--hover);
 }
 
-.settings-nav a[aria-current='true'] {
+.settings-nav button[aria-current='page'] {
   background: var(--brand);
   color: #fff;
-  font-weight: 500;
   box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
 }
 
-.settings-nav a[aria-current='true'] svg {
-  color: #fff;
+.settings-nav button[aria-current='page'] small,
+.settings-nav button[aria-current='page'] svg {
+  color: rgb(255 255 255 / 80%);
 }
 
 .settings-body {
@@ -3805,6 +3868,7 @@ kbd {
 }
 
 .settings-section > .error:empty,
+.settings-body > .error:empty,
 .page-head + .error:empty {
   display: none;
 }
@@ -4071,6 +4135,163 @@ kbd {
   border-top: 1px solid var(--border-soft);
 }
 
+/* Cards: agents, integrations, rooms, knowledge bases. */
+.card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.tile:hover {
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--border-soft));
+  box-shadow: var(--shadow);
+}
+
+.tile-body {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 14px;
+  padding: 20px;
+}
+
+.tile-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tile-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-control);
+  background: var(--brand-soft);
+  color: var(--brand-text);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.tile-title {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tile-title strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tile-title strong .badge,
+.tile-title strong .pill {
+  margin-left: 0;
+}
+
+.tile-title > .muted {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-text {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.tile-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  font-size: 13px;
+}
+
+.tile-facts > div {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.tile-facts dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tile-facts dt svg {
+  color: var(--faint);
+}
+
+.tile-facts dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--surface-2) 50%, transparent);
+}
+
+.tile-actions .btn.text.danger {
+  margin-left: auto;
+  border-color: transparent;
+}
+
+.tile-status {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+.tile:has(.tile-status) .tile-title {
+  padding-right: 104px;
+}
+
 .table-card {
   overflow-x: auto;
   background: var(--surface);
@@ -4240,8 +4461,13 @@ kbd {
     padding-bottom: 4px;
   }
 
-  .settings-nav a {
+  .settings-nav button {
     flex: none;
+    width: auto;
+  }
+
+  .settings-nav button small {
+    display: none;
   }
 
   .settings-section {
