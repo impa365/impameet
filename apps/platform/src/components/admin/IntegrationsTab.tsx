@@ -3,14 +3,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { serverMessage, type T, useT } from '@/i18n/client';
 import { embeddingsFirst, modelCategory } from '@/lib/models';
-import {
-  FISH_TTS_MODELS,
-  LLM_PRESETS,
-  type LlmPreset,
-  SPEECH_CATALOG,
-  type SpeechProvider,
-  presetFor,
-} from '@/lib/providers';
+import { LLM_PRESETS, type LlmPreset, SPEECH_CATALOG, type SpeechProvider, presetFor } from '@/lib/providers';
 import { Icon, type IconName } from '../ui/Icon';
 import { api } from '../api';
 import { ModelPicker } from './ModelPicker';
@@ -52,13 +45,7 @@ const NEW_LLM: Draft = {
   models: [],
 };
 const NEW_EMBEDDING: Draft = { ...NEW_LLM, kind: 'embedding', preset: '', baseUrl: '' };
-const newSpeech = (kind: SpeechProvider): Draft => ({
-  ...NEW_LLM,
-  kind,
-  preset: '',
-  baseUrl: '',
-  defaultModel: kind === 'fish' ? 's2.1-pro' : '',
-});
+const newSpeech = (kind: SpeechProvider): Draft => ({ ...NEW_LLM, kind, preset: '', baseUrl: '' });
 
 const KIND_LABEL = {
   llm: 'admin.integrations.kindLlm',
@@ -210,14 +197,7 @@ export function IntegrationsTab() {
               apiKey: draft.apiKey || undefined,
               defaultModel: draft.defaultModel,
             }
-          : draft.kind === 'fish'
-            ? {
-                kind: 'fish',
-                name: draft.name,
-                apiKey: draft.apiKey || undefined,
-                defaultModel: draft.defaultModel,
-              }
-            : { kind: draft.kind, name: draft.name, apiKey: draft.apiKey || undefined };
+          : { kind: draft.kind, name: draft.name, apiKey: draft.apiKey || undefined };
     try {
       if (editing === 'new') await api('/api/admin/integrations', { body });
       else await api(`/api/admin/integrations/${editing}`, { method: 'PUT', body });
@@ -437,16 +417,7 @@ export function IntegrationsTab() {
                   </div>
                 )}
               </>
-            ) : draft.kind !== 'fish' ? null : (
-              <label>
-                {t('admin.integrations.defaultVoiceModel')}
-                <select value={draft.defaultModel} onChange={(e) => set('defaultModel', e.target.value)}>
-                  {FISH_TTS_MODELS.map((m) => (
-                    <option key={m}>{m}</option>
-                  ))}
-                </select>
-              </label>
-            )}
+            ) : null}
           </section>
           <div className="save-bar">
             <button className="btn" disabled={busy}>

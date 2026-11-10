@@ -286,16 +286,7 @@ export const integrationInput = z.discriminatedUnion('kind', [
     defaultModel: modelId,
     models: z.array(modelId).max(500).default([]),
   }),
-  z.object({
-    kind: z.literal('fish'),
-    name: integrationName,
-    apiKey,
-    defaultModel: z
-      .string()
-      .trim()
-      .regex(/^[a-z0-9._-]{1,40}$/, 'Modelo de voz inválido')
-      .default('s2.1-pro'),
-  }),
+  z.object({ kind: z.literal('fish'), name: integrationName, apiKey }),
   z.object({ kind: z.literal('deepgram'), name: integrationName, apiKey }),
   z.object({ kind: z.literal('elevenlabs'), name: integrationName, apiKey }),
   /** OpenAI-compatible /embeddings (OpenAI, Mistral, Jina, Voyage, Together, Ollama behind https…). */

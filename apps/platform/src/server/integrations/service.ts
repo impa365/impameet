@@ -84,8 +84,6 @@ async function findIntegration(sql: Sql, tenantId: string, id: string): Promise<
 }
 
 async function fields(deps: IntegrationDeps, input: IntegrationInput) {
-  if (input.kind === 'fish')
-    return { baseUrl: null, defaultModel: input.defaultModel, models: [] as string[] };
   if (input.kind === 'embedding') {
     const baseUrl = await assertPublicHttpsUrl(input.baseUrl, deps.resolve ?? systemResolver);
     return { baseUrl, defaultModel: input.defaultModel, models: [input.defaultModel] };

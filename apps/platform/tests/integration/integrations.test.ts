@@ -106,7 +106,18 @@ describe('the default agent', () => {
   it('exists, is editable, can be replaced as default but never deleted while default', async () => {
     const { admin, tenant } = await org('acme');
     const [kaiser] = await listAgents(db(), admin);
-    expect(kaiser).toMatchObject({ name: 'Kaiser', isDefault: true });
+    // Nothing is preset: no provider, model or voice until the admin chooses them.
+    expect(kaiser).toMatchObject({
+      name: 'Kaiser',
+      isDefault: true,
+      ready: false,
+      ttsModel: null,
+      llmModel: null,
+      sttModel: null,
+      llmIntegrationId: null,
+      ttsIntegrationId: null,
+      sttIntegrationId: null,
+    });
     expect(await defaultAgentId(db(), tenant.id)).toBe(kaiser.id);
 
     const chosen = await providers(admin);
@@ -203,7 +214,7 @@ describe('integrations', () => {
     expect((await integrationSecret(db(), KEY, tenant.id, llm.id)).apiKey).toBe('sk-or-new-key-999999');
 
     const fish = await createIntegration(deps(), admin, FISH(), null);
-    expect(fish).toMatchObject({ kind: 'fish', baseUrl: null, defaultModel: 's2.1-pro' });
+    expect(fish).toMatchObject({ kind: 'fish', baseUrl: null, defaultModel: null });
     expect((await listIntegrations(db(), admin)).map((i) => i.name)).toEqual([
       'Fish principal',
       'OpenRouter',

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { type FormEvent, useEffect, useState } from 'react';
 import { serverMessage, useLocale, useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
+import { Icon, type IconName } from '../ui/Icon';
 import { api } from '../api';
 import type { Integration } from './IntegrationsTab';
 import { messageOf, useLoad } from './useLoad';
@@ -52,6 +53,12 @@ const KIND: Record<Source['kind'], MessageKey> = {
   url: 'admin.knowledge.kindUrl',
   qa: 'admin.knowledge.kindQa',
 };
+const KIND_ICON = {
+  text: 'description',
+  file: 'download',
+  url: 'public',
+  qa: 'chat',
+} as const satisfies Record<Source['kind'], IconName>;
 
 /** Knowledge bases (RAG): documents the organization's agents look things up in. */
 export function KnowledgeTab() {
@@ -97,12 +104,11 @@ export function KnowledgeTab() {
 
   return (
     <>
-      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
-        <p className="muted" style={{ margin: 0, maxWidth: 680 }}>
-          {t('admin.knowledge.intro')}
-        </p>
+      <div className="page-head">
+        <p>{t('admin.knowledge.intro')}</p>
         {!creating && (
           <button className="btn" onClick={() => setCreating(true)}>
+            <Icon name="add" size={18} />
             {t('admin.knowledge.newBase')}
           </button>
         )}
@@ -111,8 +117,10 @@ export function KnowledgeTab() {
         {error}
       </div>
       {creating && (
-        <form onSubmit={create} className="card form" style={{ maxWidth: 640, margin: '0 0 16px' }}>
-          <strong>{t('admin.knowledge.newBase')}</strong>
+        <form onSubmit={create} className="form settings-section panel-form">
+          <header className="section-head">
+            <h3>{t('admin.knowledge.newBase')}</h3>
+          </header>
           <label>
             {t('admin.knowledge.nameLabel')}
             <input
@@ -147,12 +155,12 @@ export function KnowledgeTab() {
               ))}
             </select>
             {embeddings.length === 0 && (
-              <span className="muted">
+              <span className="field-help">
                 {t('admin.knowledge.noEmbedding')}{' '}
                 <Link href="/admin?tab=integrations">{t('admin.knowledge.goIntegrations')}</Link>
               </span>
             )}
-            <span className="muted small-print">{t('admin.knowledge.embeddingHelp')}</span>
+            <span className="field-help">{t('admin.knowledge.embeddingHelp')}</span>
           </label>
           <div className="row">
             <button className="btn" disabled={busy}>
@@ -164,30 +172,41 @@ export function KnowledgeTab() {
           </div>
         </form>
       )}
-      {data?.bases.length === 0 && !creating && <p className="muted">{t('admin.knowledge.empty')}</p>}
-      <ul className="rooms">
-        {data?.bases.map((b) => (
-          <li key={b.id}>
-            <div>
-              <strong>{b.name}</strong>
-              <span className="badge">{t('admin.knowledge.sourcesBadge', { count: b.sources })}</span>
-              <span className="badge">{t('admin.knowledge.chunksBadge', { count: b.chunks })}</span>
-              <span className="badge">🤖 {b.agents}</span>
-              <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-                {b.description || b.embeddingModel} · {b.dimensions}d
+      {data?.bases.length === 0 && !creating && <p className="int-empty">{t('admin.knowledge.empty')}</p>}
+      {(data?.bases.length ?? 0) > 0 && (
+        <ul className="item-list">
+          {data?.bases.map((b) => (
+            <li key={b.id} className="agent-row">
+              <div className="agent-row-name">
+                <strong>{b.name}</strong>
+                <span className="muted">{b.description || `${b.embeddingModel} · ${b.dimensions}d`}</span>
               </div>
-            </div>
-            <div className="row">
-              <button className="btn secondary small" onClick={() => setOpen(b)}>
-                {t('admin.knowledge.open')}
-              </button>
-              <button className="btn danger small" onClick={() => remove(b)}>
-                {t('common.delete')}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+              <div className="meta-cols">
+                <div className="meta">
+                  <span>{t('admin.knowledge.sourcesColumn')}</span>
+                  <span>{b.sources}</span>
+                </div>
+                <div className="meta">
+                  <span>{t('admin.knowledge.chunksColumn')}</span>
+                  <span>{b.chunks}</span>
+                </div>
+                <div className="meta">
+                  <span>{t('admin.knowledge.agentsColumn')}</span>
+                  <span>{b.agents}</span>
+                </div>
+              </div>
+              <div className="row-actions">
+                <button className="btn text danger small" onClick={() => remove(b)}>
+                  {t('common.delete')}
+                </button>
+                <button className="btn secondary small" onClick={() => setOpen(b)}>
+                  {t('admin.knowledge.open')}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }
@@ -279,24 +298,29 @@ function BaseView({ base, onBack }: { base: Base; onBack: () => void }) {
   }
 
   return (
-    <section>
-      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-        <div>
-          <button className="btn text" onClick={onBack}>
-            ← {t('admin.knowledge.back')}
+    <div className="settings-body wide">
+      <div className="settings-head">
+        <button type="button" className="btn text small back-link" onClick={onBack}>
+          <Icon name="arrow_back" size={18} />
+          {t('admin.knowledge.back')}
+        </button>
+        <h2>{base.name}</h2>
+        <span className="status-line">
+          {base.embeddingModel} · {base.dimensions}d
+        </span>
+      </div>
+      <div className="row add-row" role="group" aria-label={t('admin.knowledge.addSource')}>
+        {(['text', 'file', 'url', 'qa'] as const).map((k) => (
+          <button
+            key={k}
+            className={adding === k ? 'btn tonal small' : 'btn secondary small'}
+            aria-pressed={adding === k}
+            onClick={() => setAdding(k)}
+          >
+            <Icon name={KIND_ICON[k]} size={18} />
+            {t(KIND[k])}
           </button>
-          <h3 style={{ margin: '4px 0' }}>{base.name}</h3>
-          <span className="muted">
-            {base.embeddingModel} · {base.dimensions}d
-          </span>
-        </div>
-        <div className="row">
-          {(['text', 'file', 'url', 'qa'] as const).map((k) => (
-            <button key={k} className="btn secondary small" onClick={() => setAdding(k)}>
-              + {t(KIND[k])}
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
       <div className="error" role="alert">
         {error}
@@ -304,9 +328,8 @@ function BaseView({ base, onBack }: { base: Base; onBack: () => void }) {
 
       {adding === 'text' && (
         <form
-          className="card form"
+          className="form settings-section panel-form"
           onSubmit={(e) => (e.preventDefault(), void send({ kind: 'text', ...text }))}
-          style={{ maxWidth: 760 }}
         >
           <label>
             {t('admin.knowledge.titleLabel')}
@@ -333,9 +356,8 @@ function BaseView({ base, onBack }: { base: Base; onBack: () => void }) {
       )}
       {adding === 'url' && (
         <form
-          className="card form"
+          className="form settings-section panel-form"
           onSubmit={(e) => (e.preventDefault(), void send({ kind: 'url', ...url }))}
-          style={{ maxWidth: 760 }}
         >
           <label>
             {t('admin.knowledge.urlLabel')}
@@ -360,7 +382,7 @@ function BaseView({ base, onBack }: { base: Base; onBack: () => void }) {
         </form>
       )}
       {adding === 'file' && (
-        <form className="card form" onSubmit={upload} style={{ maxWidth: 760 }}>
+        <form className="form settings-section panel-form" onSubmit={upload}>
           <label>
             {t('admin.knowledge.fileLabel')}
             <input
@@ -376,7 +398,7 @@ function BaseView({ base, onBack }: { base: Base; onBack: () => void }) {
       )}
       {adding === 'qa' && (
         <form
-          className="card form"
+          className="form settings-section panel-form"
           onSubmit={(e) => (
             e.preventDefault(),
             void send({
@@ -385,7 +407,6 @@ function BaseView({ base, onBack }: { base: Base; onBack: () => void }) {
               pairs: pairs.filter((p) => p.question.trim() && p.answer.trim()),
             })
           )}
-          style={{ maxWidth: 760 }}
         >
           <label>
             {t('admin.knowledge.titleLabel')}
@@ -434,39 +455,48 @@ function BaseView({ base, onBack }: { base: Base; onBack: () => void }) {
         </form>
       )}
 
-      {data?.sources.length === 0 && <p className="muted">{t('admin.knowledge.noSources')}</p>}
-      <ul className="rooms" aria-live="polite">
-        {data?.sources.map((s) => (
-          <li key={s.id}>
-            <div>
-              <strong>{s.title}</strong> <span className="badge">{t(KIND[s.kind])}</span>
-              <span className={`badge${s.status === 'failed' ? ' warn' : ''}`}>{t(STATUS[s.status])}</span>
-              {s.status === 'ready' && (
-                <span className="badge">{t('admin.knowledge.chunksBadge', { count: s.chunkCount })}</span>
-              )}
-              {!s.enabled && <span className="badge warn">{t('admin.knowledge.off')}</span>}
-              <div className="muted" style={{ fontSize: 13, marginTop: 4, wordBreak: 'break-all' }}>
-                {s.url ?? t('admin.knowledge.chars', { count: s.chars.toLocaleString(locale) })}
+      {data?.sources.length === 0 && <p className="int-empty">{t('admin.knowledge.noSources')}</p>}
+      {(data?.sources.length ?? 0) > 0 && (
+        <ul className="item-list" aria-live="polite">
+          {data?.sources.map((s) => (
+            <li key={s.id} className="list-row">
+              <div className="list-row-main">
+                <strong>
+                  {s.title}
+                  <span className="badge">{t(KIND[s.kind])}</span>
+                  <span className={`badge${s.status === 'failed' ? ' warn' : ''}`}>
+                    {t(STATUS[s.status])}
+                  </span>
+                  {s.status === 'ready' && (
+                    <span className="badge">{t('admin.knowledge.chunksBadge', { count: s.chunkCount })}</span>
+                  )}
+                  {!s.enabled && <span className="badge warn">{t('admin.knowledge.off')}</span>}
+                </strong>
+                <span className="muted">
+                  {s.url ?? t('admin.knowledge.chars', { count: s.chars.toLocaleString(locale) })}
+                </span>
+                {s.error && <span className="error">{serverMessage(s.error)}</span>}
               </div>
-              {s.error && <div className="error">{serverMessage(s.error)}</div>}
-            </div>
-            <div className="row">
-              <button className="btn secondary small" onClick={() => patch(s, { enabled: !s.enabled })}>
-                {s.enabled ? t('admin.knowledge.disable') : t('admin.knowledge.enable')}
-              </button>
-              <button className="btn secondary small" onClick={() => patch(s, { reprocess: true })}>
-                {t('admin.knowledge.reprocess')}
-              </button>
-              <button className="btn danger small" onClick={() => remove(s)}>
-                {t('common.delete')}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+              <div className="row-actions">
+                <button className="btn text small" onClick={() => patch(s, { reprocess: true })}>
+                  {t('admin.knowledge.reprocess')}
+                </button>
+                <button className="btn text danger small" onClick={() => remove(s)}>
+                  {t('common.delete')}
+                </button>
+                <button className="btn secondary small" onClick={() => patch(s, { enabled: !s.enabled })}>
+                  {s.enabled ? t('admin.knowledge.disable') : t('admin.knowledge.enable')}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      <form className="card form" onSubmit={search} style={{ maxWidth: 760, marginTop: 16 }}>
-        <strong>{t('admin.knowledge.testTitle')}</strong>
+      <form className="form settings-section panel-form" onSubmit={search}>
+        <header className="section-head">
+          <h3>{t('admin.knowledge.testTitle')}</h3>
+        </header>
         <div className="row">
           <input
             style={{ flex: 1 }}
@@ -494,7 +524,7 @@ function BaseView({ base, onBack }: { base: Base; onBack: () => void }) {
           </ol>
         )}
       </form>
-    </section>
+    </div>
   );
 }
 

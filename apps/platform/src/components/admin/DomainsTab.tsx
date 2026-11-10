@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from 'react';
 import { useT } from '@/i18n/client';
+import { Icon } from '../ui/Icon';
 import { api } from '../api';
 import { messageOf, useLoad } from './useLoad';
 
@@ -50,53 +51,63 @@ export function DomainsTab() {
 
   return (
     <>
-      <form onSubmit={add} className="card form" style={{ maxWidth: 'none', marginBottom: 20 }}>
-        <strong>{t('admin.domains.title')}</strong>
-        <div className="row">
+      <form onSubmit={add} className="form settings-section panel-form">
+        <header className="section-head">
+          <h3>{t('admin.domains.title')}</h3>
+          <p>{t('admin.domains.intro')}</p>
+        </header>
+        <div className="row inline-add">
           <input
             required
+            aria-label={t('admin.domains.title')}
             placeholder={t('admin.domains.placeholder')}
             value={hostname}
             onChange={(e) => setHostname(e.target.value.toLowerCase())}
           />
-          <button className="btn">{t('common.add')}</button>
+          <button className="btn">
+            <Icon name="add" size={18} />
+            {t('common.add')}
+          </button>
         </div>
       </form>
       <div className="error" role="alert">
         {error}
       </div>
       {data?.domains.map((d) => (
-        <div key={d.hostname} className="card" style={{ marginBottom: 12 }}>
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <strong>{d.hostname}</strong>
-            <span className="badge">
-              {d.verifiedAt ? t('admin.domains.verified') : t('admin.domains.awaitingDns')}
-            </span>
+        <section key={d.hostname} className="settings-section panel-form" aria-label={d.hostname}>
+          <div className="int-group-head">
+            <div className="section-head">
+              <h3>{d.hostname}</h3>
+              <span className="status-line">
+                <span className={d.verifiedAt ? 'status-dot' : 'status-dot warn'} aria-hidden />
+                {d.verifiedAt ? t('admin.domains.verified') : t('admin.domains.awaitingDns')}
+              </span>
+            </div>
+            <div className="row-actions">
+              <button className="btn text danger small" onClick={() => remove(d.hostname)}>
+                {t('admin.domains.remove')}
+              </button>
+              {!d.verifiedAt && (
+                <button className="btn small" onClick={() => verify(d.hostname)}>
+                  {t('admin.domains.verifyNow')}
+                </button>
+              )}
+            </div>
           </div>
           {!d.verifiedAt && (
-            <>
-              <p className="muted">{t('admin.domains.createRecords')}</p>
-              <div>{t('admin.domains.cnameRecord')}</div>
+            <div className="dns-records">
+              <span className="field-help">{t('admin.domains.createRecords')}</span>
+              <span>{t('admin.domains.cnameRecord')}</span>
               <code className="record">
                 {d.hostname} → {data.target}
               </code>
-              <div>{t('admin.domains.txtRecord')}</div>
+              <span>{t('admin.domains.txtRecord')}</span>
               <code className="record">
                 {d.record.name} = {d.record.value}
               </code>
-            </>
+            </div>
           )}
-          <div className="row" style={{ marginTop: 10 }}>
-            {!d.verifiedAt && (
-              <button className="btn small" onClick={() => verify(d.hostname)}>
-                {t('admin.domains.verifyNow')}
-              </button>
-            )}
-            <button className="btn danger small" onClick={() => remove(d.hostname)}>
-              {t('admin.domains.remove')}
-            </button>
-          </div>
-        </div>
+        </section>
       ))}
     </>
   );

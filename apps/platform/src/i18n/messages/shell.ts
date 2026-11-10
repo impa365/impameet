@@ -4,6 +4,8 @@ export default defineMessages(
   {
     nav: {
       main: 'Navegação principal',
+      openMenu: 'Abrir o menu',
+      closeMenu: 'Fechar o menu',
       newMeeting: 'Nova reunião',
       meetings: 'Reuniões',
       administration: 'Administração',
@@ -78,6 +80,8 @@ export default defineMessages(
     en: {
       nav: {
         main: 'Main navigation',
+        openMenu: 'Open the menu',
+        closeMenu: 'Close the menu',
         newMeeting: 'New meeting',
         meetings: 'Meetings',
         administration: 'Administration',
@@ -151,6 +155,8 @@ export default defineMessages(
     es: {
       nav: {
         main: 'Navegación principal',
+        openMenu: 'Abrir el menú',
+        closeMenu: 'Cerrar el menú',
         newMeeting: 'Nueva reunión',
         meetings: 'Reuniones',
         administration: 'Administración',

@@ -1283,36 +1283,62 @@ code.record {
   padding: 8px 24px 48px;
 }
 
+.nav-toggle {
+  display: none;
+}
+
+/* Narrow screens: the side navigation becomes a drawer opened from the top bar. */
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .shell-nav {
-    position: static;
-    height: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border-soft);
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(300px, 86vw);
+    height: 100dvh;
+    background: var(--bg);
+    box-shadow: var(--shadow);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 0.2s ease,
+      visibility 0s linear 0.2s;
   }
 
-  .shell-nav nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+  .shell[data-nav-open] .shell-nav {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.2s ease;
   }
 
-  .shell-brand,
-  .nav-section {
-    display: none;
+  .nav-toggle {
+    display: inline-grid;
+    margin-left: -8px;
   }
 
-  .nav-cta {
-    height: 40px;
-    margin: 0 8px 0 0;
-    box-shadow: none;
+  .nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgb(0 0 0 / 40%);
+  }
+
+  .shell-top {
+    gap: 8px;
+    padding: 0 16px;
+  }
+
+  .shell-top h1 {
+    font-size: 18px;
+  }
+
+  .shell-content {
+    padding: 8px 16px 48px;
   }
 
   .shell-user > span {
@@ -3574,6 +3600,75 @@ kbd {
   margin-left: -12px;
 }
 
+.settings-body.wide {
+  max-width: none;
+}
+
+.form.panel-form {
+  max-width: 800px;
+  margin: 0;
+}
+
+.form.panel-form > .row:last-child {
+  padding-top: 4px;
+}
+
+.add-row {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inline-add input {
+  flex: 1;
+}
+
+.dns-records {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.color-field input[type='color'] {
+  flex: none;
+  width: 48px;
+  height: 40px;
+  padding: 2px;
+}
+
+.brand-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg);
+  pointer-events: none;
+}
+
+.brand-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  font-size: 16px;
+}
+
+.brand-preview-bar img {
+  max-width: 120px;
+  max-height: 32px;
+  object-fit: contain;
+}
+
+.brand-preview-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--brand);
+}
+
 .form.settings-form {
   max-width: none;
   margin: 0;
@@ -3847,6 +3942,66 @@ kbd {
 
 .item-list > li + li {
   border-top: 1px solid var(--border-soft);
+}
+
+.table-card {
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+}
+
+.table-card table.grid th,
+.table-card table.grid td {
+  padding: 12px 16px;
+}
+
+.table-card table.grid tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table-card td.strong {
+  font-weight: 500;
+}
+
+.table-card .inline-select {
+  min-height: 32px;
+  padding: 4px 8px;
+}
+
+.list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 20px;
+}
+
+.list-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.list-row-main > strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.list-row-main > .muted {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.list-row-main .badge {
+  margin-left: 0;
+}
+
+.list-row-main .error {
+  min-height: 0;
 }
 
 .agent-row {

@@ -55,30 +55,32 @@ export function AuditTab() {
   const { data, error } = useLoad<{ entries: Entry[] }>('/api/admin/audit');
   if (error) return <div className="error">{error}</div>;
   return (
-    <table className="grid">
-      <thead>
-        <tr>
-          <th>{t('admin.audit.when')}</th>
-          <th>{t('admin.audit.who')}</th>
-          <th>{t('admin.audit.action')}</th>
-          <th>{t('admin.audit.target')}</th>
-          <th>{t('admin.audit.ip')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data?.entries.map((e) => {
-          const label = ACTION_LABEL[e.action];
-          return (
-            <tr key={e.id}>
-              <td className="muted">{new Date(e.createdAt).toLocaleString(locale)}</td>
-              <td>{e.actorName ?? '—'}</td>
-              <td>{label ? <span title={e.action}>{t(label)}</span> : <code>{e.action}</code>}</td>
-              <td>{e.target ?? ''}</td>
-              <td className="muted">{e.ip ?? ''}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="table-card">
+      <table className="grid">
+        <thead>
+          <tr>
+            <th>{t('admin.audit.when')}</th>
+            <th>{t('admin.audit.who')}</th>
+            <th>{t('admin.audit.action')}</th>
+            <th>{t('admin.audit.target')}</th>
+            <th>{t('admin.audit.ip')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data?.entries.map((e) => {
+            const label = ACTION_LABEL[e.action];
+            return (
+              <tr key={e.id}>
+                <td className="muted">{new Date(e.createdAt).toLocaleString(locale)}</td>
+                <td>{e.actorName ?? '—'}</td>
+                <td>{label ? <span title={e.action}>{t(label)}</span> : <code>{e.action}</code>}</td>
+                <td>{e.target ?? ''}</td>
+                <td className="muted">{e.ip ?? ''}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

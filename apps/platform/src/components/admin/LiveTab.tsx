@@ -24,13 +24,16 @@ export function LiveTab() {
     );
   }
   return (
-    <ul className="rooms">
+    <ul className="item-list">
       {data.rooms.map((r) => (
-        <li key={r.slug}>
-          <div>
-            <strong>{r.name}</strong>
-            <span className="badge">{t('admin.live.online', { n: r.participants.length })}</span>
-            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+        <li key={r.slug} className="list-row">
+          <div className="list-row-main">
+            <strong>
+              <span className="status-dot" aria-hidden />
+              {r.name}
+              <span className="badge">{t('admin.live.online', { n: r.participants.length })}</span>
+            </strong>
+            <span className="muted">
               {r.participants
                 .map((p) => {
                   const tag = p.isAgent
@@ -38,10 +41,11 @@ export function LiveTab() {
                     : p.role === 'moderator'
                       ? ` ${t('admin.live.moderator')}`
                       : '';
-                  return `${p.handRaised ? '✋ ' : ''}${p.name}${tag}`;
+                  const hand = p.handRaised ? ` (${t('admin.live.handRaised')})` : '';
+                  return `${p.name}${tag}${hand}`;
                 })
                 .join(', ')}
-            </div>
+            </span>
           </div>
           <Link className="btn small" href={`/r/${r.slug}`}>
             {t('admin.live.enter')}

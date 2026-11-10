@@ -6,6 +6,7 @@ import type { Branding } from '@/server/tenants/repo';
 import { Brand } from './Brand';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { LogoutButton } from './LogoutButton';
+import { NavDrawerToggle } from './NavDrawerToggle';
 import { ThemeToggle } from './ThemeToggle';
 import { ADMIN_TABS, DASHBOARD_VIEWS, type DashboardView, adminTabsFor } from './admin/tabs';
 import { Avatar } from './meet/Avatar';
@@ -40,7 +41,7 @@ export async function AppShell(props: {
       <a className="skip-link" href="#conteudo">
         {t('common.skipToContent')}
       </a>
-      <aside className="shell-nav">
+      <aside className="shell-nav" id="shell-nav">
         <div className="shell-brand">
           <Brand branding={props.branding} />
         </div>
@@ -84,6 +85,7 @@ export async function AppShell(props: {
       </aside>
       <div className="shell-main">
         <header className="shell-top">
+          <NavDrawerToggle openLabel={t('shell.nav.openMenu')} closeLabel={t('shell.nav.closeMenu')} />
           <h1>{props.title}</h1>
           <div className="shell-tools">
             <LanguageSwitcher compact />
