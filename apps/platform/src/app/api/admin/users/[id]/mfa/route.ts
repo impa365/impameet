@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { resetUserMfa } from '@/server/auth/mfa';
-import { mfaDeps } from '@/server/auth/mfa-client';
+import { mfaDeps } from '@/server/mfa-client';
 import { writerUser } from '@/server/guard';
 import { clientIp, handle, json } from '@/server/http';
 

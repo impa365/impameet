@@ -13,6 +13,7 @@ from livekit import rtc
 from livekit.agents import Agent, ModelSettings, StopResponse, llm, stt
 
 from .bargein import Engagement, should_interrupt
+from .chat import CHAT_INSTRUCTIONS
 from .knowledge import KNOWLEDGE_NOTE, KnowledgeClient, knowledge_tools, training_note
 from .languages import guess_language, languages_note, main_language, pick_language, words
 from .listening import is_addressed
@@ -130,15 +131,8 @@ class VoiceAgent(Agent):
         tools: list[Any] = []
         if handoff is not None:
             tools += self._handoff_tools()
-        parts = [
-            profile.instructions,
-            training_note(profile.style_rules, profile.examples),
-            SPEAKER_INSTRUCTIONS,
-            languages_note(profile.voices),
-        ]
-        if knowledge is not None:
-            tools += knowledge_tools(knowledge)
-            parts.append(KNOWLEDGE_NOTE)
+        parts: list[str] = []
+        self._knowledge = knowledge
         if screen is not None:
             tools += screen_tools(screen, self)
             parts.append(SCREEN_INSTRUCTIONS)
@@ -160,11 +154,82 @@ class VoiceAgent(Agent):
         if perception is not None and perception.allowed:
             tools += perception_tools(perception, self)
             parts.append(perception_note(perception.allowed))
-        self._base_instructions = "\n\n".join(p for p in parts if p)
+        # What the room gives the agent (screen, moderation, tools...) stays for the meeting;
+        # what the admin writes (instructions, training, knowledge) can change during it.
+        self._room_parts = parts
+        self._room_tools = tools
+        self._base_instructions = self._compose()
         # Voice activity alone never cuts the agent off; see `_maybe_barge_in`.
         super().__init__(
-            instructions=self._current_instructions(), tools=tools, allow_interruptions=False
+            instructions=self._current_instructions(),
+            tools=self._all_tools(),
+            allow_interruptions=False,
         )
+
+    def _compose(self) -> str:
+        p = self._profile
+        parts = [
+            p.instructions,
+            training_note(p.style_rules, p.examples),
+            SPEAKER_INSTRUCTIONS,
+            CHAT_INSTRUCTIONS,
+            languages_note(p.voices),
+            KNOWLEDGE_NOTE if self._knowledge is not None else "",
+            *self._room_parts,
+        ]
+        return "\n\n".join(x for x in parts if x)
+
+    def _all_tools(self) -> list[Any]:
+        extra = knowledge_tools(self._knowledge) if self._knowledge is not None else []
+        return [*self._room_tools, *extra]
+
+    async def apply_profile(self, profile: AgentProfile, knowledge: KnowledgeClient | None) -> bool:
+        """An admin changed the agent during the meeting: new instructions, training or bases.
+
+        The voice, the models and the room's tools need a new session; these do not.
+        """
+        before = self._profile
+        same = (profile.instructions, profile.style_rules, profile.examples) == (
+            before.instructions,
+            before.style_rules,
+            before.examples,
+        ) and (knowledge is None) == (self._knowledge is None)
+        if same:
+            return False
+        self._profile = replace(
+            before,
+            instructions=profile.instructions,
+            style_rules=profile.style_rules,
+            examples=profile.examples,
+            knowledge_bases=profile.knowledge_bases,
+        )
+        tools_changed = (knowledge is None) != (self._knowledge is None)
+        self._knowledge = knowledge
+        self._base_instructions = self._compose()
+        await self.update_instructions(self._current_instructions())
+        if tools_changed:
+            await self.update_tools(self._all_tools())
+        logger.info(
+            "profile changed during the meeting", extra={"knowledge": knowledge is not None}
+        )
+        return True
+
+    async def on_chat(self, identity: str, name: str, role: str, text: str) -> None:
+        """A chat message: answered like speech, after the agent finishes its sentence."""
+        who = Talker(name=name, role=role, identity=identity)
+        line = f"{who.label()} no chat: {text}"
+        if self._hearing is not None:
+            self._hearing(who, f"[chat] {text}")
+        quiet = self.muted or self._profile.respond_mode == "when_named" or bool(self.peers)
+        if quiet and not is_addressed(text, self._profile.name, self.peers):
+            # Not for the agent: it still knows what was written.
+            ctx = self.chat_ctx.copy()
+            ctx.add_message(role="user", content=line)
+            await self.update_chat_ctx(ctx)
+            return
+        self._authors = (who,)
+        self._engagement.touch(identity)
+        self.session.generate_reply(user_input=line)
 
     async def on_enter(self) -> None:
         if self._profile.greeting:

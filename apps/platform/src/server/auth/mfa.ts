@@ -45,6 +45,13 @@ export interface RelyingParty {
   name: string;
 }
 
+/** The relying party for a request's host: passkeys made on one address only work there. */
+export function relyingPartyFor(hostHeader: string, secure: boolean, name: string): RelyingParty {
+  const host = hostHeader.trim().toLowerCase();
+  const id = host.replace(/:\d+$/, '');
+  return { id, origin: `${secure ? 'https' : 'http'}://${host}`, name: name.slice(0, 60) || id };
+}
+
 export interface WebAuthnLib {
   generateRegistrationOptions: typeof generateRegistrationOptions;
   verifyRegistrationResponse: typeof verifyRegistrationResponse;

@@ -1,5 +1,5 @@
 import { afterPassword } from '@/server/auth/mfa';
-import { mfaDeps, relyingParty, startSession } from '@/server/auth/mfa-client';
+import { mfaDeps, relyingParty, startSession } from '@/server/mfa-client';
 import { login } from '@/server/auth/service';
 import { db } from '@/server/db';
 import { notFound, tooManyRequests } from '@/server/errors';

@@ -1,13 +1,13 @@
 import 'server-only';
-import { config } from '../config';
-import { db } from '../db';
-import { json, clientIp, sessionCookie } from '../http';
-import { mailDeps } from '../mail/client';
-import { tenantMailer } from '../mail/service';
-import { parseMasterKey } from '../security/secrets';
-import type { MfaDeps, RelyingParty } from './mfa';
-import { recordLogin } from './service';
-import { SESSION_COOKIE, type SessionUser, createSession } from './session';
+import { config } from './config';
+import { db } from './db';
+import { clientIp, json, sessionCookie } from './http';
+import { mailDeps } from './mail/client';
+import { tenantMailer } from './mail/service';
+import { parseMasterKey } from './security/secrets';
+import { type MfaDeps, type RelyingParty, relyingPartyFor } from './auth/mfa';
+import { recordLogin } from './auth/service';
+import { SESSION_COOKIE, type SessionUser, createSession } from './auth/session';
 
 let key: Buffer | null | undefined;
 
@@ -19,13 +19,7 @@ export function mfaDeps(): MfaDeps {
 
 /** Passkeys belong to the exact address the user is on (subdomain or custom domain). */
 export function relyingParty(req: Request, name: string): RelyingParty {
-  const host = (req.headers.get('host') ?? '').toLowerCase();
-  const id = host.replace(/:\d+$/, '');
-  return {
-    id,
-    origin: `${config().secureCookies ? 'https' : 'http'}://${host}`,
-    name: name.slice(0, 60) || id,
-  };
+  return relyingPartyFor(req.headers.get('host') ?? '', config().secureCookies, name);
 }
 
 /** Opens the session once every step is done, and records the sign-in. */

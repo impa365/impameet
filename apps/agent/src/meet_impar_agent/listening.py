@@ -49,12 +49,48 @@ def same_name(a: str, b: str) -> bool:
     return _fold(a).strip() == _fold(b).strip() != ""
 
 
+#: Shorter words are left alone: "Ana" must be heard as "Ana".
+_FUZZY_MIN_LETTERS = 4
+_LONG_NAME = 6
+
+
+def _distance(a: str, b: str) -> int:
+    """Levenshtein distance (names are short, so the plain table is enough)."""
+    row = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        prev, row[0] = row[0], i
+        for j, cb in enumerate(b, 1):
+            prev, row[j] = row[j], min(row[j] + 1, row[j - 1] + 1, prev + (ca != cb))
+    return row[-1]
+
+
+def sounds_like(word: str, name: str) -> bool:
+    """A transcription slip of the name: "Kaísa", "Kaize" or "Kaizen" for "Kaiser".
+
+    Speech-to-text often misspells unusual names. A word counts when it starts like the name
+    and differs by one letter (two for names of six letters or more), so "casa" or "caixa"
+    are still not "Kaiser".
+    """
+    if word == name:
+        return True
+    if min(len(word), len(name)) < _FUZZY_MIN_LETTERS or word[:2] != name[:2]:
+        return False
+    return _distance(word, name) <= (2 if len(name) >= _LONG_NAME else 1)
+
+
 def _position(folded_text: str, agent_name: str) -> int | None:
     name = _fold(agent_name).strip()
     if not name:
         return None
     found = re.search(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])", folded_text)
-    return found.start() if found else None
+    if found:
+        return found.start()
+    if " " in name:
+        return None
+    for word in re.finditer(r"[a-z0-9]+", folded_text):
+        if sounds_like(word.group(), name):
+            return word.start()
+    return None
 
 
 def is_addressed(text: str, agent_name: str, others: Iterable[str] = ()) -> bool:

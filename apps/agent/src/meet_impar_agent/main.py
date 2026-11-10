@@ -11,11 +11,20 @@ from typing import Any
 
 import httpx
 from livekit import rtc
-from livekit.agents import AgentServer, AgentSession, JobContext, JobProcess, JobRequest, cli
+from livekit.agents import (
+    AgentServer,
+    AgentSession,
+    JobContext,
+    JobProcess,
+    JobRequest,
+    cli,
+    room_io,
+)
 from livekit.plugins import silero
 
 from . import redaction, telemetry
 from .captions import MODE_ATTRIBUTE, run_captions
+from .chat import follow_chat
 from .config import Settings, get_settings
 from .insights import (
     COPILOT_TOPIC,
@@ -56,6 +65,8 @@ from .tools import ToolsClient, ToolSpec
 logger = logging.getLogger("meet_impar_agent")
 MUTED_ATTRIBUTE = "impa.muted"
 MAX_TOOL_STEPS = 10
+#: How often a live agent picks up what an admin changed (instructions, training, bases).
+PROFILE_REFRESH_S = 30.0
 HANDOFF_TOPIC = "impa.handoff"
 AGENT_SETTINGS_TOPIC = "impa.agent"
 LOBBY_TOPIC = "impa.lobby"
@@ -322,7 +333,12 @@ async def entrypoint(ctx: JobContext) -> None:
         record=record,
         knowledge=knowledge,
     )
-    await session.start(agent=agent, room=ctx.room, record=False)
+    # The room's chat is read by ollow_chat (everyone's messages, not only the linked person's).
+    await session.start(
+        agent=agent, room=ctx.room, record=False, room_options=room_io.RoomOptions(text_input=False)
+    )
+    follow_chat(ctx.room, agent.on_chat)
+    follow_profile(ctx, settings, agent, knowledge)
     # Lets the platform tell the voice agent apart from captions and the AI screen.
     await ctx.room.local_participant.set_attributes(
         {MODE_ATTRIBUTE: "voice", **insights_attributes(profile.insights, profile.insights_access)}
@@ -397,6 +413,38 @@ def spawn(coro: Awaitable[Any]) -> None:
     task = asyncio.ensure_future(coro)
     _TASKS.add(task)
     task.add_done_callback(_TASKS.discard)
+
+
+def follow_profile(
+    ctx: JobContext, settings: Settings, agent: VoiceAgent, knowledge: KnowledgeClient | None
+) -> None:
+    """Applies the admin's changes during the meeting (a base linked now works now)."""
+    current = {"client": knowledge}
+
+    async def refresh() -> None:
+        while True:
+            await asyncio.sleep(PROFILE_REFRESH_S)
+            fresh = await load_profile(settings, ctx.job.metadata)
+            if fresh is None:
+                continue
+            client = current["client"]
+            if (
+                fresh.knowledge_bases > 0
+                and client is None
+                and settings.platform
+                and fresh.agent_id
+            ):
+                client = KnowledgeClient(
+                    settings.platform,
+                    fresh.agent_id,
+                    ctx.room.name,
+                    language=next(iter(fresh.voices), None),
+                )
+                ctx.add_shutdown_callback(client.aclose)
+                current["client"] = client
+            await agent.apply_profile(fresh, client if fresh.knowledge_bases > 0 else None)
+
+    spawn(refresh())
 
 
 def meeting_record(profile: AgentProfile) -> MeetingRecord | None:

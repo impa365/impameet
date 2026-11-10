@@ -14,6 +14,7 @@ import {
   passkeyRegisterOptions,
   passkeyRemove,
   regenerateRecovery,
+  relyingPartyFor,
   resetUserMfa,
   securityOverview,
   sendLoginCode,
@@ -24,7 +25,13 @@ import {
   verifyLogin,
 } from '@/server/auth/mfa';
 import { signup } from '@/server/auth/service';
-import { type SessionUser, createSession, findSessionUser } from '@/server/auth/session';
+import {
+  type SessionUser,
+  createSession,
+  findSessionUser,
+  listSessions,
+  revokeSessions,
+} from '@/server/auth/session';
 import type { Sql } from '@/server/db';
 import { AppError } from '@/server/errors';
 import type { MailMessage } from '@/server/mail/smtp';
@@ -159,6 +166,46 @@ async function withTotp(user: SessionUser) {
 const tick = (steps = 1) => {
   clock += steps * 30_000;
 };
+
+describe('sessions', () => {
+  it('lists the open sessions (this one marked) and signs out one or all the others', async () => {
+    const { admin } = await org('acme');
+    const here = await createSession(db(), admin.id, {
+      ip: '1.1.1.1',
+      userAgent: 'Chrome',
+      mfaMethod: 'totp',
+    });
+    const phone = await createSession(db(), admin.id, { ip: '2.2.2.2', userAgent: 'Safari' });
+    await createSession(db(), admin.id, { ip: '3.3.3.3', userAgent: 'Firefox' });
+    const list = await listSessions(db(), admin.id, here.token);
+    expect(list).toHaveLength(3);
+    expect(list.find((s) => s.current)).toMatchObject({ ip: '1.1.1.1', mfaMethod: 'totp' });
+    expect(list.every((s) => /^[0-9a-f]{16}$/.test(s.id))).toBe(true);
+    expect(JSON.stringify(list)).not.toContain(here.token);
+
+    const phoneId = list.find((s) => s.ip === '2.2.2.2')!.id;
+    const mine = list.find((s) => s.current)!.id;
+    expect(await revokeSessions(db(), admin.id, mine, here.token)).toBe(0); // never this one
+    expect(await revokeSessions(db(), admin.id, phoneId, here.token)).toBe(1);
+    expect(await findSessionUser(db(), phone.token, admin.tenantId)).toBeNull();
+    expect(await revokeSessions(db(), admin.id, 'others', here.token)).toBe(1);
+    expect(await listSessions(db(), admin.id, here.token)).toMatchObject([{ current: true }]);
+    expect(await listSessions(db(), admin.id, undefined)).toMatchObject([{ current: false }]);
+  });
+
+  it('ties passkeys to the exact address', () => {
+    expect(relyingPartyFor('Acme.Meet.Test:3000', false, 'Acme Meet')).toEqual({
+      id: 'acme.meet.test',
+      origin: 'http://acme.meet.test:3000',
+      name: 'Acme Meet',
+    });
+    expect(relyingPartyFor('meet.acme.com', true, '')).toEqual({
+      id: 'meet.acme.com',
+      origin: 'https://meet.acme.com',
+      name: 'meet.acme.com',
+    });
+  });
+});
 
 describe('two-step verification', () => {
   it('signs in with the password alone until a method is on, then asks for it', async () => {

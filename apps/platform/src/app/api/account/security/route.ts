@@ -14,7 +14,7 @@ import {
   totpDisable,
   totpStart,
 } from '@/server/auth/mfa';
-import { mfaDeps, relyingParty } from '@/server/auth/mfa-client';
+import { mfaDeps, relyingParty } from '@/server/mfa-client';
 import { SESSION_COOKIE, listSessions, revokeSessions } from '@/server/auth/session';
 import { audit } from '@/server/audit';
 import { db } from '@/server/db';

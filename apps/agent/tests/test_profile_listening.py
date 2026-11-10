@@ -53,10 +53,27 @@ class TestListening:
             ("KAISER!", True),
             ("o kaiserismo é outra coisa", False),
             ("vamos começar", False),
+            # Speech-to-text slips heard in real meetings
+            ("Kaísa, responde pra gente", True),
+            ("Kaize, clica aí em pular o anúncio", True),
+            ("Kaizen, quem é você?", True),
+            ("Kaiserr me ouve", True),
+            # ...but not ordinary words that merely look alike
+            ("a casa caiu", False),
+            ("pega a caixa", False),
+            ("kaio chegou", False),
         ],
     )
     def test_is_addressed(self, text: str, expected: bool) -> None:
         assert is_addressed(text, "Kaiser") is expected
+
+    def test_short_and_long_names_tolerate_different_slips(self) -> None:
+        assert is_addressed("Lara, oi", "Laura")  # one letter in a five-letter name
+        assert not is_addressed("Larissa, oi", "Laura")
+        assert not is_addressed("Ane, oi", "Ana")  # three letters: exact only
+        assert is_addressed("Ana, oi", "Ana")
+        assert not is_addressed("Ana Paulo", "Ana Paula")  # full names: the exact phrase
+        assert is_addressed("ei Ana Paula", "Ana Paula")
 
     def test_is_addressed_ignores_accents(self) -> None:
         assert is_addressed("Olá, Júlia!", "Julia")

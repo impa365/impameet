@@ -1,6 +1,6 @@
 import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { passkeyLogin, passkeyOptions } from '@/server/auth/mfa';
-import { mfaDeps, relyingParty, startSession } from '@/server/auth/mfa-client';
+import { mfaDeps, relyingParty, startSession } from '@/server/mfa-client';
 import { notFound, tooManyRequests } from '@/server/errors';
 import { assertSameOrigin, clientIp, handle, json, readJson } from '@/server/http';
 import { limits } from '@/server/limits';
