@@ -1,43 +1,7 @@
-import 'server-only';
-import nodemailer from 'nodemailer';
-import { config } from '../config';
+import type { MailMessage, Mailer } from '../mail/smtp';
 
-export interface InviteMail {
-  to: string;
-  subject: string;
-  text: string;
-  /** Calendar invite attached when present (meeting invitations). */
-  ics?: string;
-}
-
-export interface Mailer {
-  send(mail: InviteMail): Promise<void>;
-}
-
-let mailer: Mailer | null | undefined;
-
-/** Null when SMTP is not configured: invites are then shared by copy/paste and .ics download. */
-export function getMailer(): Mailer | null {
-  if (mailer !== undefined) return mailer;
-  const { smtpUrl, mailFrom } = config();
-  if (!smtpUrl || !mailFrom) {
-    mailer = null;
-    return mailer;
-  }
-  const transport = nodemailer.createTransport(smtpUrl);
-  mailer = {
-    async send(mail) {
-      await transport.sendMail({
-        from: mailFrom,
-        to: mail.to,
-        subject: mail.subject,
-        text: mail.text,
-        ...(mail.ics ? { icalEvent: { method: 'REQUEST', content: mail.ics } } : {}),
-      });
-    },
-  };
-  return mailer;
-}
+export type { Mailer };
+export type InviteMail = MailMessage;
 
 /** Sends one mail per invitee; failures are counted, never thrown (the meeting is already saved). */
 export async function sendInvites(

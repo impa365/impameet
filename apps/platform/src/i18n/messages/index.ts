@@ -4,10 +4,11 @@ import admin from './admin';
 import common from './common';
 import dashboard from './dashboard';
 import knowledge from './knowledge';
+import mail from './mail';
 import room from './room';
 import shell from './shell';
 
-const NAMESPACES = { common, shell, room, dashboard, admin, knowledge };
+const NAMESPACES = { common, shell, room, dashboard, admin, knowledge, mail };
 
 /** The Portuguese tree: the reference every translation is checked against. */
 export type AppMessages = { [N in keyof typeof NAMESPACES]: (typeof NAMESPACES)[N]['reference'] };

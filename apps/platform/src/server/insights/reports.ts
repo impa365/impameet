@@ -53,7 +53,8 @@ export interface ReportDeps {
   key: Buffer | null;
   net: NetPolicy;
   complete: Complete;
-  mailer: Mailer | null;
+  /** How the meeting's organization sends e-mail (null: it does not). */
+  mailerFor: (tenantId: string) => Promise<Mailer | null>;
 }
 
 /** Long meetings are summarised in parts first, then the minutes come from the parts. */
@@ -216,14 +217,15 @@ async function deliver(
   ownerId: string | null,
 ): Promise<MeetingReport['delivered']> {
   const delivered: MeetingReport['delivered'] = {};
-  if (deps.mailer) {
+  const mailer = await deps.mailerFor(agent.tenantId).catch(() => null);
+  if (mailer) {
     const to = await recipients(deps.sql, agent.tenantId, ownerId, report.participants);
     const subject = `Ata — ${report.roomName}`;
     const body = minutesText(report);
     let sent = 0;
     for (const address of to) {
       try {
-        await deps.mailer.send({ to: address, subject, text: body });
+        await mailer.send({ to: address, subject, text: body });
         sent += 1;
       } catch {
         /* one bad address does not stop the others */

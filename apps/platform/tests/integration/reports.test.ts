@@ -84,12 +84,13 @@ function fakes(
       calls.push(req);
       return answer(req);
     },
-    mailer: {
+    mailerFor: async () => ({
+      from: 'atas@acme.test',
       async send(mail) {
         if (mail.to.startsWith('broken')) throw new Error('smtp');
         mails.push(mail);
       },
-    },
+    }),
   };
   return { deps, calls, mails };
 }

@@ -55,6 +55,37 @@ export const loginInput = z.object({
   password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
 });
 
+const smtpServer = z.object({
+  host: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1, 'Informe o servidor SMTP')
+    .max(253)
+    .regex(
+      /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$|^[0-9a-f:.]+$/,
+      'Servidor SMTP inválido',
+    ),
+  port: z.number({ error: 'Informe a porta' }).int().min(1).max(65535),
+  security: z.enum(['tls', 'starttls', 'none'], { error: 'Escolha a segurança da conexão' }),
+  username: z.string().trim().max(254).default(''),
+  /** Left out to keep the saved one. */
+  password: z.string().max(500).optional(),
+  fromEmail: email,
+  fromName: z.string().trim().max(80).default(''),
+  replyTo: email.nullable().default(null),
+});
+
+export const tenantSmtpInput = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('platform') }),
+  z.object({ mode: z.literal('off') }),
+  smtpServer.extend({ mode: z.literal('custom') }),
+]);
+
+export const platformSmtpInput = smtpServer.extend({ offerToTenants: z.boolean().default(true) });
+
+export const smtpTestInput = z.object({ to: email.optional() });
+
 export const ROOM_ACCESS = ['open', 'trusted', 'restricted'] as const;
 export const roomAccess = z.enum(ROOM_ACCESS);
 export const COLLAB_POLICIES = ['everyone', 'moderators'] as const;

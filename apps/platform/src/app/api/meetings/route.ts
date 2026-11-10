@@ -6,7 +6,9 @@ import { readerUser, writerUser } from '@/server/guard';
 import { clientIp, handle, json, readJson } from '@/server/http';
 import { inviteText } from '@/server/meetings/ics';
 import { inviteEvent, inviteMail, roomUrl } from '@/server/meetings/invite';
-import { getMailer, sendInvites } from '@/server/meetings/mailer';
+import { mailDeps } from '@/server/mail/client';
+import { tenantMailer } from '@/server/mail/service';
+import { sendInvites } from '@/server/meetings/mailer';
 import { createMeeting, listMeetings } from '@/server/meetings/service';
 import { currentTenant } from '@/server/request';
 import { meetingInput } from '@/server/validation';
@@ -19,7 +21,7 @@ export async function GET(req: Request): Promise<Response> {
     const meetings = await listMeetings(db(), user);
     const secure = config().secureCookies;
     return json({
-      mailEnabled: getMailer() !== null,
+      mailEnabled: (await tenantMailer(mailDeps(), user.tenantId)) !== null,
       meetings: meetings.map((m) => ({ ...m, url: roomUrl(req, m.roomSlug, secure) })),
     });
   });
@@ -34,7 +36,7 @@ export async function POST(req: Request): Promise<Response> {
     const meeting = await createMeeting(db(), user, await readJson(req, meetingInput), clientIp(req));
     const url = roomUrl(req, meeting.roomSlug, config().secureCookies);
     const event = inviteEvent(meeting, url, ctx.branding.productName, await getLocale());
-    const mailer = getMailer();
+    const mailer = await tenantMailer(mailDeps(), ctx.tenant.id);
     const mail = mailer
       ? await sendInvites(mailer, meeting.invitees, (to) => inviteMail(event, to))
       : { sent: 0, failed: 0 };

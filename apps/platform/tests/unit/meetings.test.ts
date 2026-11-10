@@ -92,6 +92,7 @@ describe('invite delivery', () => {
     const sent: string[] = [];
     const result = await sendInvites(
       {
+        from: 'convites@acme.test',
         async send(mail) {
           if (mail.to.startsWith('b')) throw new Error('smtp down');
           sent.push(mail.to);

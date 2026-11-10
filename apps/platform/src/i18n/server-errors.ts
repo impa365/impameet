@@ -242,6 +242,26 @@ const EN: Record<string, string> = {
   'sem mudanças': 'no changes',
   '{n} trechos': '{n} pieces',
   'Não foi possível gerar embeddings': 'Could not generate embeddings',
+  'Configure a chave de criptografia do servidor para salvar o SMTP':
+    'Set up the server encryption key to save the SMTP settings',
+  'Só administradores configuram o e-mail': 'Only admins set up e-mail',
+  'Servidor SMTP não encontrado': 'SMTP server not found',
+  'O servidor SMTP precisa estar na internet pública': 'The SMTP server must be on the public internet',
+  'O servidor recusou o usuário ou a senha': 'The server refused the user name or password',
+  'Não foi possível conectar ao servidor SMTP (confira servidor, porta e segurança)':
+    'Could not connect to the SMTP server (check server, port and security)',
+  'Falha no TLS: confira a segurança escolhida e o certificado do servidor':
+    'TLS failed: check the chosen security and the server certificate',
+  'O servidor recusou a mensagem ({n})': 'The server refused the message ({n})',
+  'O servidor SMTP não aceitou a mensagem': 'The SMTP server did not accept the message',
+  'Use uma porta SMTP: {n}, 465, 587, 2525': 'Use an SMTP port: {n}, 465, 587, 2525',
+  'Ao trocar o servidor SMTP, informe a senha de novo':
+    'When changing the SMTP server, enter the password again',
+  'Nenhum servidor de e-mail configurado': 'No e-mail server set up',
+  'Informe o servidor SMTP': 'Enter the SMTP server',
+  'Servidor SMTP inválido': 'Invalid SMTP server',
+  'Informe a porta': 'Enter the port',
+  'Escolha a segurança da conexão': 'Choose the connection security',
 };
 
 const ES: Record<string, string> = {
@@ -485,6 +505,26 @@ const ES: Record<string, string> = {
   'sem mudanças': 'sin cambios',
   '{n} trechos': '{n} fragmentos',
   'Não foi possível gerar embeddings': 'No se pudieron generar embeddings',
+  'Configure a chave de criptografia do servidor para salvar o SMTP':
+    'Configura la clave de cifrado del servidor para guardar el SMTP',
+  'Só administradores configuram o e-mail': 'Solo los administradores configuran el correo',
+  'Servidor SMTP não encontrado': 'Servidor SMTP no encontrado',
+  'O servidor SMTP precisa estar na internet pública': 'El servidor SMTP debe estar en internet pública',
+  'O servidor recusou o usuário ou a senha': 'El servidor rechazó el usuario o la contraseña',
+  'Não foi possível conectar ao servidor SMTP (confira servidor, porta e segurança)':
+    'No se pudo conectar al servidor SMTP (revisa servidor, puerto y seguridad)',
+  'Falha no TLS: confira a segurança escolhida e o certificado do servidor':
+    'Falló el TLS: revisa la seguridad elegida y el certificado del servidor',
+  'O servidor recusou a mensagem ({n})': 'El servidor rechazó el mensaje ({n})',
+  'O servidor SMTP não aceitou a mensagem': 'El servidor SMTP no aceptó el mensaje',
+  'Use uma porta SMTP: {n}, 465, 587, 2525': 'Usa un puerto SMTP: {n}, 465, 587, 2525',
+  'Ao trocar o servidor SMTP, informe a senha de novo':
+    'Al cambiar el servidor SMTP, escribe la contraseña de nuevo',
+  'Nenhum servidor de e-mail configurado': 'Ningún servidor de correo configurado',
+  'Informe o servidor SMTP': 'Escribe el servidor SMTP',
+  'Servidor SMTP inválido': 'Servidor SMTP no válido',
+  'Informe a porta': 'Escribe el puerto',
+  'Escolha a segurança da conexão': 'Elige la seguridad de la conexión',
 };
 
 export const SERVER_ERRORS: Record<Locale, Record<string, string>> = { 'pt-BR': {}, en: EN, es: ES };

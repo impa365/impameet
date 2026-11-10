@@ -3,6 +3,7 @@
 import type { Branding } from '@/server/tenants/repo';
 import { AgentsTab } from './AgentsTab';
 import { AuditTab } from './AuditTab';
+import { MailTab } from './MailTab';
 import { BrandingTab } from './BrandingTab';
 import { DomainsTab } from './DomainsTab';
 import { IntegrationsTab } from './IntegrationsTab';
@@ -28,6 +29,7 @@ export function AdminPanel(props: {
       {tab === 'live' && <LiveTab />}
       {tab === 'branding' && <BrandingTab initial={props.branding} />}
       {tab === 'domains' && <DomainsTab />}
+      {tab === 'email' && <MailTab />}
       {tab === 'audit' && <AuditTab />}
     </>
   );

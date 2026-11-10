@@ -9,6 +9,7 @@ export type AdminTab =
   | 'live'
   | 'branding'
   | 'domains'
+  | 'email'
   | 'audit';
 
 export const ADMIN_TABS: Record<AdminTab, { label: MessageKey; icon: IconName }> = {
@@ -19,12 +20,13 @@ export const ADMIN_TABS: Record<AdminTab, { label: MessageKey; icon: IconName }>
   live: { label: 'shell.nav.tabs.live', icon: 'sensors' },
   branding: { label: 'shell.nav.tabs.branding', icon: 'palette' },
   domains: { label: 'shell.nav.tabs.domains', icon: 'language' },
+  email: { label: 'shell.nav.tabs.email', icon: 'mail' },
   audit: { label: 'shell.nav.tabs.audit', icon: 'history' },
 };
 
 export function adminTabsFor(role: 'admin' | 'manager' | 'member'): AdminTab[] {
   if (role === 'admin')
-    return ['agents', 'knowledge', 'integrations', 'users', 'live', 'branding', 'domains', 'audit'];
+    return ['agents', 'knowledge', 'integrations', 'users', 'live', 'branding', 'domains', 'email', 'audit'];
   if (role === 'manager') return ['users', 'live'];
   return [];
 }

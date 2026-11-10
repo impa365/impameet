@@ -36,6 +36,7 @@ export default defineConfig({
         'src/server/knowledge/youtube.ts',
         'src/server/knowledge/office.ts',
         'src/server/knowledge/rerank.ts',
+        'src/server/mail/smtp.ts',
       ],
       thresholds: { lines: 95, branches: 85 },
     },
