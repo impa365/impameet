@@ -21,6 +21,7 @@ import {
   jsonAfter,
   momentUrl,
   parseJson3,
+  parseXmlCaptions,
   pickTrack,
   playlistVideos,
   transcriptText,
@@ -247,6 +248,59 @@ describe('YouTube videos', () => {
       'https://www.youtube.com/watch?v=abcdefghijk&t=120s',
     ]);
     expect(transcriptText({ ...t, title: '', segments: [] })).toBe('# abcdefghijk\n');
+  });
+
+  it("asks the app player for fresh caption links and reads YouTube's XML captions", async () => {
+    const calls: { url: string; body?: string }[] = [];
+    const appTrack = {
+      baseUrl: 'https://www.youtube.com/api/timedtext?v=abc&lang=pt&fmt=srv3',
+      languageCode: 'pt',
+    };
+    const get: Get = async (url, init): Promise<Fetched> => {
+      calls.push({ url, body: init?.body });
+      if (url.startsWith('https://www.youtube.com/watch'))
+        return {
+          url,
+          status: 200,
+          headers: { 'content-type': H },
+          body: `<script>ytcfg.set({"INNERTUBE_API_KEY":"AIzaTest_123"});</script>${watchPage({
+            playabilityStatus: { status: 'OK' },
+            videoDetails: { title: 'Título da página' },
+          })}`,
+        };
+      if (url.startsWith('https://www.youtube.com/youtubei/v1/player?key=AIzaTest_123'))
+        return {
+          url,
+          status: 200,
+          headers: {},
+          body: JSON.stringify({
+            playabilityStatus: { status: 'OK' },
+            videoDetails: { title: 'Título do app', author: 'Canal', lengthSeconds: '90' },
+            captions: { playerCaptionsTracklistRenderer: { captionTracks: [appTrack] } },
+          }),
+        };
+      if (url === 'https://www.youtube.com/api/timedtext?v=abc&lang=pt')
+        return {
+          url,
+          status: 200,
+          headers: {},
+          body: '<?xml version="1.0"?><transcript><text start="0.5" dur="2">Ol&amp;#225; &lt;b&gt;turma&lt;/b&gt;</text><text start="130.2">fim</text><text start="3"> </text></transcript>',
+        };
+      return { url, status: 404, headers: {}, body: '' };
+    };
+    const t = await fetchTranscript('abcdefghijk', get);
+    expect(t).toMatchObject({ title: 'Título da página', channel: 'Canal', seconds: 90, language: 'pt' });
+    expect(t.segments).toEqual([
+      { start: 0, text: 'Olá turma' },
+      { start: 130, text: 'fim' },
+    ]);
+    expect(JSON.parse(calls[1].body ?? '{}')).toMatchObject({
+      videoId: 'abcdefghijk',
+      context: { client: { clientName: 'ANDROID' } },
+    });
+    expect(
+      parseXmlCaptions('<timedtext><body><p t="61500" d="900">um <s>dois</s></p></body></timedtext>'),
+    ).toEqual([{ start: 61, text: 'um dois' }]);
   });
 
   it('explains why a video cannot be read', async () => {

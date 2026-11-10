@@ -306,7 +306,12 @@ async def entrypoint(ctx: JobContext) -> None:
     record = meeting_record(profile)
     knowledge = None
     if settings.platform and profile.agent_id and profile.knowledge_bases > 0:
-        knowledge = KnowledgeClient(settings.platform, profile.agent_id, ctx.room.name)
+        knowledge = KnowledgeClient(
+            settings.platform,
+            profile.agent_id,
+            ctx.room.name,
+            language=next(iter(profile.voices), None),
+        )
         ctx.add_shutdown_callback(knowledge.aclose)
     agent = _build_agent(
         ctx,

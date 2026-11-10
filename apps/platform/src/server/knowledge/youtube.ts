@@ -92,7 +92,10 @@ type Player = {
 };
 
 export function playerInfo(html: string) {
-  const player = (jsonAfter(html, 'ytInitialPlayerResponse') ?? {}) as Player;
+  return playerFields((jsonAfter(html, 'ytInitialPlayerResponse') ?? {}) as Player);
+}
+
+function playerFields(player: Player) {
   return {
     status: player.playabilityStatus?.status ?? 'UNKNOWN',
     reason: player.playabilityStatus?.reason ?? '',
@@ -133,6 +136,35 @@ export function parseJson3(body: string): Segment[] {
     .filter((s) => s.text);
 }
 
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+const unescapeXml = (s: string) =>
+  s.replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, code: string) => {
+    if (code[0] !== '#') return ENTITIES[code.toLowerCase()] ?? m;
+    const n = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+    return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : '';
+  });
+
+/** YouTube's XML captions: <text start="1.5"> (classic) or <p t="1500"> (srv3). */
+export function parseXmlCaptions(body: string): Segment[] {
+  const out: Segment[] = [];
+  for (const m of body.matchAll(/<(text|p)\b([^>]*)>([\s\S]*?)<\/\1>/g)) {
+    const attrs = m[2];
+    const seconds =
+      m[1] === 'text'
+        ? Number(/\bstart="([\d.]+)"/.exec(attrs)?.[1] ?? 0)
+        : Number(/\bt="(\d+)"/.exec(attrs)?.[1] ?? 0) / 1000;
+    const stripTags = (s: string) => s.replace(/<[^>]+>/g, '');
+    const text = unescapeXml(stripTags(unescapeXml(stripTags(m[3]))))
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (text) out.push({ start: Math.floor(seconds), text });
+  }
+  return out;
+}
+
+export const parseCaptions = (body: string): Segment[] =>
+  body.trimStart().startsWith('{') ? parseJson3(body) : parseXmlCaptions(body);
+
 export const clock = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -167,18 +199,42 @@ export function momentUrl(videoId: string, section: string): string {
   return `https://www.youtube.com/watch?v=${videoId}${seconds ? `&t=${seconds}s` : ''}`;
 }
 
+/** The player as YouTube's Android app asks for it: its caption links work without a browser token. */
+const APP_CLIENT = { clientName: 'ANDROID', clientVersion: '20.10.38' };
+
+async function appPlayer(videoId: string, html: string, get: Get) {
+  const apiKey = /"INNERTUBE_API_KEY":"([\w-]+)"/.exec(html)?.[1];
+  if (!apiKey) return null;
+  try {
+    const res = await get(`https://www.youtube.com/youtubei/v1/player?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ context: { client: APP_CLIENT }, videoId }),
+    });
+    return res.status === 200 ? playerFields(JSON.parse(res.body) as Player) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchTranscript(videoId: string, get: Get): Promise<Transcript> {
   const page = await get(`https://www.youtube.com/watch?v=${videoId}&hl=pt-BR&persist_hl=1`);
   if (page.status !== 200) throw new Error(`O YouTube respondeu HTTP ${page.status}`);
-  const info = playerInfo(page.body);
+  const web = playerInfo(page.body);
+  const app = await appPlayer(videoId, page.body, get);
+  const info = app?.status === 'OK' ? { ...app, title: web.title || app.title } : web;
   if (info.status !== 'OK')
     throw new Error(
       info.reason ? `O YouTube não liberou o vídeo: ${info.reason}` : 'O YouTube não liberou o vídeo',
     );
-  const track = pickTrack(info.tracks);
+  const track = pickTrack(info.tracks.length > 0 ? info.tracks : web.tracks);
   if (!track) throw new Error('O vídeo não tem legendas (nem automáticas)');
-  const captions = await get(`${track.baseUrl}&fmt=json3`);
-  const segments = captions.status === 200 ? parseJson3(captions.body) : [];
+  let segments: Segment[] = [];
+  for (const url of [track.baseUrl.replace(/&fmt=[^&]*/, ''), `${track.baseUrl}&fmt=json3`]) {
+    const captions = await get(url);
+    segments = captions.status === 200 ? parseCaptions(captions.body) : [];
+    if (segments.length > 0) break;
+  }
   if (segments.length === 0) throw new Error('O YouTube não entregou a legenda do vídeo');
   return {
     videoId,

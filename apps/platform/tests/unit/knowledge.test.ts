@@ -55,6 +55,20 @@ describe('cutting documents into pieces', () => {
     expect(chunkText('x'.repeat(2500), 1000, 0).map((p) => p.content.length)).toEqual([1000, 1000, 500]);
   });
 
+  it('keeps sibling headings apart, whatever level the document starts at', () => {
+    const sections = (text: string) => chunkText(text).map((p) => p.section);
+    expect(sections('## Tem fidelidade?\n\nNão.\n\n## Aceita pix?\n\nSim.')).toEqual([
+      'Tem fidelidade?',
+      'Aceita pix?',
+    ]);
+    expect(sections('# Guia\n### Fundo\na\n## Meio\nb\n#### Detalhe\nc\n# Outro\nd')).toEqual([
+      'Guia > Fundo',
+      'Guia > Meio',
+      'Guia > Meio > Detalhe',
+      'Outro',
+    ]);
+  });
+
   it('turns tables into sentences retrieval understands', () => {
     const [piece] = chunkText('| Plano | Preço |\n| --- | --- |\n| Pro | R$ 99 |\n| Max | R$ 199 |');
     expect(piece.content).toBe('Plano: Pro, Preço: R$ 99.\nPlano: Max, Preço: R$ 199');
@@ -74,6 +88,7 @@ describe('cutting documents into pieces', () => {
     expect(text).toContain('| A | B |');
     expect(text).not.toMatch(/alert|menu|\.a\{/);
     expect(htmlToText('<p>&bogus; &#0;</p>').text).toBe('&bogus;');
+    expect(htmlToText('<title>&lt;&#x2F;&gt; htmx &amp; <b>co</b></title>').title).toBe('</> htmx & co');
   });
 
   it('builds keyword vectors without accents or common words, the same way every time', () => {

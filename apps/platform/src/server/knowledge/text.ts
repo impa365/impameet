@@ -73,12 +73,13 @@ function tableSentences(block: string): string | null {
 /** Pieces that remember the headings they sit under (prefixed, so each piece stands on its own). */
 export function chunkText(text: string, limit = PIECE_CHARS, overlap = OVERLAP_CHARS): Piece[] {
   const sections: { path: string[]; body: string[] }[] = [{ path: [], body: [] }];
-  let path: string[] = [];
+  let open: { level: number; title: string }[] = [];
   for (const line of text.replace(/\r\n?/g, '\n').split('\n')) {
     const h = HEADING.exec(line);
     if (h) {
-      path = [...path.slice(0, h[1].length - 1), h[2]];
-      sections.push({ path, body: [] });
+      const level = h[1].length;
+      open = [...open.filter((o) => o.level < level), { level, title: h[2] }];
+      sections.push({ path: open.map((o) => o.title), body: [] });
     } else sections[sections.length - 1].body.push(line);
   }
   const pieces: Piece[] = [];
@@ -116,9 +117,20 @@ export function chunkText(text: string, limit = PIECE_CHARS, overlap = OVERLAP_C
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
+const decodeEntities = (s: string) =>
+  s.replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, code: string) => {
+    if (code[0] === '#') {
+      const n = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+      return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : ' ';
+    }
+    return ENTITIES[code.toLowerCase()] ?? m;
+  });
+
 /** HTML as plain text with Markdown headings, list bullets and table rows; scripts dropped. */
 export function htmlToText(html: string): { title: string; text: string } {
-  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1]?.trim() ?? '';
+  const title = decodeEntities(
+    (/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? '').replace(/<[^>]+>/g, ' '),
+  ).trim();
   let s = html
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<(script|style|noscript|svg|template|iframe|nav|footer|header)\b[\s\S]*?<\/\1>/gi, ' ');
@@ -132,14 +144,8 @@ export function htmlToText(html: string): { title: string; text: string } {
     .replace(/<tr\b[^>]*>/gi, '\n| ')
     .replace(/<(br|hr)\b[^>]*>/gi, '\n')
     .replace(/<\/(p|div|section|article|ul|ol|table|blockquote|pre)>/gi, '\n\n')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, code: string) => {
-      if (code[0] === '#') {
-        const n = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
-        return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : ' ';
-      }
-      return ENTITIES[code.toLowerCase()] ?? m;
-    });
+    .replace(/<[^>]+>/g, ' ');
+  s = decodeEntities(s);
   const text = s
     .split('\n')
     .map((l) => l.replace(/[ \t]+/g, ' ').trim())

@@ -3,7 +3,13 @@
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { useLocale, useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
-import { SPEECH_CATALOG, type SpeechProvider, VOICE_LANGUAGES, type VoiceLanguage } from '@/lib/providers';
+import {
+  SPEECH_CATALOG,
+  type SpeechProvider,
+  VOICE_LANGUAGES,
+  type VoiceLanguage,
+  isSpeechProvider,
+} from '@/lib/providers';
 import { Icon, type IconName } from '../ui/Icon';
 import { api } from '../api';
 import { AgentExamples } from './AgentExamples';
@@ -202,14 +208,14 @@ export function AgentsTab() {
     useLoad<{ integrations: Integration[] }>('/api/admin/integrations').data?.integrations ?? [];
   const bases = useLoad<{ bases: { id: string; name: string }[] }>('/api/admin/knowledge').data?.bases ?? [];
   const llms = integrations.filter((i) => i.kind === 'llm');
-  const speech = integrations.filter((i) => i.kind !== 'llm' && i.kind !== 'embedding');
+  const speech = integrations.filter((i) => isSpeechProvider(i.kind));
   const nameOf = (id: string | null) => integrations.find((i) => i.id === id)?.name;
   const speechKind = (id: string | null): SpeechProvider | undefined => {
     const kind = integrations.find((i) => i.id === id)?.kind;
-    return kind && kind !== 'llm' && kind !== 'embedding' ? kind : undefined;
+    return kind && isSpeechProvider(kind) ? kind : undefined;
   };
   const speechLabel = (i: Integration) =>
-    i.kind === 'llm' || i.kind === 'embedding' ? i.name : `${i.name} · ${SPEECH_CATALOG[i.kind].name}`;
+    isSpeechProvider(i.kind) ? `${i.name} · ${SPEECH_CATALOG[i.kind].name}` : i.name;
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [busy, setBusy] = useState(false);

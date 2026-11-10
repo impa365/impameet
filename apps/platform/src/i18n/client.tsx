@@ -18,7 +18,21 @@ let currentServerErrors: Record<string, string> = {};
 let currentLocale: Locale = 'pt-BR';
 
 export function serverMessage(message: string): string {
-  return currentServerErrors[message] ?? translatePattern(message) ?? message;
+  return known(message) ?? translateParts(message) ?? message;
+}
+
+const known = (message: string) => currentServerErrors[message] ?? translatePattern(message);
+
+/** "Context: detail" messages (a page title, an upstream error) are translated part by part. */
+function translateParts(message: string): string | undefined {
+  const at = message.indexOf(': ');
+  if (at < 0) return undefined;
+  const head = message.slice(0, at);
+  const tail = message.slice(at + 2);
+  const headText = known(head);
+  const tailText = known(tail);
+  if (headText === undefined && tailText === undefined) return undefined;
+  return `${headText ?? head}: ${tailText ?? tail}`;
 }
 
 export function activeLocale(): Locale {

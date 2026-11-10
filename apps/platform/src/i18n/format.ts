@@ -6,9 +6,12 @@ export interface Messages {
 /** Same shape as `T`, with every leaf widened to `string` (what a translation must provide). */
 export type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };
 
+/** Plural forms are asked for by their base name ("n" for "n_one" / "n_other"). */
+type Plain<K extends string> = K extends `${infer B}_one` ? B : K extends `${infer B}_other` ? B : K;
+
 /** "a.b.c" for every leaf of `T`. */
 export type Leaves<T, P extends string = ''> = {
-  [K in keyof T & string]: T[K] extends string ? `${P}${K}` : Leaves<T[K], `${P}${K}.`>;
+  [K in keyof T & string]: T[K] extends string ? `${P}${Plain<K>}` : Leaves<T[K], `${P}${K}.`>;
 }[keyof T & string];
 
 export type Vars = Record<string, string | number>;

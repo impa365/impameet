@@ -9,7 +9,7 @@ import { api } from '../api';
 import { ModelPicker } from './ModelPicker';
 import { messageOf, useLoad } from './useLoad';
 
-export type IntegrationKind = 'llm' | 'embedding' | SpeechProvider;
+export type IntegrationKind = 'llm' | 'embedding' | 'rerank' | SpeechProvider;
 
 export interface Integration {
   id: string;
@@ -45,11 +45,35 @@ const NEW_LLM: Draft = {
   models: [],
 };
 const NEW_EMBEDDING: Draft = { ...NEW_LLM, kind: 'embedding', preset: '', baseUrl: '' };
+const NEW_RERANK: Draft = { ...NEW_LLM, kind: 'rerank', preset: '', baseUrl: '' };
+
+/** Rerank APIs sharing the /rerank request; picking one fills the address, never the model. */
+const RERANK_PRESETS = [
+  {
+    id: 'cohere',
+    name: 'Cohere',
+    baseUrl: 'https://api.cohere.com/v2',
+    models: ['rerank-v3.5', 'rerank-multilingual-v3.0'],
+  },
+  {
+    id: 'jina',
+    name: 'Jina',
+    baseUrl: 'https://api.jina.ai/v1',
+    models: ['jina-reranker-v2-base-multilingual', 'jina-reranker-m0'],
+  },
+  {
+    id: 'voyage',
+    name: 'Voyage',
+    baseUrl: 'https://api.voyageai.com/v1',
+    models: ['rerank-2.5', 'rerank-2.5-lite'],
+  },
+] as const;
 const newSpeech = (kind: SpeechProvider): Draft => ({ ...NEW_LLM, kind, preset: '', baseUrl: '' });
 
 const KIND_LABEL = {
   llm: 'admin.integrations.kindLlm',
   embedding: 'admin.integrations.kindEmbedding',
+  rerank: 'admin.integrations.kindRerank',
   fish: 'admin.integrations.kindFish',
   deepgram: 'admin.integrations.kindDeepgram',
   elevenlabs: 'admin.integrations.kindElevenlabs',
@@ -118,6 +142,7 @@ const presetExample = (p: LlmPreset, t: T) => p.example || t('admin.integrations
 const KIND_ICON = {
   llm: 'psychology',
   embedding: 'menu_book',
+  rerank: 'tune',
   fish: 'graphic_eq',
   deepgram: 'hearing',
   elevenlabs: 'record_voice_over',
@@ -161,7 +186,15 @@ export function IntegrationsTab() {
     setNotice('');
     if (!i) {
       setEditing('new');
-      setDraft(kind === 'llm' ? NEW_LLM : kind === 'embedding' ? NEW_EMBEDDING : newSpeech(kind));
+      setDraft(
+        kind === 'llm'
+          ? NEW_LLM
+          : kind === 'embedding'
+            ? NEW_EMBEDDING
+            : kind === 'rerank'
+              ? NEW_RERANK
+              : newSpeech(kind),
+      );
       return;
     }
     setEditing(i.id);
@@ -189,9 +222,9 @@ export function IntegrationsTab() {
             defaultModel: draft.defaultModel,
             models: draft.models,
           }
-        : draft.kind === 'embedding'
+        : draft.kind === 'embedding' || draft.kind === 'rerank'
           ? {
-              kind: 'embedding',
+              kind: draft.kind,
               name: draft.name,
               baseUrl: draft.baseUrl,
               apiKey: draft.apiKey || undefined,
@@ -283,6 +316,8 @@ export function IntegrationsTab() {
       </div>
     );
     const embeddingChoices = embeddingModels.slice(0, 40);
+    const rerankModels: readonly string[] =
+      RERANK_PRESETS.find((p) => p.baseUrl === draft.baseUrl)?.models ?? [];
     return (
       <div className="settings-body">
         <div className="settings-head">
@@ -323,7 +358,27 @@ export function IntegrationsTab() {
                 onChange={(e) => set('name', e.target.value)}
               />
             </label>
-            {(draft.kind === 'llm' || draft.kind === 'embedding') && (
+            {draft.kind === 'rerank' && (
+              <div
+                className="preset-grid"
+                role="radiogroup"
+                aria-label={t('admin.integrations.rerankProvider')}
+              >
+                {RERANK_PRESETS.map((p) => (
+                  <button
+                    type="button"
+                    key={p.id}
+                    role="radio"
+                    aria-checked={draft.baseUrl === p.baseUrl}
+                    className={draft.baseUrl === p.baseUrl ? 'preset active' : 'preset'}
+                    onClick={() => setDraft({ ...draft, baseUrl: p.baseUrl, name: draft.name || p.name })}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {(draft.kind === 'llm' || draft.kind === 'embedding' || draft.kind === 'rerank') && (
               <label>
                 {t('admin.integrations.baseUrlLabel')}
                 <input
@@ -417,6 +472,34 @@ export function IntegrationsTab() {
                   </div>
                 )}
               </>
+            ) : draft.kind === 'rerank' ? (
+              <>
+                <label>
+                  {t('admin.integrations.rerankModel')}
+                  <input
+                    required
+                    maxLength={120}
+                    value={draft.defaultModel}
+                    onChange={(e) => set('defaultModel', e.target.value)}
+                  />
+                  <span className="field-help">{t('admin.integrations.rerankModelHint')}</span>
+                </label>
+                {rerankModels.length > 0 && (
+                  <div className="chips" role="group" aria-label={t('admin.integrations.rerankModel')}>
+                    {rerankModels.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        className={m === draft.defaultModel ? 'chip add accent' : 'chip add'}
+                        aria-pressed={m === draft.defaultModel}
+                        onClick={() => set('defaultModel', m)}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : null}
           </section>
           <div className="save-bar">
@@ -446,6 +529,7 @@ export function IntegrationsTab() {
       title: t('admin.integrations.embeddingTitle'),
       hint: t('admin.integrations.embeddingGroupHint'),
     },
+    { kind: 'rerank', title: t('admin.integrations.rerankTitle'), hint: t('admin.integrations.rerankHint') },
     { kind: 'fish', title: 'Fish Audio', hint: t('admin.integrations.fishHint') },
     { kind: 'deepgram', title: 'Deepgram', hint: t('admin.integrations.deepgramHint') },
     { kind: 'elevenlabs', title: 'ElevenLabs', hint: t('admin.integrations.elevenlabsHint') },
@@ -516,7 +600,9 @@ export function IntegrationsTab() {
                     ? preset.id === 'custom'
                       ? host
                       : `${presetName(preset, t)} · ${host}`
-                    : i.kind !== 'llm' && i.kind !== 'embedding' && SPEECH_CATALOG[i.kind].name;
+                    : i.kind === 'rerank'
+                      ? host
+                      : i.kind !== 'llm' && i.kind !== 'embedding' && SPEECH_CATALOG[i.kind].name;
                   return (
                     <li key={i.id} className="tile">
                       <div className="tile-body">

@@ -126,18 +126,18 @@ export async function fetchPage(
 const MAX_HOPS = 4;
 
 /**
- * GET through the outbound guard, following redirects one hop at a time (each hop is checked
- * again, so a redirect can never lead to a private address).
+ * GET (or a JSON POST) through the outbound guard, following GET redirects one hop at a time
+ * (each hop is checked again, so a redirect can never lead to a private address).
  */
 export function webGet(net: NetPolicy): Get {
-  return async (start) => {
+  return async (start, init) => {
     let url = start;
     for (let hop = 0; hop <= MAX_HOPS; hop++) {
       const youtube = /(^|\.)youtube\.com$/.test(new URL(url).hostname);
       const res = await outbound(
         {
           url,
-          method: 'GET',
+          method: init?.method ?? 'GET',
           headers: {
             accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.1',
             'accept-language': 'pt-BR,pt;q=0.9,en;q=0.8,es;q=0.7',
@@ -148,14 +148,16 @@ export function webGet(net: NetPolicy): Get {
                   cookie: 'CONSENT=YES+',
                 }
               : {}),
+            ...init?.headers,
           },
+          ...(init ? { body: init.body } : {}),
           timeoutMs: 20_000,
           maxBytes: 6 * 1024 * 1024,
         },
         net,
       );
       const location = res.headers.location;
-      if (res.status >= 300 && res.status < 400 && location) {
+      if (!init && res.status >= 300 && res.status < 400 && location) {
         url = new URL(location, url).toString();
         continue;
       }

@@ -1,7 +1,8 @@
 /**
  * Finding the pages of a website to import: its sitemaps first (robots.txt, /sitemap.xml and
  * sitemap indexes), then the links of the pages themselves, breadth first, never leaving the
- * site. Every request goes through the outbound guard (public https only, no redirects).
+ * site. Every request goes through the outbound guard (public addresses only, each redirect
+ * checked again).
  */
 import { htmlToText } from './text';
 
@@ -13,7 +14,14 @@ export interface Fetched {
   body: string;
 }
 
-export type Get = (url: string) => Promise<Fetched>;
+/** A JSON POST, for the few APIs that need one (redirects are not followed). */
+export interface PostInit {
+  method: 'POST';
+  headers?: Record<string, string>;
+  body: string;
+}
+
+export type Get = (url: string, init?: PostInit) => Promise<Fetched>;
 
 export interface CrawlOptions {
   /** How many links away from the start page (1 = only the pages it links to). */
