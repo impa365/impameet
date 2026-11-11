@@ -14,7 +14,6 @@ import pytest
 from livekit.agents import APIConnectionError, APIStatusError
 from livekit.agents import llm as lk_llm
 
-from meet_impar_agent.config import LLMSettings
 from meet_impar_agent.pipeline import build_conn_options, build_llm
 
 
@@ -81,14 +80,16 @@ def server() -> Iterator[FakeLLMServer]:
     thread.join()
 
 
-async def _ask(settings: LLMSettings, server: FakeLLMServer) -> str:
-    model = build_llm(settings, model="m", base_url=server.url, api_key="llm-secret")
+async def _ask(server: FakeLLMServer, *, timeout_s: float = 2.0) -> str:
+    model = build_llm(
+        model="m", base_url=server.url, api_key="llm-secret", temperature=0.3, max_tokens=320
+    )
     ctx = lk_llm.ChatContext()
     ctx.add_message(role="user", content="oi")
     parts: list[str] = []
     try:
         async with model.chat(
-            chat_ctx=ctx, conn_options=build_conn_options(settings).llm_conn_options
+            chat_ctx=ctx, conn_options=build_conn_options(timeout_s).llm_conn_options
         ) as stream:
             async for chunk in stream:
                 if chunk.delta and chunk.delta.content:
@@ -98,19 +99,15 @@ async def _ask(settings: LLMSettings, server: FakeLLMServer) -> str:
     return "".join(parts)
 
 
-def _settings(timeout_s: float = 2.0) -> LLMSettings:
-    return LLMSettings(timeout_s=timeout_s)
-
-
-async def test_streams_the_reply_and_sends_the_configured_request(server: FakeLLMServer) -> None:
-    assert await _ask(_settings(), server) == "Olá, tudo bem?"
+async def test_streams_the_reply_and_sends_the_agent_request(server: FakeLLMServer) -> None:
+    assert await _ask(server) == "Olá, tudo bem?"
 
     request = server.requests[0]
     assert request["auth"] == "Bearer llm-secret"
     assert request["body"]["model"] == "m"
     assert request["body"]["stream"] is True
-    assert request["body"]["max_completion_tokens"] == 400
-    assert request["body"]["temperature"] == pytest.approx(0.6)
+    assert request["body"]["max_completion_tokens"] == 320
+    assert request["body"]["temperature"] == pytest.approx(0.3)
 
 
 async def test_a_stalled_llm_is_cut_off_instead_of_hanging(server: FakeLLMServer) -> None:
@@ -118,7 +115,7 @@ async def test_a_stalled_llm_is_cut_off_instead_of_hanging(server: FakeLLMServer
     started = time.monotonic()
 
     with pytest.raises(APIConnectionError):
-        await _ask(_settings(timeout_s=0.5), server)
+        await _ask(server, timeout_s=0.5)
 
     assert time.monotonic() - started < 2.5
     assert len(server.requests) == 2
@@ -128,6 +125,6 @@ async def test_auth_errors_are_not_retried(server: FakeLLMServer) -> None:
     server.status = 401
 
     with pytest.raises(APIStatusError):
-        await _ask(_settings(), server)
+        await _ask(server)
 
     assert len(server.requests) == 1

@@ -108,6 +108,11 @@ COMPLETE: dict[str, Any] = {
     "llm": {"baseUrl": "https://llm.example/v1", "apiKey": "sk-0123456789"},
     "tts": {"provider": "fish", "apiKey": "fish-0123456789"},
     "stt": {"provider": "fish", "apiKey": "fish-0123456789"},
+    "llmTemperature": 0.6,
+    "llmMaxTokens": 400,
+    "llmTimeoutS": 15,
+    "thinkingVolume": 0.5,
+    "ttsLatency": "balanced",
 }
 
 

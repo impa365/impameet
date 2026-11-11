@@ -210,7 +210,6 @@ async def run_captions(ctx: JobContext, settings: Settings) -> None:
     transcript = Transcript()
     stt = build_stt(
         profile.stt_provider,
-        settings.fish,
         api_key=profile.stt_api_key or "",
         model=profile.stt_model,
         languages=tuple(profile.voices),

@@ -13,7 +13,7 @@ from meet_impar_agent.config import load_settings
 from meet_impar_agent.persona import Talker, VoiceAgent
 from meet_impar_agent.profile import MAX_DISPLAY_NAME_LENGTH, AgentProfile, display_name
 
-from .conftest import LIVEKIT_KEY, LIVEKIT_SECRET
+from .conftest import LIVEKIT_KEY, LIVEKIT_SECRET, TUNING
 
 
 def profile(**overrides: Any) -> AgentProfile:
@@ -31,7 +31,7 @@ def profile(**overrides: Any) -> AgentProfile:
         "stt_api_key": "fish-test-0123456789",
         "voices": {"pt": "voz-kaiser"},
     }
-    return AgentProfile(**(base | overrides))
+    return AgentProfile(**(TUNING | base | overrides))
 
 
 @pytest.fixture

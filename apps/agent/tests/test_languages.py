@@ -18,6 +18,8 @@ from meet_impar_agent.languages import (
 from meet_impar_agent.persona import Talker, VoiceAgent
 from meet_impar_agent.profile import AgentProfile
 
+from .conftest import TUNING
+
 VOICES = {"pt": "voz-pt-1", "en": "voice-en-1", "es": "voz-es-1"}
 
 
@@ -30,7 +32,7 @@ def profile(**overrides: Any) -> AgentProfile:
         "tts_model": "s2.1-pro",
         "llm_model": "m",
     }
-    return AgentProfile(**(base | overrides))
+    return AgentProfile(**(TUNING | base | overrides))
 
 
 def test_voices_keep_only_known_languages_and_valid_ids() -> None:

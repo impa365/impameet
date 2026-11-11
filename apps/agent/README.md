@@ -17,7 +17,7 @@ o modelo de transcrição e uma voz por idioma. Um agente incompleto não entra 
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `config.py` | Configuração do worker (LiveKit, plataforma, ajustes finos); segredos de `<NOME>_FILE` |
+| `config.py` | Configuração do worker (LiveKit, plataforma, tela); segredos de `<NOME>_FILE` |
 | `profile.py` | Carrega da plataforma o perfil de cada agente (persona, chaves, modelos, vozes) |
 | `languages.py` | Idioma de quem fala e a voz de cada idioma |
 | `providers.py` | Provedores de voz e transcrição e como cada um troca de voz |
@@ -36,10 +36,12 @@ o modelo de transcrição e uma voz por idioma. Um agente incompleto não entra 
 | `LIVEKIT_URL`, `LIVEKIT_API_KEY_FILE`, `LIVEKIT_API_SECRET_FILE` | Conexão com o LiveKit (obrigatória) |
 | `PLATFORM_URL`, `PLATFORM_TOKEN_FILE` | De onde vêm os perfis dos agentes |
 | `SCREEN_URL`, `SCREEN_TOKEN_FILE` | Compartilhamento de tela pela IA (opcional) |
-| `AGENT_NAME` | Nome de despacho; igual ao `AGENT_NAME` da plataforma (padrão `kaiser`) |
-| `FISH_BASE_URL`, `FISH_LATENCY_MODE`, `FISH_SPEED` | Ajustes de conexão e ritmo da fala |
-| `LLM_TEMPERATURE`, `LLM_MAX_COMPLETION_TOKENS`, `LLM_TIMEOUT_S` | Ajustes das requisições ao LLM |
-| `AGENT_THINKING_SOUND`, `AGENT_THINKING_VOLUME` | Som de digitação enquanto o LLM pensa |
+| `AGENT_NAME` | Nome de despacho; igual ao `AGENT_NAME` da plataforma (os dois usam `kaiser` se não definido) |
+| `LOG_LEVEL` | Nível de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+
+O worker só sabe onde se conectar. Provedores, chaves, modelos, vozes, temperatura, tamanho
+da resposta, tempo limite, latência da voz e volume do som de digitação são escolhidos em
+cada agente no painel e chegam pela plataforma; nada disso tem valor no servidor.
 
 Segredos nunca ficam em arquivo, variável de ambiente ou log: são Docker Swarm secrets
 (criptografados em repouso e em trânsito, montados em memória só no container).

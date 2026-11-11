@@ -7,6 +7,7 @@ import pytest
 from meet_impar_agent.config import (
     MAX_SECRET_BYTES,
     ConfigError,
+    Settings,
     get_settings,
     load_settings,
     read_secret,
@@ -23,75 +24,57 @@ def test_loads_a_complete_environment(env: dict[str, str]) -> None:
     assert settings.livekit.api_secret.get_secret_value() == LIVEKIT_SECRET
 
 
-def test_defaults_apply_to_unset_variables(env: dict[str, str]) -> None:
+def test_the_worker_only_knows_where_to_connect(env: dict[str, str]) -> None:
+    """Providers, keys, models, voices and their tuning are chosen per agent, never here."""
     settings = load_settings(env)
 
-    assert str(settings.fish.base_url) == "https://api.fish.audio/"
-    assert settings.fish.latency_mode == "balanced"
-    assert settings.fish.speed is None
-    assert settings.llm.temperature == pytest.approx(0.6)
-    assert settings.llm.max_completion_tokens == 400
+    assert set(Settings.model_fields) == {
+        "livekit",
+        "agent",
+        "platform",
+        "screen",
+        "log_level",
+    }
+    assert set(type(settings.agent).model_fields) == {"name"}
     assert settings.agent.name == "kaiser"
     assert settings.log_level == "INFO"
 
 
-def test_no_provider_model_or_voice_is_configured_on_the_worker(env: dict[str, str]) -> None:
-    """Keys, models and voices are chosen per agent on the platform, never here."""
-    settings = load_settings(env)
+@pytest.mark.parametrize(
+    "variable",
+    [
+        "FISH_BASE_URL",
+        "FISH_LATENCY_MODE",
+        "FISH_SPEED",
+        "FISH_TTS_MODEL",
+        "FISH_VOICE_ID",
+        "LLM_BASE_URL",
+        "LLM_MODEL",
+        "LLM_TEMPERATURE",
+        "LLM_MAX_COMPLETION_TOKENS",
+        "LLM_TIMEOUT_S",
+        "AGENT_THINKING_SOUND",
+        "AGENT_THINKING_VOLUME",
+    ],
+)
+def test_agent_choices_in_the_environment_are_ignored(env: dict[str, str], variable: str) -> None:
+    env[variable] = "anything"
 
-    for section in (settings.fish, settings.llm, settings.agent):
-        fields = set(type(section).model_fields)
-        assert not fields & {"api_key", "model", "voice_id", "tts_model", "stt_model"}
-        assert not fields & {"instructions", "greeting", "display_name", "language"}
+    assert load_settings(env) == load_settings({k: v for k, v in env.items() if k != variable})
 
 
 def test_overrides_are_applied(env: dict[str, str]) -> None:
-    env |= {
-        "FISH_BASE_URL": "https://fish.example.com",
-        "FISH_LATENCY_MODE": "low",
-        "FISH_SPEED": "1.1",
-        "LLM_TEMPERATURE": "0.2",
-        "LLM_MAX_COMPLETION_TOKENS": "256",
-        "LLM_TIMEOUT_S": "8",
-        "AGENT_NAME": "impadmin",
-        "LOG_LEVEL": "DEBUG",
-    }
+    env |= {"AGENT_NAME": "impadmin", "LOG_LEVEL": "DEBUG"}
     settings = load_settings(env)
 
-    assert str(settings.fish.base_url) == "https://fish.example.com/"
-    assert settings.fish.latency_mode == "low"
-    assert settings.fish.speed == pytest.approx(1.1)
-    assert settings.llm.temperature == pytest.approx(0.2)
-    assert settings.llm.max_completion_tokens == 256
-    assert settings.llm.timeout_s == pytest.approx(8)
     assert settings.agent.name == "impadmin"
     assert settings.log_level == "DEBUG"
 
 
-def test_thinking_sound_is_on_by_default(env: dict[str, str]) -> None:
-    agent = load_settings(env).agent
+def test_the_dispatch_name_matches_the_platform_unless_both_change(env: dict[str, str]) -> None:
+    del env["AGENT_NAME"]
 
-    assert agent.thinking_sound is True
-    assert agent.thinking_volume == pytest.approx(0.5)
-
-
-@pytest.mark.parametrize(("value", "expected"), [("off", False), ("0", False), ("ON", True)])
-def test_thinking_sound_flag(env: dict[str, str], value: str, expected: bool) -> None:
-    env |= {"AGENT_THINKING_SOUND": value, "AGENT_THINKING_VOLUME": "0.3"}
-    agent = load_settings(env).agent
-
-    assert agent.thinking_sound is expected
-    assert agent.thinking_volume == pytest.approx(0.3)
-
-
-@pytest.mark.parametrize(
-    ("variable", "value"), [("AGENT_THINKING_SOUND", "maybe"), ("AGENT_THINKING_VOLUME", "2")]
-)
-def test_invalid_thinking_settings(env: dict[str, str], variable: str, value: str) -> None:
-    env[variable] = value
-
-    with pytest.raises(ConfigError, match="invalid configuration"):
-        load_settings(env)
+    assert load_settings(env).agent.name == "kaiser"
 
 
 @pytest.mark.parametrize("secret", ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"])
@@ -113,12 +96,6 @@ def test_livekit_url_is_required(env: dict[str, str]) -> None:
     ("variable", "value"),
     [
         ("LIVEKIT_URL", "https://not-a-websocket.example.com"),
-        ("FISH_BASE_URL", "not a url"),
-        ("FISH_LATENCY_MODE", "turbo"),
-        ("FISH_SPEED", "3"),
-        ("LLM_TEMPERATURE", "-1"),
-        ("LLM_MAX_COMPLETION_TOKENS", "1"),
-        ("LLM_TIMEOUT_S", "0"),
         ("AGENT_NAME", "Kaiser With Spaces"),
         ("LOG_LEVEL", "LOUD"),
     ],
@@ -163,7 +140,7 @@ def test_settings_are_immutable(env: dict[str, str]) -> None:
     settings = load_settings(env)
 
     with pytest.raises(ValueError, match="frozen"):
-        settings.llm.temperature = 1.0  # type: ignore[misc]
+        settings.agent.name = "other"  # type: ignore[misc]
 
 
 class TestReadSecret:

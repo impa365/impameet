@@ -18,6 +18,8 @@ from meet_impar_agent.knowledge import KNOWLEDGE_NOTE, KnowledgeClient
 from meet_impar_agent.persona import VoiceAgent
 from meet_impar_agent.profile import AgentProfile
 
+from .conftest import TUNING
+
 PLATFORM = PlatformSettings(url="http://platform:3000", token=SecretStr("tok"))  # type: ignore[arg-type]
 
 
@@ -32,7 +34,7 @@ def profile(**overrides: Any) -> AgentProfile:
         "voices": {"pt": "voz"},
         "agent_id": "ag-1",
     }
-    return AgentProfile(**(base | overrides))
+    return AgentProfile(**(TUNING | base | overrides))
 
 
 def person(identity: str, name: str, role: str, *, agent: bool = False) -> MagicMock:

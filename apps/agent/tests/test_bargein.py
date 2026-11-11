@@ -16,6 +16,8 @@ from meet_impar_agent.persona import Talker, VoiceAgent
 from meet_impar_agent.pipeline import ThinkingAudio, build_thinking_audio, build_turn_handling
 from meet_impar_agent.profile import AgentProfile, thinking_sound
 
+from .conftest import TUNING
+
 ANA = Talker(name="Ana", role="participant", identity="u-ana")
 BIA = Talker(name="Bia", role="guest", identity="g-bia")
 MOD = Talker(name="Carla", role="moderator", identity="u-carla")
@@ -95,7 +97,7 @@ def profile(**overrides: Any) -> AgentProfile:
         "llm_model": "m",
         "voices": {"pt": "voz-pt-1"},
     }
-    return AgentProfile(**(base | overrides))
+    return AgentProfile(**(TUNING | base | overrides))
 
 
 @pytest.fixture

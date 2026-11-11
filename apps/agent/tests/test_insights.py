@@ -25,6 +25,7 @@ from meet_impar_agent.insights import (
 )
 from meet_impar_agent.profile import AgentProfile, profile_from_platform
 
+from .conftest import TUNING
 from .test_agent_credentials import REMOTE
 
 PLATFORM = PlatformSettings(url="http://platform:3000", token=SecretStr("tok"))  # type: ignore[arg-type]
@@ -292,7 +293,7 @@ def profile(**overrides: Any) -> AgentProfile:
         "voices": {"pt": "voz-kaiser"},
         "mute_policy": "disabled",
     }
-    return AgentProfile(**(base | overrides))
+    return AgentProfile(**(TUNING | base | overrides))
 
 
 async def test_the_agent_follows_the_room_for_the_record_and_the_copilot() -> None:

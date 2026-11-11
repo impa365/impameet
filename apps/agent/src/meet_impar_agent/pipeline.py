@@ -1,7 +1,7 @@
-"""Builds the voice pipeline (STT -> LLM -> TTS) from :class:`Settings`.
+"""Builds the voice pipeline (STT -> LLM -> TTS) from the agent's own choices.
 
-Each builder is a pure function of the settings so providers can be swapped by
-configuration alone and every wiring decision is unit-testable without a network.
+Each builder is a pure function of what the agent chose on the platform, so providers can be
+swapped by configuration alone and every wiring decision is unit-testable without a network.
 """
 
 from __future__ import annotations
@@ -21,9 +21,10 @@ from livekit.agents import (
 )
 from livekit.plugins import deepgram, elevenlabs, fishaudio, openai
 
-from .config import AgentSettings, FishSettings, LLMSettings
+from .profile import TtsLatency
 from .providers import DEEPGRAM_MULTILINGUAL_STT, SpeechProvider
 
+FISH_API_URL = "https://api.fish.audio"
 FISH_SAMPLE_RATE = 24_000
 """PCM keeps decoding off the hot path; Fish refuses 48 kHz PCM, 24 kHz is plenty for voice."""
 TTS_SAMPLE_RATE = 24_000
@@ -39,7 +40,6 @@ def _base_url(url: object) -> str:
 
 def build_stt(
     provider: SpeechProvider,
-    fish: FishSettings,
     *,
     api_key: str,
     model: str,
@@ -66,7 +66,7 @@ def build_stt(
         return elevenlabs.STT(api_key=api_key, model=model, server_vad={}, tag_audio_events=False)
     return fishaudio.STT(
         api_key=api_key,
-        base_url=_base_url(fish.base_url),
+        base_url=FISH_API_URL,
         model=model,
         turn_detection_mode="auto",
     )
@@ -74,13 +74,16 @@ def build_stt(
 
 def build_tts(
     provider: SpeechProvider,
-    fish: FishSettings,
     *,
     voice_id: str,
     model: str,
     api_key: str,
+    latency: TtsLatency | None,
 ) -> tts.TTS[Any]:
-    """The agent's own voice, speech model and account (never the worker's)."""
+    """The agent's own voice, speech model and account (never the worker's).
+
+    ``latency`` is Fish Audio's, chosen in the agent (required with Fish, unused otherwise).
+    """
     if provider == "deepgram":
         # Deepgram voices are model names: "flux-…" streams on /v2/speak, "aura-2-…" on /v1/speak.
         if model == "flux":
@@ -90,40 +93,38 @@ def build_tts(
         return elevenlabs.TTS(
             voice_id=voice_id, model=model, api_key=api_key, encoding=ELEVENLABS_ENCODING
         )
-    kwargs: dict[str, Any] = {
-        "api_key": api_key,
-        "base_url": _base_url(fish.base_url),
-        "model": model,
-        "voice_id": voice_id,
-        "latency_mode": fish.latency_mode,
-        "output_format": "pcm",
-        "sample_rate": FISH_SAMPLE_RATE,
-    }
-    if fish.speed is not None:
-        kwargs["speed"] = fish.speed
-    return fishaudio.TTS(**kwargs)
+    if latency is None:
+        raise ValueError("a Fish Audio voice needs the latency chosen in the agent")
+    return fishaudio.TTS(
+        api_key=api_key,
+        base_url=FISH_API_URL,
+        model=model,
+        voice_id=voice_id,
+        latency_mode=latency,
+        output_format="pcm",
+        sample_rate=FISH_SAMPLE_RATE,
+    )
 
 
-def build_llm(llm: LLMSettings, *, model: str, base_url: str, api_key: str) -> openai.LLM:
-    """The agent's own OpenAI-compatible endpoint, key and model (never the worker's).
-
-    Only tuning (temperature, answer length, timeouts) comes from the worker settings.
-    """
+def build_llm(
+    *, model: str, base_url: str, api_key: str, temperature: float, max_tokens: int
+) -> openai.LLM:
+    """The agent's own OpenAI-compatible endpoint, key, model and tuning (never the worker's)."""
     return openai.LLM(
         model=model,
         base_url=_base_url(base_url),
         api_key=api_key,
-        temperature=llm.temperature,
-        max_completion_tokens=llm.max_completion_tokens,
+        temperature=temperature,
+        max_completion_tokens=max_tokens,
         max_retries=0,
     )
 
 
-def build_conn_options(llm: LLMSettings) -> SessionConnectOptions:
+def build_conn_options(timeout_s: float) -> SessionConnectOptions:
     """Per-request deadlines; LiveKit applies these, not the HTTP client's own timeout."""
     return SessionConnectOptions(
         llm_conn_options=APIConnectOptions(
-            max_retry=1, retry_interval=0.5, timeout=llm.timeout_s, liveness_timeout=llm.timeout_s
+            max_retry=1, retry_interval=0.5, timeout=timeout_s, liveness_timeout=timeout_s
         ),
     )
 
@@ -147,19 +148,19 @@ class ThinkingAudio(BackgroundAudioPlayer):
             self._thinking_handle.stop()
 
 
-def build_thinking_audio(agent: AgentSettings, *, enabled: bool = True) -> ThinkingAudio | None:
+def build_thinking_audio(volume: float, *, enabled: bool) -> ThinkingAudio | None:
     """Soft keyboard typing while the LLM works, so the wait never sounds like dead air.
 
-    The worker setting turns the feature off for every room; ``enabled`` is the room's own
-    switch, which can still change during the meeting (``ThinkingAudio.set_enabled``).
+    ``volume`` is the agent's (0 turns the feature off); ``enabled`` is the room's own switch,
+    which can still change during the meeting (``ThinkingAudio.set_enabled``).
     """
-    if not agent.thinking_sound or agent.thinking_volume == 0:
+    if volume == 0:
         return None
     return ThinkingAudio(
         enabled=enabled,
         thinking_sound=[
-            AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=agent.thinking_volume),
-            AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING2, volume=agent.thinking_volume),
+            AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=volume),
+            AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING2, volume=volume),
         ],
     )
 

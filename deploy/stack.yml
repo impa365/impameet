@@ -48,10 +48,7 @@ services:
       TRAEFIK_SERVICE: impameet_platform@${TRAEFIK_PROVIDER:-swarm}
       TRAEFIK_CERT_RESOLVER: ${TRAEFIK_CERT_RESOLVER:-letsencryptresolver}
       TRAEFIK_ENTRYPOINT: ${TRAEFIK_ENTRYPOINT:-websecure}
-      # E-mail invitations (optional): create the secret meet_smtp_url
-      # (smtps://user:password@host:465), add it below and uncomment:
-      # SMTP_URL_FILE: /run/secrets/meet_smtp_url
-      # MAIL_FROM: IMPA Meet <meet@example.com>
+      # E-mail (SMTP) is set in the panel, per organization and for the platform, encrypted.
     secrets:
       - {source: meet_platform_database_url, mode: 0400, uid: "10001"}
       - {source: meet_livekit_api_key, mode: 0400, uid: "10001"}
@@ -85,7 +82,8 @@ services:
 
   # ---------------------------------------------------------------------------
   # AI voice agents (LiveKit Agents + Fish Audio + any OpenAI-compatible LLM).
-  # Providers, models and voices are chosen per agent in the admin panel.
+  # Providers, keys, models, voices and their tuning are chosen per agent in the admin panel;
+  # this service only knows where to connect.
   # ---------------------------------------------------------------------------
   agent:
     image: impa365/impameet-agent:${IMPAMEET_VERSION:-latest}

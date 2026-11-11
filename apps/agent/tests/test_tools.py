@@ -22,6 +22,8 @@ from meet_impar_agent.tools import (
     tools_note,
 )
 
+from .conftest import TUNING
+
 PLATFORM = PlatformSettings(url="http://platform:3000", token=SecretStr("tok"))  # type: ignore[arg-type]
 BASE = "/api/internal/agents/ag-1/tools"
 ANA = Talker(name="Ana", role="moderator", identity="u-11111111-1111-1111-1111-111111111111-a")
@@ -238,7 +240,7 @@ def profile(**overrides: Any) -> AgentProfile:
         "mute_policy": "disabled",
         "agent_id": "ag-1",
     }
-    return AgentProfile(**(base | overrides))
+    return AgentProfile(**(TUNING | base | overrides))
 
 
 def final(text: str) -> stt.SpeechEvent:

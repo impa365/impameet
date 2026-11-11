@@ -31,6 +31,7 @@ from meet_impar_agent.profile import (
     profile_from_platform,
 )
 
+from .conftest import TUNING
 from .test_agent_credentials import REMOTE
 
 
@@ -321,7 +322,7 @@ def profile(**overrides: Any) -> AgentProfile:
         "voices": {"pt": "voz-kaiser"},
         "mute_policy": "disabled",
     }
-    return AgentProfile(**(base | overrides))
+    return AgentProfile(**(TUNING | base | overrides))
 
 
 async def test_the_agent_builds_its_eyes_and_follows_the_room(env: dict[str, str]) -> None:

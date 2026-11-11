@@ -9,6 +9,7 @@ import { assertTenantBases, setAgentBases } from '../knowledge/service';
 import type { agentInput } from '../validation';
 
 export type AgentInput = z.infer<typeof agentInput>;
+export type TtsLatency = 'low' | 'balanced' | 'normal';
 
 /** Agents carry up to 100k characters of knowledge (UTF-8 can take up to 4 bytes each). */
 export const MAX_AGENT_BYTES = 512 * 1024;
@@ -17,11 +18,26 @@ export const MAX_AGENT_BYTES = 512 * 1024;
 eady is false and it is not dispatched). */
 export interface AgentConfig extends Omit<
   AgentInput,
-  'llmModel' | 'sttModel' | 'ttsModel' | 'llmIntegrationId' | 'ttsIntegrationId' | 'sttIntegrationId'
+  | 'llmModel'
+  | 'sttModel'
+  | 'ttsModel'
+  | 'llmIntegrationId'
+  | 'ttsIntegrationId'
+  | 'sttIntegrationId'
+  | 'llmTemperature'
+  | 'llmMaxTokens'
+  | 'llmTimeoutS'
+  | 'thinkingVolume'
+  | 'ttsLatency'
 > {
   id: string;
   tenantId: string;
   llmModel: string | null;
+  llmTemperature: number | null;
+  llmMaxTokens: number | null;
+  llmTimeoutS: number | null;
+  thinkingVolume: number | null;
+  ttsLatency: TtsLatency | null;
   sttModel: string | null;
   ttsModel: string | null;
   llmIntegrationId: string | null;
@@ -53,6 +69,8 @@ const AGENT_COLUMNS = (sql: Sql) => sql`
   moderation_tools as "moderationTools", moderation_rules as "moderationRules", perception,
   insights, insights_access as "insightsAccess", minutes_webhook as "minutesWebhook",
   style_rules as "styleRules",
+  llm_temperature::float8 as "llmTemperature", llm_max_tokens as "llmMaxTokens",
+  llm_timeout_s as "llmTimeoutS", thinking_volume::float8 as "thinkingVolume", tts_latency as "ttsLatency",
   array(select ak.kb_id::text from agent_knowledge ak where ak.agent_id = agents.id) as "knowledgeBaseIds",
   llm_integration_id as "llmIntegrationId", tts_integration_id as "ttsIntegrationId",
   stt_integration_id as "sttIntegrationId",
@@ -70,7 +88,11 @@ const READY = (sql: Sql, a = 'agents') =>
   (${a}.llm_integration_id is not null and ${a}.llm_model is not null
    and ${a}.tts_integration_id is not null and ${a}.stt_integration_id is not null
    and ${a}.tts_model is not null
-   and ${a}.stt_model is not null and ${a}.voices <> '{}'::jsonb)`);
+   and ${a}.stt_model is not null and ${a}.voices <> '{}'::jsonb
+   and ${a}.llm_temperature is not null and ${a}.llm_max_tokens is not null
+   and ${a}.llm_timeout_s is not null and ${a}.thinking_volume is not null
+   and (${a}.tts_latency is not null or not exists (
+     select 1 from integrations i where i.id = ${a}.tts_integration_id and i.kind = 'fish')))`);
 
 function assertAdmin(user: SessionUser): void {
   if (user.role !== 'admin') throw forbidden('Só administradores configuram agentes de IA');
@@ -81,11 +103,12 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 /** The integrations belong to the organization, and each model and voice to its provider. */
-async function assertIntegrations(sql: Sql, tenantId: string, input: AgentInput): Promise<void> {
+async function assertIntegrations(sql: Sql, tenantId: string, input: AgentInput): Promise<SpeechProvider> {
   await assertTenantIntegration(sql, tenantId, input.llmIntegrationId, 'llm');
   const speaks = await speechIntegrationKind(sql, tenantId, input.ttsIntegrationId);
   const listens = await speechIntegrationKind(sql, tenantId, input.sttIntegrationId);
   assertSpeechChoices(speaks, listens, input);
+  return speaks;
 }
 
 export function assertSpeechChoices(
@@ -100,6 +123,12 @@ export function assertSpeechChoices(
   // Deepgram voices are model names of the chosen family, e.g. flux-bianca-pt.
   if (speaks === 'deepgram' && Object.values(input.voices).some((v) => !v?.startsWith(`${input.ttsModel}-`)))
     throw badRequest('As vozes do Deepgram precisam ser do modelo escolhido (ex.: flux-bianca-pt)');
+  if (speaks === 'fish' && !input.ttsLatency) throw badRequest('Escolha a latência da voz da Fish Audio');
+}
+
+/** The latency is a Fish Audio setting: other providers keep none. */
+function ttsLatencyOf(input: AgentInput, speaks: SpeechProvider): TtsLatency | null {
+  return speaks === 'fish' ? (input.ttsLatency ?? null) : null;
 }
 
 /** Everyone in the organization may see which agents exist (to pick one for a room). */
@@ -122,19 +151,22 @@ export async function listAgents(sql: Sql, user: SessionUser): Promise<AgentConf
 
 export async function createAgent(sql: Sql, actor: SessionUser, input: AgentInput, ip: string | null) {
   assertAdmin(actor);
-  await assertIntegrations(sql, actor.tenantId, input);
+  const speaks = await assertIntegrations(sql, actor.tenantId, input);
   await assertTenantBases(sql, actor.tenantId, input.knowledgeBaseIds);
   try {
     const [agent] = await sql<AgentConfig[]>`
       insert into agents (tenant_id, name, description, instructions, knowledge, greeting, voice_id, voices, tts_model, stt_model,
                           llm_model, listen_mode, respond_mode, mute_policy, moderation_tools, moderation_rules,
                           perception, insights, insights_access, minutes_webhook, style_rules,
-                          llm_integration_id, tts_integration_id, stt_integration_id)
+                          llm_integration_id, tts_integration_id, stt_integration_id,
+                          llm_temperature, llm_max_tokens, llm_timeout_s, thinking_volume, tts_latency)
       values (${actor.tenantId}, ${input.name}, ${input.description}, ${input.instructions}, ${input.knowledge}, ${input.greeting},
               ${mainVoice(input)}, ${sql.json(input.voices)}, ${input.ttsModel}, ${input.sttModel}, ${input.llmModel}, ${input.listenMode}, ${input.respondMode},
               ${input.mutePolicy}, ${input.moderationTools}, ${input.moderationRules},
               ${input.perception}, ${input.insights}, ${input.insightsAccess}, ${input.minutesWebhook},
-              ${input.styleRules}, ${input.llmIntegrationId}, ${input.ttsIntegrationId}, ${input.sttIntegrationId})
+              ${input.styleRules}, ${input.llmIntegrationId}, ${input.ttsIntegrationId}, ${input.sttIntegrationId},
+              ${input.llmTemperature}, ${input.llmMaxTokens}, ${input.llmTimeoutS}, ${input.thinkingVolume},
+              ${ttsLatencyOf(input, speaks)})
       returning ${AGENT_COLUMNS(sql)}`;
     await setAgentBases(sql, actor.tenantId, agent.id, input.knowledgeBaseIds);
     agent.knowledgeBaseIds = [...new Set(input.knowledgeBaseIds)];
@@ -160,7 +192,7 @@ export async function updateAgent(
   ip: string | null,
 ): Promise<AgentConfig> {
   assertAdmin(actor);
-  await assertIntegrations(sql, actor.tenantId, input);
+  const speaks = await assertIntegrations(sql, actor.tenantId, input);
   await assertTenantBases(sql, actor.tenantId, input.knowledgeBaseIds);
   try {
     const [agent] = await sql<AgentConfig[]>`
@@ -176,6 +208,9 @@ export async function updateAgent(
         style_rules = ${input.styleRules},
         llm_integration_id = ${input.llmIntegrationId}, tts_integration_id = ${input.ttsIntegrationId},
         stt_integration_id = ${input.sttIntegrationId},
+        llm_temperature = ${input.llmTemperature}, llm_max_tokens = ${input.llmMaxTokens},
+        llm_timeout_s = ${input.llmTimeoutS}, thinking_volume = ${input.thinkingVolume},
+        tts_latency = ${ttsLatencyOf(input, speaks)},
         updated_at = now()
       where id = ${id} and tenant_id = ${actor.tenantId}
       returning ${AGENT_COLUMNS(sql)}`;
@@ -312,6 +347,11 @@ export interface WorkerAgent {
   ttsModel: string | null;
   sttModel: string | null;
   llmModel: string | null;
+  llmTemperature: number | null;
+  llmMaxTokens: number | null;
+  llmTimeoutS: number | null;
+  thinkingVolume: number | null;
+  ttsLatency: TtsLatency | null;
   listenMode: string;
   respondMode: string;
   mutePolicy: string;
@@ -369,6 +409,11 @@ export async function agentForWorker(sql: Sql, key: Buffer | null, id: string): 
     ttsModel: row.ttsModel,
     sttModel: row.sttModel,
     llmModel: row.llmModel,
+    llmTemperature: row.llmTemperature,
+    llmMaxTokens: row.llmMaxTokens,
+    llmTimeoutS: row.llmTimeoutS,
+    thinkingVolume: row.thinkingVolume,
+    ttsLatency: row.ttsLatency,
     listenMode: row.listenMode,
     respondMode: row.respondMode,
     mutePolicy: row.mutePolicy,

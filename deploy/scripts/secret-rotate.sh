@@ -3,7 +3,7 @@
 # secret alternates between two names, <base> and <base>_next; deploy.sh always picks the
 # one that exists.
 #
-#   deploy/scripts/secret-rotate.sh meet_fish_api_key [service]   (default service: meet_agent)
+#   deploy/scripts/secret-rotate.sh meet_screen_token [service]   (default service: meet_agent)
 set -euo pipefail
 
 base="${1:?usage: secret-rotate.sh <secret-name> [service]}"

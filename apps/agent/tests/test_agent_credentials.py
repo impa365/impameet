@@ -26,6 +26,11 @@ REMOTE: dict[str, Any] = {
     },
     "tts": {"provider": "fish", "apiKey": "fish-agent-0123456789"},
     "stt": {"provider": "deepgram", "apiKey": "dg-agent-0123456789"},
+    "llmTemperature": 0.3,
+    "llmMaxTokens": 320,
+    "llmTimeoutS": 12,
+    "thinkingVolume": 0.25,
+    "ttsLatency": "low",
 }
 
 
@@ -43,6 +48,8 @@ def test_profile_carries_the_agent_choices_without_printing_keys() -> None:
     )
     assert p.voice_id == "voz-ana-pt"
     assert p.voices == {"pt": "voz-ana-pt", "en": "voice-ana-en"}
+    assert (p.llm_temperature, p.llm_max_tokens, p.llm_timeout_s) == (0.3, 320, 12)
+    assert (p.thinking_volume, p.tts_latency) == (0.25, "low")
     assert p.secrets() == [
         "sk-or-agent-0123456789",
         "fish-agent-0123456789",
@@ -67,32 +74,53 @@ def test_profile_carries_the_agent_choices_without_printing_keys() -> None:
         {"sttModel": None},
         {"voices": {}},
         {"voices": {"fr": "voix-1234"}},
+        {"llmTemperature": None},
+        {"llmTemperature": 2.5},
+        {"llmMaxTokens": "400"},
+        {"llmMaxTokens": 8},
+        {"llmTimeoutS": None},
+        {"thinkingVolume": True},
+        {"ttsLatency": None},
+        {"ttsLatency": "turbo"},
     ],
 )
 def test_nothing_falls_back_to_the_server(missing: dict[str, Any]) -> None:
     assert profile_from_platform(REMOTE | missing) is None
 
 
-def test_builders_use_only_what_the_agent_chose(env: dict[str, str]) -> None:
-    settings = load_settings(env)
+def test_latency_belongs_to_fish_only() -> None:
+    eleven = REMOTE | {"tts": {"provider": "elevenlabs", "apiKey": "el-0123456789"}}
+    p = profile_from_platform(eleven | {"ttsLatency": None})
+    assert p is not None
+    assert p.tts_latency is None
+    p = profile_from_platform(eleven)
+    assert p is not None
+    assert p.tts_latency is None
+
+
+def test_builders_use_only_what_the_agent_chose() -> None:
     own = build_llm(
-        settings.llm,
         model="deepseek/deepseek-chat",
         base_url="https://openrouter.ai/api/v1/",
         api_key="sk-or-agent-0123456789",
+        temperature=0.3,
+        max_tokens=320,
     )
     assert own.model == "deepseek/deepseek-chat"
     assert str(own._client.base_url).rstrip("/") == "https://openrouter.ai/api/v1"
     assert own._client.api_key == "sk-or-agent-0123456789"
 
-    fish = settings.fish
     tts = build_tts(
-        "fish", fish, voice_id="voz-ana-pt", model="s2.1-pro", api_key="fish-agent-0123456789"
+        "fish",
+        voice_id="voz-ana-pt",
+        model="s2.1-pro",
+        api_key="fish-agent-0123456789",
+        latency="low",
     )
     assert tts._opts.api_key == "fish-agent-0123456789"
     assert tts._opts.voice_id == "voz-ana-pt"
     assert tts._opts.model == "s2.1-pro"
-    stt = build_stt("fish", fish, api_key="fish-agent-0123456789", model="transcribe-stream-1")
+    stt = build_stt("fish", api_key="fish-agent-0123456789", model="transcribe-stream-1")
     assert stt._api_key == "fish-agent-0123456789"
 
 
@@ -158,7 +186,7 @@ async def test_captions_transcribe_with_the_room_agent_account_and_model(
     monkeypatch.setattr(captions, "load_profile", AsyncMock(return_value=agent))
     built: list[tuple[str, str, str]] = []
 
-    def fake_stt(provider: str, fish: object, *, api_key: str, model: str, **_: object) -> object:
+    def fake_stt(provider: str, *, api_key: str, model: str, **_: object) -> object:
         built.append((provider, api_key, model))
         return MagicMock()
 

@@ -280,27 +280,27 @@ async def entrypoint(ctx: JobContext) -> None:
     session: AgentSession[None] = AgentSession(
         stt=build_stt(
             profile.stt_provider,
-            settings.fish,
             api_key=profile.stt_api_key or "",
             model=profile.stt_model,
             languages=tuple(profile.voices),
         ),
         llm=build_llm(
-            settings.llm,
             model=profile.llm_model,
             base_url=profile.llm_base_url or "",
             api_key=profile.llm_api_key or "",
+            temperature=profile.llm_temperature,
+            max_tokens=profile.llm_max_tokens,
         ),
         tts=build_tts(
             profile.tts_provider,
-            settings.fish,
             voice_id=profile.voice_id or "",
             model=profile.tts_model,
             api_key=profile.tts_api_key or "",
+            latency=profile.tts_latency,
         ),
         vad=ctx.proc.userdata["vad"],
         turn_handling=build_turn_handling(),
-        conn_options=build_conn_options(settings.llm),
+        conn_options=build_conn_options(profile.llm_timeout_s),
         tts_text_transforms=["filter_emoji", "filter_markdown"],
         aec_warmup_duration=3.0,
         # Showing a page, looking, scrolling and clicking chain several tools in one answer.
@@ -377,7 +377,7 @@ async def entrypoint(ctx: JobContext) -> None:
         await follow_meeting(ctx.room, agent.perception)
 
     if thinking_audio := build_thinking_audio(
-        settings.agent, enabled=thinking_sound(ctx.job.metadata)
+        profile.thinking_volume, enabled=thinking_sound(ctx.job.metadata)
     ):
         await thinking_audio.start(room=ctx.room, agent_session=session)
         ctx.add_shutdown_callback(thinking_audio.aclose)

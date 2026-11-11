@@ -28,6 +28,8 @@ RespondMode = Literal["always", "when_named"]
 # Who may tell the agent to stop talking (and to talk again); "disabled" turns the feature off.
 MutePolicy = Literal["everyone", "moderators", "disabled"]
 MUTE_POLICIES = ("everyone", "moderators", "disabled")
+TtsLatency = Literal["low", "balanced", "normal"]
+TTS_LATENCIES = ("low", "balanced", "normal")
 
 KNOWLEDGE_HEADER = (
     "\n\nBASE DE CONHECIMENTO (use estas informações para responder; se a resposta não estiver "
@@ -48,6 +50,13 @@ class AgentProfile:
     voice_id: str | None
     tts_model: str
     llm_model: str
+    # How it thinks and sounds, chosen in the agent like its providers (nothing is preset).
+    llm_temperature: float
+    llm_max_tokens: int
+    llm_timeout_s: float
+    thinking_volume: float
+    # Fish Audio only: its trade-off between how soon the voice starts and how it sounds.
+    tts_latency: TtsLatency | None
     listen_mode: ListenMode = "everyone"
     respond_mode: RespondMode = "always"
     mute_policy: MutePolicy = "everyone"
@@ -179,13 +188,23 @@ def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
         "tts_model": _text(remote.get("ttsModel")),
         "stt_model": _text(remote.get("sttModel")),
     }
-    missing = [key for key, value in required.items() if value is None]
+    tuning = {
+        "llm_temperature": _number(remote.get("llmTemperature"), 0, 2),
+        "llm_max_tokens": _number(remote.get("llmMaxTokens"), 16, 8192),
+        "llm_timeout_s": _number(remote.get("llmTimeoutS"), 1, 120),
+        "thinking_volume": _number(remote.get("thinkingVolume"), 0, 1),
+    }
+    latency = remote.get("ttsLatency")
+    tts_latency: TtsLatency | None = latency if latency in TTS_LATENCIES else None
+    missing = [key for key, value in [*required.items(), *tuning.items()] if value is None]
     if not voices:
         missing.append("voices")
     if tts_provider is None:
         missing.append("tts_provider")
     if stt_provider is None:
         missing.append("stt_provider")
+    if tts_provider == "fish" and tts_latency is None:
+        missing.append("tts_latency")
     if missing or tts_provider is None or stt_provider is None:
         logger.error("agent is not fully configured", extra={"missing": missing})
         return None
@@ -204,6 +223,11 @@ def profile_from_platform(remote: dict[str, Any]) -> AgentProfile | None:
         tts_model=str(required["tts_model"]),
         stt_model=str(required["stt_model"]),
         llm_model=str(required["llm_model"]),
+        llm_temperature=float(tuning["llm_temperature"] or 0),
+        llm_max_tokens=int(tuning["llm_max_tokens"] or 0),
+        llm_timeout_s=float(tuning["llm_timeout_s"] or 0),
+        thinking_volume=float(tuning["thinking_volume"] or 0),
+        tts_latency=tts_latency if tts_provider == "fish" else None,
         listen_mode=listen if listen in ("everyone", "moderators", "members") else "everyone",
         respond_mode=respond if respond in ("always", "when_named") else "always",
         mute_policy=mute if mute in MUTE_POLICIES else "everyone",
@@ -251,6 +275,13 @@ def clean_rules(raw: object) -> str:
 def _section(remote: dict[str, Any], key: str) -> dict[str, Any]:
     value = remote.get(key)
     return value if isinstance(value, dict) else {}
+
+
+def _number(value: object, low: float, high: float) -> float | None:
+    """A number the platform sent within its range, or None (then the agent stays out)."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value) if low <= value <= high else None
 
 
 def _text(value: object) -> str | None:

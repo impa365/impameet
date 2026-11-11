@@ -4,6 +4,7 @@ import os
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -14,6 +15,14 @@ LIVEKIT_KEY = "lk-key-0123456789"
 LIVEKIT_SECRET = "lk-secret-abcdefghijklmnopqrstuvwxyz"
 FISH_KEY = "fish-key-9876543210"
 LLM_KEY = "llm-key-zyxwvutsrq"
+# How a test agent thinks and sounds (each agent chooses these on the platform).
+TUNING: dict[str, Any] = {
+    "llm_temperature": 0.6,
+    "llm_max_tokens": 400,
+    "llm_timeout_s": 15.0,
+    "thinking_volume": 0.5,
+    "tts_latency": "balanced",
+}
 
 
 @pytest.fixture
@@ -29,6 +38,7 @@ def env(tmp_path: Path) -> dict[str, str]:
         "LIVEKIT_URL": "wss://livekit.example.com",
         "LIVEKIT_API_KEY_FILE": secret_file("livekit_api_key", LIVEKIT_KEY),
         "LIVEKIT_API_SECRET_FILE": secret_file("livekit_api_secret", LIVEKIT_SECRET),
+        "AGENT_NAME": "kaiser",
     }
 
 

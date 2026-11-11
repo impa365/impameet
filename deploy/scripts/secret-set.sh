@@ -2,7 +2,7 @@
 # Store one secret as an encrypted Docker Swarm secret without it touching disk, shell
 # history, process arguments or logs.
 #
-#   deploy/scripts/secret-set.sh meet_fish_api_key           # prompts (input hidden)
+#   deploy/scripts/secret-set.sh meet_screen_token           # prompts (input hidden)
 #   printf '%s' "$VALUE" | deploy/scripts/secret-set.sh NAME  # from a pipe
 #
 # Swarm keeps secrets encrypted at rest (Raft log) and in transit (mutual TLS), and mounts

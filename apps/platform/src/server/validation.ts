@@ -330,6 +330,28 @@ export const agentInput = z.object({
     .trim()
     .regex(/^[a-z0-9._-]{1,60}$/, 'Escolha o modelo de transcrição'),
   llmModel: z.string({ error: 'Escolha o modelo de LLM' }).trim().min(1, 'Escolha o modelo de LLM').max(120),
+  /** How the LLM answers: chosen per agent, nothing comes from the server. */
+  llmTemperature: z
+    .number({ error: 'Escolha a temperatura do LLM (0 a 2)' })
+    .min(0, 'Escolha a temperatura do LLM (0 a 2)')
+    .max(2, 'Escolha a temperatura do LLM (0 a 2)'),
+  llmMaxTokens: z
+    .number({ error: 'Escolha o tamanho máximo da resposta (16 a 8192 tokens)' })
+    .int('Escolha o tamanho máximo da resposta (16 a 8192 tokens)')
+    .min(16, 'Escolha o tamanho máximo da resposta (16 a 8192 tokens)')
+    .max(8192, 'Escolha o tamanho máximo da resposta (16 a 8192 tokens)'),
+  llmTimeoutS: z
+    .number({ error: 'Escolha o tempo limite do LLM (1 a 120 segundos)' })
+    .int('Escolha o tempo limite do LLM (1 a 120 segundos)')
+    .min(1, 'Escolha o tempo limite do LLM (1 a 120 segundos)')
+    .max(120, 'Escolha o tempo limite do LLM (1 a 120 segundos)'),
+  /** The typing sound while it thinks (0 turns it off; each room can still switch it off). */
+  thinkingVolume: z
+    .number({ error: 'Escolha o volume do som de digitação (0 a 1)' })
+    .min(0, 'Escolha o volume do som de digitação (0 a 1)')
+    .max(1, 'Escolha o volume do som de digitação (0 a 1)'),
+  /** Fish Audio only (required with it, checked with the provider): speed against quality. */
+  ttsLatency: z.enum(['low', 'balanced', 'normal']).nullable().optional(),
   listenMode: z.enum(['everyone', 'moderators', 'members']).default('everyone'),
   respondMode: z.enum(['always', 'when_named']).default('always'),
   mutePolicy: z.enum(['everyone', 'moderators', 'disabled']).default('everyone'),

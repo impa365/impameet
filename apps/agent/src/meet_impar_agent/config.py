@@ -1,9 +1,10 @@
-"""Typed, validated runtime configuration.
+"""Typed, validated runtime configuration: only where the worker connects to.
 
 Every value comes from the process environment. Secrets are read from the file named by
 ``<NAME>_FILE`` (Docker/Swarm secrets mounted on tmpfs) and fall back to ``<NAME>`` only
 for local development. Secret values are wrapped in ``SecretStr`` so they never show up in
-``repr``, logs or tracebacks.
+``repr``, logs or tracebacks. How an agent thinks, speaks and listens is never configured
+here: it is chosen per agent on the platform (see ``profile``).
 """
 
 from __future__ import annotations
@@ -64,33 +65,11 @@ class LiveKitSettings(BaseModel):
     api_secret: SecretStr
 
 
-class FishSettings(BaseModel):
-    """How the worker talks to Fish Audio. Keys, models and voices belong to each agent."""
-
-    model_config = _Frozen
-
-    base_url: AnyHttpUrl = AnyHttpUrl("https://api.fish.audio")
-    latency_mode: Literal["low", "balanced", "normal"] = "balanced"
-    speed: Annotated[float, Field(ge=0.5, le=2.0)] | None = None
-
-
-class LLMSettings(BaseModel):
-    """Request tuning only. Endpoint, key and model belong to each agent."""
-
-    model_config = _Frozen
-
-    temperature: Annotated[float, Field(ge=0.0, le=2.0)] = 0.6
-    max_completion_tokens: Annotated[int, Field(ge=16, le=8192)] = 400
-    timeout_s: Annotated[float, Field(gt=0, le=120)] = 15.0
-
-
 class AgentSettings(BaseModel):
     model_config = _Frozen
 
-    # The dispatch name the platform asks for (its AGENT_NAME must match).
+    # The dispatch name the platform asks for (its AGENT_NAME must match): wiring, not a choice.
     name: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,62}$")] = "kaiser"
-    thinking_sound: bool = True
-    thinking_volume: Annotated[float, Field(ge=0.0, le=1.0)] = 0.5
 
 
 class PlatformSettings(BaseModel):
@@ -115,8 +94,6 @@ class Settings(BaseModel):
     model_config = _Frozen
 
     livekit: LiveKitSettings
-    fish: FishSettings = FishSettings()
-    llm: LLMSettings = LLMSettings()
     agent: AgentSettings = AgentSettings()
     platform: PlatformSettings | None = None
     screen: ScreenSettings | None = None
@@ -130,21 +107,6 @@ class Settings(BaseModel):
         if self.screen:
             secrets.append(self.screen.token)
         return [s.get_secret_value() for s in secrets]
-
-
-_TRUE = {"1", "true", "on", "sim", "yes"}
-_FALSE = {"0", "false", "off", "nao", "não", "no"}
-
-
-def _flag(env: Mapping[str, str], name: str) -> bool | None:
-    value = _optional(env, name)
-    if value is None:
-        return None
-    if value.lower() in _TRUE:
-        return True
-    if value.lower() in _FALSE:
-        return False
-    raise ConfigError(f"invalid configuration: {name} must be on or off")
 
 
 def _optional(env: Mapping[str, str], name: str) -> str | None:
@@ -170,21 +132,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
             "api_key": read_secret(env, "LIVEKIT_API_KEY"),
             "api_secret": read_secret(env, "LIVEKIT_API_SECRET"),
         },
-        "fish": {
-            "base_url": _optional(env, "FISH_BASE_URL"),
-            "latency_mode": _optional(env, "FISH_LATENCY_MODE"),
-            "speed": _optional(env, "FISH_SPEED"),
-        },
-        "llm": {
-            "temperature": _optional(env, "LLM_TEMPERATURE"),
-            "max_completion_tokens": _optional(env, "LLM_MAX_COMPLETION_TOKENS"),
-            "timeout_s": _optional(env, "LLM_TIMEOUT_S"),
-        },
-        "agent": {
-            "name": _optional(env, "AGENT_NAME"),
-            "thinking_sound": _flag(env, "AGENT_THINKING_SOUND"),
-            "thinking_volume": _optional(env, "AGENT_THINKING_VOLUME"),
-        },
+        "agent": {"name": _optional(env, "AGENT_NAME")},
         "platform": _service(env, "PLATFORM"),
         "screen": _service(env, "SCREEN"),
         "log_level": _optional(env, "LOG_LEVEL"),

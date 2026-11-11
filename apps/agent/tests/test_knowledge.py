@@ -22,6 +22,7 @@ from meet_impar_agent.knowledge import (
 from meet_impar_agent.persona import VoiceAgent
 from meet_impar_agent.profile import AgentProfile, profile_from_platform
 
+from .conftest import TUNING
 from .test_agent_credentials import REMOTE
 
 PLATFORM = PlatformSettings(url="http://platform:3000", token=SecretStr("tok"))  # type: ignore[arg-type]
@@ -138,7 +139,7 @@ def profile(**overrides: Any) -> AgentProfile:
         "mute_policy": "disabled",
         "agent_id": "ag-1",
     }
-    return AgentProfile(**(base | overrides))
+    return AgentProfile(**(TUNING | base | overrides))
 
 
 def test_the_agent_gets_its_training_and_the_lookup_tool() -> None:

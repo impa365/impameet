@@ -8,6 +8,15 @@ import { integrationInput } from '@/server/validation';
 export const READY_AGENT_KEY = randomBytes(32);
 const KEY = READY_AGENT_KEY;
 
+/** How the agent thinks and sounds (chosen per agent like its providers). */
+export const AGENT_TUNING = {
+  llmTemperature: 0.6,
+  llmMaxTokens: 400,
+  llmTimeoutS: 15,
+  thinkingVolume: 0.5,
+  ttsLatency: 'balanced',
+} as const;
+
 /**
  * Everything an agent has to choose (there is no server provider, model or voice): an LLM and a
  * Fish Audio integration of the organization (speaking and listening), the models and one voice.
@@ -40,5 +49,6 @@ export async function agentChoices(sql: Sql, admin: SessionUser) {
     ttsModel: 's2.1-pro',
     sttModel: 'transcribe-stream-1',
     voices: { pt: 'voz-teste-1' },
+    ...AGENT_TUNING,
   };
 }

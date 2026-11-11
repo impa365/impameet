@@ -43,9 +43,21 @@ interface Agent {
   llmIntegrationId: string | null;
   ttsIntegrationId: string | null;
   sttIntegrationId: string | null;
+  llmTemperature: number | null;
+  llmMaxTokens: number | null;
+  llmTimeoutS: number | null;
+  thinkingVolume: number | null;
+  ttsLatency: TtsLatency | null;
   isDefault: boolean;
   ready: boolean;
 }
+
+type TtsLatency = 'low' | 'balanced' | 'normal';
+const LATENCY = {
+  low: 'admin.agents.ttsLatencyLow',
+  balanced: 'admin.agents.ttsLatencyBalanced',
+  normal: 'admin.agents.ttsLatencyNormal',
+} as const satisfies Record<TtsLatency, MessageKey>;
 
 /** The form: every provider, model and voice is chosen here; nothing has a preset value. */
 interface Draft {
@@ -72,6 +84,12 @@ interface Draft {
   llmIntegrationId: string;
   ttsIntegrationId: string;
   sttIntegrationId: string;
+  /** Numbers as typed, so an empty field stays a choice still to make. */
+  llmTemperature: string;
+  llmMaxTokens: string;
+  llmTimeoutS: string;
+  thinkingVolume: string;
+  ttsLatency: TtsLatency | '';
 }
 
 const KNOWLEDGE_MAX = 100000;
@@ -125,7 +143,15 @@ const EMPTY: Draft = {
   llmIntegrationId: '',
   ttsIntegrationId: '',
   sttIntegrationId: '',
+  llmTemperature: '',
+  llmMaxTokens: '',
+  llmTimeoutS: '',
+  thinkingVolume: '',
+  ttsLatency: '',
 };
+
+const numberText = (value: number | null) => (value === null ? '' : String(value));
+const numberOf = (text: string) => (text.trim() === '' ? undefined : Number(text.replace(',', '.')));
 
 const VOICE_LABEL = {
   pt: 'admin.agents.voicePt',
@@ -163,11 +189,20 @@ type SectionId = (typeof AGENT_SECTIONS)[number][0];
 type Choices = Record<
   'llmIntegrationId' | 'llmModel' | 'ttsIntegrationId' | 'ttsModel' | 'sttIntegrationId' | 'sttModel',
   string | null
-> & { voices: Partial<Record<VoiceLanguage, string>> };
+> &
+  Record<'llmTemperature' | 'llmMaxTokens' | 'llmTimeoutS' | 'thinkingVolume', string | number | null> & {
+    voices: Partial<Record<VoiceLanguage, string>>;
+    ttsLatency: string | null;
+  };
+
+const blank = (value: string | number | null) => value === null || value === '';
 
 /** What still has to be chosen before the agent can join meetings (nothing has a preset). */
-function missingParts(c: Choices): MessageKey[] {
+function missingParts(c: Choices, speaksFish: boolean): MessageKey[] {
+  const tuning = [c.llmTemperature, c.llmMaxTokens, c.llmTimeoutS, c.thinkingVolume];
   const parts: (MessageKey | false)[] = [
+    tuning.some(blank) && 'admin.agents.missingTuning',
+    speaksFish && !c.ttsLatency && 'admin.agents.missingLatency',
     !c.llmIntegrationId && 'admin.agents.missingBrain',
     !!c.llmIntegrationId && !c.llmModel?.trim() && 'admin.agents.missingModel',
     !c.ttsIntegrationId && 'admin.agents.missingVoice',
@@ -256,6 +291,11 @@ export function AgentsTab() {
       llmIntegrationId: agent.llmIntegrationId ?? '',
       ttsIntegrationId: agent.ttsIntegrationId ?? '',
       sttIntegrationId: agent.sttIntegrationId ?? '',
+      llmTemperature: numberText(agent.llmTemperature),
+      llmMaxTokens: numberText(agent.llmMaxTokens),
+      llmTimeoutS: numberText(agent.llmTimeoutS),
+      thinkingVolume: numberText(agent.thinkingVolume),
+      ttsLatency: agent.ttsLatency ?? '',
     });
   }
 
@@ -279,7 +319,16 @@ export function AgentsTab() {
       setBusy(false);
       return;
     }
-    const body = { ...draft, voices, llmModel: draft.llmModel.trim() };
+    const body = {
+      ...draft,
+      voices,
+      llmModel: draft.llmModel.trim(),
+      llmTemperature: numberOf(draft.llmTemperature),
+      llmMaxTokens: numberOf(draft.llmMaxTokens),
+      llmTimeoutS: numberOf(draft.llmTimeoutS),
+      thinkingVolume: numberOf(draft.thinkingVolume),
+      ttsLatency: speechKind(draft.ttsIntegrationId) === 'fish' ? draft.ttsLatency || null : null,
+    };
     try {
       if (editing === 'new') await api('/api/admin/agents', { body });
       else await api(`/api/admin/agents/${editing}`, { method: 'PUT', body });
@@ -330,7 +379,7 @@ export function AgentsTab() {
 
   if (editing) {
     const isNew = editing === 'new';
-    const missing = missingParts(draft);
+    const missing = missingParts(draft, ttsKind === 'fish');
     const switchList = <K extends string>(
       list: K[],
       key: 'moderationTools' | 'perception' | 'insights',
@@ -469,6 +518,50 @@ export function AgentsTab() {
                 </label>
               </div>
               {llms.length === 0 && <span className="field-help">{t('admin.agents.noLlm')}</span>}
+              <div className="fields">
+                <label>
+                  {t('admin.agents.llmTemperature')}
+                  <input
+                    required
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={draft.llmTemperature}
+                    onChange={(e) => set('llmTemperature', e.target.value)}
+                  />
+                  <span className="field-help">{t('admin.agents.llmTemperatureHelp')}</span>
+                </label>
+                <label>
+                  {t('admin.agents.llmMaxTokens')}
+                  <input
+                    required
+                    type="number"
+                    inputMode="numeric"
+                    min={16}
+                    max={8192}
+                    step={1}
+                    value={draft.llmMaxTokens}
+                    onChange={(e) => set('llmMaxTokens', e.target.value)}
+                  />
+                  <span className="field-help">{t('admin.agents.llmMaxTokensHelp')}</span>
+                </label>
+                <label>
+                  {t('admin.agents.llmTimeout')}
+                  <input
+                    required
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={120}
+                    step={1}
+                    value={draft.llmTimeoutS}
+                    onChange={(e) => set('llmTimeoutS', e.target.value)}
+                  />
+                  <span className="field-help">{t('admin.agents.llmTimeoutHelp')}</span>
+                </label>
+              </div>
 
               <h4>{t('admin.agents.voiceLegend')}</h4>
               <div className="fields">
@@ -501,6 +594,25 @@ export function AgentsTab() {
                     ))}
                   </select>
                 </label>
+                {ttsKind === 'fish' && (
+                  <label>
+                    {t('admin.agents.ttsLatency')}
+                    <select
+                      required
+                      value={draft.ttsLatency}
+                      onChange={(e) => set('ttsLatency', e.target.value as TtsLatency)}
+                    >
+                      <option value="" disabled>
+                        {t('admin.agents.choose')}
+                      </option>
+                      {Object.entries(LATENCY).map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {t(l)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </div>
               <span className="field-help">
                 {t('admin.agents.voicesHint')}
@@ -680,6 +792,20 @@ export function AgentsTab() {
                 </label>
               </div>
               <span className="field-help">{t('admin.agents.muteHint')}</span>
+              <label>
+                {t('admin.agents.thinkingVolume')}
+                <input
+                  required
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={draft.thinkingVolume}
+                  onChange={(e) => set('thinkingVolume', e.target.value)}
+                />
+                <span className="field-help">{t('admin.agents.thinkingVolumeHelp')}</span>
+              </label>
             </section>
 
             <section
@@ -876,7 +1002,7 @@ export function AgentsTab() {
             const voices = VOICE_LANGUAGES.filter((l) => a.voices[l])
               .map((l) => l.toUpperCase())
               .join(' · ');
-            const missing = a.ready ? [] : missingParts(a);
+            const missing = a.ready ? [] : missingParts(a, speechKind(a.ttsIntegrationId) === 'fish');
             return (
               <li key={a.id} className="tile">
                 <div className="tile-body">

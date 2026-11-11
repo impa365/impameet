@@ -31,6 +31,7 @@ import { hashPassword } from '@/server/security/password';
 import { agentInput, createRoomInput, integrationInput, updateRoomInput } from '@/server/validation';
 import { TokenVerifier } from 'livekit-server-sdk';
 import { type TestSql, freshDatabase } from './db';
+import { AGENT_TUNING } from './ready-agent';
 
 let sql: TestSql;
 const db = () => sql as unknown as Sql;
@@ -58,6 +59,7 @@ const READY = {
   ttsModel: 's2.1-pro',
   sttModel: 'transcribe-stream-1',
   voices: { pt: 'voz-teste-1' },
+  ...AGENT_TUNING,
 };
 const A = (over: Record<string, unknown> = {}) =>
   agentInput.parse({ name: 'Ana', instructions: 'x', ...READY, ...over });
@@ -487,7 +489,30 @@ describe('agents with their own provider keys', () => {
       tts: { provider: 'fish', apiKey: 'fish-0123456789abcdef' },
       stt: { provider: 'fish', apiKey: 'fish-0123456789abcdef' },
       ttsModel: 'drama-3',
+      llmTemperature: 0.6,
+      llmMaxTokens: 400,
+      llmTimeoutS: 15,
+      thinkingVolume: 0.5,
+      ttsLatency: 'balanced',
     });
+    // Fish Audio's latency is chosen in the agent too: nothing comes from the server.
+    await expectAppError(
+      createAgent(
+        db(),
+        admin,
+        A({
+          name: 'Sem latência',
+          llmIntegrationId: llm.id,
+          ttsIntegrationId: fish.id,
+          sttIntegrationId: fish.id,
+          ttsLatency: null,
+        }),
+        null,
+      ),
+      400,
+    );
+    expect(() => A({ llmTemperature: undefined })).toThrow();
+    expect(() => A({ llmMaxTokens: 8193 })).toThrow();
 
     await updateAgent(
       db(),
@@ -535,6 +560,8 @@ describe('agents with their own provider keys', () => {
       stt: { provider: 'deepgram', apiKey: 'dg-0123456789abcdef' },
       ttsModel: 'eleven_flash_v2_5',
       sttModel: 'flux-general-multi',
+      // The latency is a Fish Audio setting: another speaking provider keeps none.
+      ttsLatency: null,
     });
 
     const reversed = A({

@@ -23,6 +23,7 @@ from meet_impar_agent.moderation import (
 from meet_impar_agent.persona import Talker, VoiceAgent
 from meet_impar_agent.profile import AgentProfile, clean_rules, clean_tools, profile_from_platform
 
+from .conftest import TUNING
 from .test_agent_credentials import REMOTE
 
 PLATFORM = PlatformSettings(url="http://platform:3000", token=SecretStr("tok"))  # type: ignore[arg-type]
@@ -292,7 +293,7 @@ def profile(**overrides: Any) -> AgentProfile:
         "voices": {"pt": "voz-kaiser"},
         "mute_policy": "disabled",
     }
-    return AgentProfile(**(base | overrides))
+    return AgentProfile(**(TUNING | base | overrides))
 
 
 def test_the_profile_reads_the_admin_choices() -> None:
