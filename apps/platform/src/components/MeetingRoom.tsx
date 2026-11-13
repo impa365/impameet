@@ -21,6 +21,7 @@ interface JoinResponse {
   role: 'moderator' | 'participant' | 'guest';
   roomName: string;
   policies: RoomPolicies;
+  studio?: boolean;
 }
 
 export function MeetingRoom(props: {
@@ -242,6 +243,7 @@ export function MeetingRoom(props: {
         breakout={breakout}
         error={error}
         policies={session.policies ?? { board: 'everyone', polls: 'everyone' }}
+        studio={session.studio === true}
         onSwitchRoom={switchRoom}
       />
     </LiveKitRoom>

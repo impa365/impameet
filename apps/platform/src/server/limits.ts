@@ -11,4 +11,6 @@ export const limits = {
   handPerIp: new RateLimiter(60, MINUTE),
   moderationPerUser: new RateLimiter(120, MINUTE),
   writePerUser: new RateLimiter(60, MINUTE),
+  /** A producer clicks a lot during a live show (on/off stage, banners, layouts). */
+  studioPerProducer: new RateLimiter(240, MINUTE),
 };

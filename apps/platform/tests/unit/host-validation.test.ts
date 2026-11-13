@@ -90,6 +90,7 @@ describe('validation', () => {
       thinkingSound: true,
       agentActions: true,
       agentEnabled: false,
+      studio: false,
     });
     expect(createRoomInput.safeParse({ name: 'x', maxParticipants: 1 }).success).toBe(false);
     expect(createRoomInput.safeParse({ name: 'x', password: '123' }).success).toBe(false);

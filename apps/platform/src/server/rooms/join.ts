@@ -3,6 +3,7 @@ import type { Config } from '../config';
 import type { Sql } from '../db';
 import { type ParticipantRole, issueJoinToken } from '../livekit';
 import { capParticipants, tenantLimits } from '../plans';
+import { studioState } from '../studio/service';
 import type { CollabPolicy, Room } from './service';
 
 export interface JoinGrant {
@@ -11,6 +12,8 @@ export interface JoinGrant {
   role: ParticipantRole;
   roomName: string;
   policies: RoomPolicies;
+  /** A live-show studio (stage, backstage, producer) rather than a meeting. */
+  studio: boolean;
 }
 
 /** Who may draw on the board and create polls; sent at join and again whenever it changes. */
@@ -49,6 +52,8 @@ export async function grantJoin(
     agentName: agents.length > 0 ? cfg.agentName : undefined,
     agentMetadata: agents.map((a) => agentDispatchMetadata(room.tenantId, a, room)),
     maxParticipants: capParticipants(room.maxParticipants, limits.maxParticipants),
+    // A studio opens with its stage as the producer left it.
+    roomMetadata: room.studio ? JSON.stringify(await studioState(sql, room)) : undefined,
   });
   return {
     serverUrl: cfg.livekitUrl,
@@ -56,5 +61,6 @@ export async function grantJoin(
     role: who.role,
     roomName: room.name,
     policies: roomPolicies(room),
+    studio: room.studio === true,
   };
 }

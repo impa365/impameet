@@ -140,5 +140,6 @@ export async function switchRoom(
     role: who.role,
     roomName: `${room.name} · Sala ${input.target}`,
     policies: roomPolicies(room),
+    studio: false,
   };
 }

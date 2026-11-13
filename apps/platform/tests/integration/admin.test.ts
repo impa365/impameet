@@ -39,7 +39,15 @@ import { hashPassword } from '@/server/security/password';
 import { listTenants, updateTenant } from '@/server/superadmin/service';
 import type { Tenant } from '@/server/tenants/repo';
 import { createUser, listUsers, updateUser } from '@/server/users/service';
-import { agentInput, agentModerationInput, createRoomInput, updateRoomInput } from '@/server/validation';
+import { saveStudio, studioState } from '@/server/studio/service';
+import {
+  agentInput,
+  agentModerationInput,
+  createRoomInput,
+  studioStateInput,
+  updateRoomInput,
+} from '@/server/validation';
+import { EMPTY_STUDIO } from '@/lib/studio';
 import { type TestSql, freshDatabase } from './db';
 import { agentChoices } from './ready-agent';
 import { listAgents, updateAgent } from '@/server/agents/service';
@@ -88,6 +96,9 @@ class FakeLiveKit implements LiveKitAdmin {
   }
   async sendData(room: string, payload: string, topic: string) {
     this.calls.push(`data ${room} ${topic} ${payload}`);
+  }
+  async updateRoomMetadata(room: string, metadata: string) {
+    this.calls.push(`metadata ${room} ${metadata}`);
   }
 }
 
@@ -445,6 +456,113 @@ describe('moderation', () => {
     await expectAppError(moderate(db(), lk, room, admin, 'remove', undefined, null), 400);
     await expectAppError(moderate(db(), lk, room, admin, 'remove', `u-${admin.id}-aaaaaa`, null), 400);
     expect(lk.calls).toEqual([]);
+  });
+});
+
+describe('studio', () => {
+  const cfg = {
+    livekitUrl: 'wss://lk.test',
+    livekitApiKey: 'APIkey',
+    livekitApiSecret: 'a-very-long-livekit-secret-for-tests-0123456789',
+    agentName: 'kaiser',
+  };
+  const stage = (input: Record<string, unknown>) =>
+    studioStateInput.parse({
+      layout: 'grid',
+      stage: [],
+      screen: null,
+      banners: [],
+      banner: null,
+      names: true,
+      brand: { color: '#112233', background: '#000000', logo: null },
+      ...input,
+    });
+
+  it('keeps the stage on the room, pushes it to the live room and opens the next session with it', async () => {
+    const { tenant, user: admin } = await org('show');
+    const room = await createRoom(db(), admin, R({ name: 'Live', studio: true }), null);
+    expect(room.studio).toBe(true);
+    const lk = new FakeLiveKit();
+    const lkRoom = `${tenant.id}.${room.slug}`;
+    const producer = { userId: admin.id, identity: `u-${admin.id}-aaaaaa`, name: 'Admin', organizer: true };
+    expect(await studioState(db(), room)).toEqual(EMPTY_STUDIO);
+
+    const saved = await saveStudio(
+      db(),
+      lk,
+      room,
+      producer,
+      stage({
+        layout: 'leader',
+        stage: ['g-ana', 'g-bob', 'g-ana'],
+        banners: [{ id: 'b1', text: 'Bem-vindos!', style: 'ticker' }],
+        banner: 'b1',
+      }),
+      '10.0.0.1',
+    );
+    expect(saved).toMatchObject({ layout: 'leader', stage: ['g-ana', 'g-bob'], banner: 'b1' });
+    expect(lk.calls).toEqual([`metadata ${lkRoom} ${JSON.stringify(saved)}`]);
+    expect(await studioState(db(), room)).toEqual(saved);
+
+    // Only who goes on or off stage is logged.
+    await saveStudio(db(), lk, room, producer, stage({ layout: 'solo', stage: ['g-bob', 'g-cid'] }), null);
+    await saveStudio(db(), lk, room, producer, stage({ layout: 'grid', stage: ['g-bob', 'g-cid'] }), null);
+    const logs = await sql<{ meta: Record<string, unknown> }[]>`
+      select meta from audit_log where action = 'studio.stage' order by id`;
+    expect(logs.map((l) => l.meta)).toEqual([
+      { joined: 'g-ana,g-bob', left: '' },
+      { joined: 'g-cid', left: 'g-ana' },
+    ]);
+
+    // A promoted guest produces too, and is logged by name.
+    await saveStudio(db(), lk, room, { ...producer, userId: null, name: 'g-eva' }, stage({}), null);
+    const [last] = await sql<{ actor_id: string | null; meta: Record<string, unknown> }[]>`
+      select actor_id, meta from audit_log where action = 'studio.stage' order by id desc limit 1`;
+    expect(last).toMatchObject({ actor_id: null, meta: { left: 'g-bob,g-cid', by: 'g-eva' } });
+
+    await saveStudio(db(), lk, room, producer, stage({ stage: ['g-ana'], layout: 'pip' }), null);
+    const grant = await grantJoin(db(), cfg, room, { identity: 'g-ana', displayName: 'Ana', role: 'guest' });
+    expect(grant.studio).toBe(true);
+    const claims = await new TokenVerifier(cfg.livekitApiKey, cfg.livekitApiSecret).verify(grant.token);
+    expect(JSON.parse(claims.roomConfig?.metadata ?? '{}')).toMatchObject({
+      layout: 'pip',
+      stage: ['g-ana'],
+    });
+  });
+
+  it('is only for studios and their producers; a meeting carries no stage', async () => {
+    const { user: admin } = await org('meet');
+    const meeting = await createRoom(db(), admin, R({ name: 'Reunião' }), null);
+    const lk = new FakeLiveKit();
+    const producer = { userId: admin.id, identity: 'u-x', name: 'Admin', organizer: true };
+    await expectAppError(saveStudio(db(), lk, meeting, producer, stage({}), null), 400, /estúdio/);
+    const grant = await grantJoin(db(), cfg, meeting, { identity: 'g-1', displayName: 'G', role: 'guest' });
+    expect(grant.studio).toBe(false);
+    const claims = await new TokenVerifier(cfg.livekitApiKey, cfg.livekitApiSecret).verify(grant.token);
+    expect(claims.roomConfig?.metadata ?? '').toBe('');
+
+    const studio = await updateRoom(db(), admin, meeting.slug, updateRoomInput.parse({ studio: true }), null);
+    expect(studio.studio).toBe(true);
+    await expectAppError(saveStudio(db(), lk, studio, null, stage({}), null), 403);
+    expect(lk.calls).toEqual([]);
+  });
+
+  it('accepts only a sane stage', () => {
+    const bad = [
+      { layout: 'mosaic' },
+      { stage: Array.from({ length: 10 }, (_, i) => `g-${i}`) },
+      { banners: [{ id: 'b 1', text: 'x', style: 'bar' }] },
+      { banners: [{ id: 'b1', text: '   ', style: 'bar' }] },
+      { banners: [{ id: 'b1', text: 'x'.repeat(201), style: 'bar' }] },
+      { banner: 'nope' },
+      { brand: { color: 'red', background: '#000000', logo: null } },
+      { brand: { color: '#000000', background: '#000000', logo: 'http://logo.test/a.png' } },
+      { extra: true },
+    ];
+    for (const input of bad) expect(() => stage(input)).toThrow();
+    expect(
+      stage({ brand: { color: '#000000', background: '#ffffff', logo: 'https://x.test/l.png' } }).brand.logo,
+    ).toBe('https://x.test/l.png');
   });
 });
 

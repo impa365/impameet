@@ -48,6 +48,7 @@ export default async function Dashboard({ searchParams }: Props) {
             allowGuests: r.allowGuests,
             access: r.access,
             agentIds: r.agentIds,
+            studio: r.studio,
           }))}
           agents={agents}
           startCreating={params.new === '1'}

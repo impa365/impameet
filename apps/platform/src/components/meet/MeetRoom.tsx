@@ -24,6 +24,7 @@ import { changeSentence } from '../BoardText';
 import { CopilotView, useInsights } from './Copilot';
 import { type BoardChange, ChangeDigest } from '@/lib/board-text';
 import { api } from '../api';
+import { StudioMain, StudioPanel, useStudioControl } from '../studio/StudioRoom';
 import { Icon } from '../ui/Icon';
 import {
   A11yView,
@@ -81,6 +82,8 @@ export function MeetRoom(props: {
   breakout: number;
   error: string;
   policies: RoomPolicies;
+  /** A live-show studio: the stage is what the producer puts on it, not everyone. */
+  studio?: boolean;
   onSwitchRoom: (target: number) => void;
 }) {
   const t = useT();
@@ -181,6 +184,7 @@ export function MeetRoom(props: {
   const breakouts = useBreakouts(room, props.slug, props.breakout, props.onSwitchRoom);
   const background = useBackground(room);
   const recording = useRecording(room, props.slug, props.signedIn, notify);
+  const studio = useStudioControl(props.slug, props.token, notify);
   const captionerRunning = captionerPresent(participants);
   const transcriber = useCaptionsControl(props.slug, props.signedIn, captionerRunning, notify);
 
@@ -633,7 +637,16 @@ export function MeetRoom(props: {
       <LiveRegions polite={polite} urgent={urgent} />
       <div className="meet-body">
         <main className="meet-main" aria-label={t('room.stage.participants')}>
-          <MeetStage />
+          {props.studio ? (
+            <StudioMain
+              producer={isModerator}
+              control={studio}
+              onPanel={() => openPanel('studio')}
+              onError={notify}
+            />
+          ) : (
+            <MeetStage />
+          )}
           {boardOpen && (
             <div className="meet-board">
               <WhiteboardPanel board={board} readOnly={!canDraw} onClose={() => setBoardOpen(false)} />
@@ -736,6 +749,7 @@ export function MeetRoom(props: {
             </div>
           )}
           {panel === 'copilot' && <CopilotView insights={insights} />}
+          {panel === 'studio' && props.studio && isModerator && <StudioPanel control={studio} />}
           {panel === 'a11y' && (
             <A11yView prefs={prefs} onChange={updatePrefs} onShortcuts={() => setShortcutsOpen(true)} />
           )}
@@ -757,6 +771,7 @@ export function MeetRoom(props: {
         more={more}
         onEffects={effectsAvailable ? () => openPanel('effects') : undefined}
         canManage={canManage || isModerator}
+        producer={props.studio === true && isModerator}
         lobbyWaiting={lobbyWaiting}
         onLeave={() => void room.disconnect()}
       />

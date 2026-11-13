@@ -18,5 +18,6 @@ export function recordingDeps(): (RecordingDeps & { recordingsDir: string }) | n
     egress: client,
     outputDir: cfg.egressOutputDir,
     recordingsDir: cfg.recordingsDir,
+    studioUrl: `${cfg.secureCookies ? 'https' : 'http'}://${cfg.platformDomain}/studio/render`,
   };
 }

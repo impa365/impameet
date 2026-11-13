@@ -78,6 +78,7 @@ export function CreateRoomWizard(props: {
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState('');
   const [agentIds, setAgentIds] = useState<string[]>([]);
+  const [studio, setStudio] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [created, setCreated] = useState<RoomSummary | null>(null);
@@ -123,6 +124,7 @@ export function CreateRoomWizard(props: {
           allowGuests,
           access,
           agentIds,
+          studio,
         },
       });
       setCreated(room);
@@ -202,6 +204,29 @@ export function CreateRoomWizard(props: {
                   {origin}/r/<strong>{slug}</strong>
                 </span>
               </p>
+              <div className="choice-cards two" role="radiogroup" aria-label={t('studio.kind.title')}>
+                {(
+                  [
+                    [false, 'video_call', 'studio.kind.meeting', 'studio.kind.meetingText'],
+                    [true, 'live_tv', 'studio.kind.studio', 'studio.kind.studioText'],
+                  ] as const
+                ).map(([value, icon, title, text]) => (
+                  <button
+                    type="button"
+                    key={title}
+                    role="radio"
+                    aria-checked={studio === value}
+                    className={studio === value ? 'choice-card selected' : 'choice-card'}
+                    onClick={() => setStudio(value)}
+                  >
+                    <span className="choice-icon" aria-hidden>
+                      <Icon name={icon} />
+                    </span>
+                    <strong>{t(title)}</strong>
+                    <small>{t(text)}</small>
+                  </button>
+                ))}
+              </div>
               <div
                 className="wizard-suggestions"
                 role="group"
@@ -348,6 +373,7 @@ export function CreateRoomWizard(props: {
                   <dd>
                     <strong>{name.trim()}</strong>
                     <small>
+                      {studio ? `${t('studio.kind.studio')} · ` : ''}
                       {origin}/r/{slug}
                     </small>
                   </dd>

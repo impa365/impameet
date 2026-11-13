@@ -43,13 +43,13 @@ class FakeLiveKit implements LiveKitAdmin {
 }
 
 class FakeEgress implements RecordingEgress {
-  started: { room: string; filepath: string }[] = [];
+  started: { room: string; filepath: string; layoutUrl?: string }[] = [];
   stopped: string[] = [];
   states = new Map<string, EgressResult | null>();
   failStart = false;
-  async start(room: string, filepath: string) {
+  async start(room: string, filepath: string, layoutUrl?: string) {
     if (this.failStart) throw new Error('no egress worker');
-    this.started.push({ room, filepath });
+    this.started.push({ room, filepath, ...(layoutUrl ? { layoutUrl } : {}) });
     return `EG_${this.started.length}`;
   }
   async stop(egressId: string) {
@@ -121,6 +121,22 @@ describe('recordings', () => {
     expect(actions.map((a) => a.action)).toEqual(
       expect.arrayContaining(['recording.started', 'recording.stopped']),
     );
+  });
+
+  it('records a studio through its stage page, not the grid of everyone', async () => {
+    const { tenant, admin, egress, deps } = await setup();
+    const studio = await createRoom(db(), admin, createRoomInput.parse({ name: 'Live', studio: true }), null);
+    const withPage = { ...deps, studioUrl: 'https://meet.test/studio/render' };
+    const rec = await startRecording(withPage, studio, admin, null);
+    expect(egress.started).toEqual([
+      {
+        room: `${tenant.id}.${studio.slug}`,
+        filepath: `/out/${rec.fileName}`,
+        layoutUrl: 'https://meet.test/studio/render',
+      },
+    ]);
+    const [row] = await sql<{ studio: boolean }[]>`select studio from recordings where id = ${rec.id}`;
+    expect(row.studio).toBe(true);
   });
 
   it('only lets moderators record, and only on plans that include it', async () => {

@@ -51,6 +51,8 @@ export interface RecordingDeps {
   egress: RecordingEgress;
   /** Where Egress writes, as seen from the Egress container (e.g. /out). */
   outputDir: string;
+  /** The studio's stage page, which Egress opens to record a studio (instead of the grid). */
+  studioUrl?: string;
 }
 
 async function assertCanRecord(deps: RecordingDeps, room: Room, user: SessionUser | null) {
@@ -94,8 +96,8 @@ export async function beginRecording(
   let id: string;
   try {
     [{ id }] = await sql<{ id: string }[]>`
-      insert into recordings (tenant_id, room_id, room_name, file_name, started_by)
-      values (${room.tenantId}, ${room.id}, ${room.name}, '', ${actorId})
+      insert into recordings (tenant_id, room_id, room_name, file_name, started_by, studio)
+      values (${room.tenantId}, ${room.id}, ${room.name}, '', ${actorId}, ${room.studio === true})
       returning id`;
   } catch (err) {
     if ((err as { code?: string }).code === '23505') throw conflict('A sala já está sendo gravada');
@@ -106,6 +108,7 @@ export async function beginRecording(
     const egressId = await deps.egress.start(
       livekitRoomName(room.tenantId, room.slug),
       `${deps.outputDir}/${fileName}`,
+      room.studio ? deps.studioUrl : undefined,
     );
     await sql`
       update recordings set file_name = ${fileName}, egress_id = ${egressId}, status = 'recording'

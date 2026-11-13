@@ -17,6 +17,7 @@ export interface RoomSummary {
   allowGuests: boolean;
   access: RoomAccess;
   agentIds: string[];
+  studio?: boolean;
 }
 
 export type AgentOption = AgentChoice;
@@ -192,6 +193,11 @@ export function RoomsPanel({
                   </div>
                 </div>
                 <span className="chips">
+                  {room.studio && (
+                    <span className="chip accent">
+                      <Icon name="live_tv" size={14} /> {t('studio.kind.studio')}
+                    </span>
+                  )}
                   <span className="chip">
                     <Icon name={room.access === 'open' ? 'link' : 'lock'} size={14} />{' '}
                     {t(ACCESS_CHIP[room.access])}

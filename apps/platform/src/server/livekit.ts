@@ -28,6 +28,8 @@ export interface JoinTokenRequest {
   maxParticipants?: number | null;
   /** 0 (default) is the main room; 1..n are its breakout rooms. */
   breakout?: number;
+  /** The room's metadata when this join creates it (a studio's stage). */
+  roomMetadata?: string;
 }
 
 export async function issueJoinToken(req: JoinTokenRequest): Promise<string> {
@@ -49,6 +51,7 @@ export async function issueJoinToken(req: JoinTokenRequest): Promise<string> {
   });
   token.roomConfig = new RoomConfiguration({
     maxParticipants: req.maxParticipants ?? 0,
+    metadata: req.roomMetadata ?? '',
     agents: req.agentName
       ? (req.agentMetadata ?? [JSON.stringify({ agentId: null, tenantId: req.tenantId })]).map(
           (metadata) => new RoomAgentDispatch({ agentName: req.agentName, metadata }),

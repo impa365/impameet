@@ -39,6 +39,8 @@ export interface LiveKitAdmin {
   remove(room: string, identity: string): Promise<void>;
   setRole(room: string, identity: string, role: string): Promise<void>;
   setAttributes(room: string, identity: string, attributes: Record<string, string>): Promise<void>;
+  /** A running room's metadata (a studio's stage); nothing to do when the room is not open. */
+  updateRoomMetadata?(room: string, metadata: string): Promise<void>;
   dispatchAgent(room: string, agentName: string, metadata: string): Promise<void>;
   /** Server-sent message to everyone in a room (reliable data packet on `topic`). */
   sendData(room: string, payload: string, topic: string): Promise<void>;
@@ -93,6 +95,11 @@ export function liveKitAdmin(apiUrl: string, apiKey: string, apiSecret: string):
     },
     async setAttributes(room, identity, attributes) {
       await client.updateParticipant(room, identity, { attributes });
+    },
+    async updateRoomMetadata(room, metadata) {
+      await client.updateRoomMetadata(room, metadata).catch((err: { status?: number }) => {
+        if (err?.status !== 404) throw err;
+      });
     },
     async dispatchAgent(room, agentName, metadata) {
       await dispatch.createDispatch(room, agentName, { metadata });

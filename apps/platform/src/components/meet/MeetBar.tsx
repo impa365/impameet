@@ -19,7 +19,8 @@ export type PanelId =
   | 'effects'
   | 'host'
   | 'a11y'
-  | 'copilot';
+  | 'copilot'
+  | 'studio';
 
 export interface MoreItem {
   id: string;
@@ -111,6 +112,8 @@ export function MeetBar(props: {
   more: MoreItem[];
   onEffects?: () => void;
   canManage: boolean;
+  /** A studio's producer: the studio panel (banners, brand) has its own button. */
+  producer?: boolean;
   lobbyWaiting: number;
   onLeave: () => void;
 }) {
@@ -264,6 +267,7 @@ export function MeetBar(props: {
           dot={props.activitiesDot}
           onClick={() => props.onPanel('activities')}
         />
+        {props.producer && panelButton('studio', 'live_tv', t('studio.panel.title'))}
         {props.canManage && panelButton('host', 'admin_panel_settings', t('room.panels.host'))}
       </div>
     </footer>

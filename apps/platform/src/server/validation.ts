@@ -189,6 +189,8 @@ export const createRoomInput = z.object({
   agentId: z.string().uuid().nullable().optional(),
   agentIds: roomAgentIds.optional(),
   maxParticipants: z.number().int().min(2).max(1000).optional(),
+  /** A studio (stage + backstage, like StreamYard) instead of a meeting. */
+  studio: z.boolean().default(false),
 });
 
 export const updateRoomInput = z
@@ -205,6 +207,7 @@ export const updateRoomInput = z
     agentId: z.string().uuid().nullable(),
     agentIds: roomAgentIds,
     maxParticipants: z.number().int().min(2).max(1000).nullable(),
+    studio: z.boolean(),
   })
   .partial()
   .strict()
@@ -278,6 +281,50 @@ export const driveStartInput = z
   .strict();
 
 export const keepLocalInput = z.object({ keepLocal: z.boolean() }).strict();
+
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida');
+
+/** The studio stage the producer sets (see lib/studio.ts). */
+export const studioStateInput = z
+  .object({
+    layout: z.enum(['solo', 'grid', 'leader', 'screen', 'pip']),
+    stage: z
+      .array(z.string().min(1).max(200))
+      .max(9, 'Até 9 pessoas no palco')
+      .transform((s) => [...new Set(s)]),
+    screen: z.string().min(1).max(200).nullable(),
+    banners: z
+      .array(
+        z
+          .object({
+            id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
+            text: z
+              .string()
+              .trim()
+              .min(1, 'Escreva o texto do banner')
+              .max(200, 'Banner muito longo (máx. 200)'),
+            style: z.enum(['bar', 'ticker']),
+          })
+          .strict(),
+      )
+      .max(20, 'Até 20 banners'),
+    banner: z.string().max(40).nullable(),
+    names: z.boolean(),
+    brand: z
+      .object({
+        color: hexColor,
+        background: hexColor,
+        logo: z
+          .string()
+          .trim()
+          .max(500)
+          .refine((v) => v.startsWith('https://'), 'Use um endereço https:// para o logo')
+          .nullable(),
+      })
+      .strict(),
+  })
+  .strict()
+  .refine((s) => s.banner === null || s.banners.some((b) => b.id === s.banner), 'Banner inexistente');
 
 /** What any moderator of the meeting may change while it runs (the rest stays the organizer's). */
 export const meetingControlsInput = z

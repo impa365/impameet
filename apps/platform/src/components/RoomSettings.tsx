@@ -45,6 +45,7 @@ interface Settings {
   pollsPolicy: CollabPolicy;
   thinkingSound: boolean;
   agentActions: boolean;
+  studio: boolean;
   invites: string[];
   agentsAllowed: boolean;
   agentIds: string[];
@@ -256,6 +257,29 @@ export function RoomSettingsEditor(props: {
             <span>
               {t('dashboard.roomSettings.agentActions')}
               <small>{t('dashboard.roomSettings.agentActionsHint')}</small>
+            </span>
+          </label>
+        </fieldset>
+      )}
+      {!props.showAgent && (
+        <fieldset className="group" disabled={busy}>
+          <legend>{t('studio.kind.title')}</legend>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.studio}
+              onChange={(e) =>
+                void patch(
+                  { studio: e.target.checked },
+                  t(
+                    e.target.checked ? 'dashboard.roomSettings.studioOn' : 'dashboard.roomSettings.studioOff',
+                  ),
+                )
+              }
+            />
+            <span>
+              {t('studio.kind.studio')}
+              <small>{t('studio.kind.studioText')}</small>
             </span>
           </label>
         </fieldset>
