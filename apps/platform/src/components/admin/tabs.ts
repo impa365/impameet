@@ -11,6 +11,7 @@ export type AdminTab =
   | 'domains'
   | 'email'
   | 'storage'
+  | 'streaming'
   | 'security'
   | 'audit';
 
@@ -24,6 +25,7 @@ export const ADMIN_TABS: Record<AdminTab, { label: MessageKey; icon: IconName }>
   domains: { label: 'shell.nav.tabs.domains', icon: 'language' },
   email: { label: 'shell.nav.tabs.email', icon: 'mail' },
   storage: { label: 'shell.nav.tabs.storage', icon: 'cloud_upload' },
+  streaming: { label: 'shell.nav.tabs.streaming', icon: 'live_tv' },
   security: { label: 'shell.nav.tabs.security', icon: 'verified_user' },
   audit: { label: 'shell.nav.tabs.audit', icon: 'history' },
 };
@@ -40,6 +42,7 @@ export function adminTabsFor(role: 'admin' | 'manager' | 'member'): AdminTab[] {
       'domains',
       'email',
       'storage',
+      'streaming',
       'security',
       'audit',
     ];

@@ -10,8 +10,21 @@ import security from './security';
 import shell from './shell';
 import storage from './storage';
 import studio from './studio';
+import live from './live';
 
-const NAMESPACES = { common, shell, room, dashboard, admin, knowledge, mail, security, storage, studio };
+const NAMESPACES = {
+  common,
+  shell,
+  room,
+  dashboard,
+  admin,
+  knowledge,
+  mail,
+  security,
+  storage,
+  studio,
+  live,
+};
 
 /** The Portuguese tree: the reference every translation is checked against. */
 export type AppMessages = { [N in keyof typeof NAMESPACES]: (typeof NAMESPACES)[N]['reference'] };

@@ -501,7 +501,9 @@ describe('studio', () => {
       '10.0.0.1',
     );
     expect(saved).toMatchObject({ layout: 'leader', stage: ['g-ana', 'g-bob'], banner: 'b1' });
-    expect(lk.calls).toEqual([`metadata ${lkRoom} ${JSON.stringify(saved)}`]);
+    expect(lk.calls).toEqual([
+      `metadata ${lkRoom} ${JSON.stringify({ studio: saved, recording: false, live: null })}`,
+    ]);
     expect(await studioState(db(), room)).toEqual(saved);
 
     // Only who goes on or off stage is logged.
@@ -525,8 +527,9 @@ describe('studio', () => {
     expect(grant.studio).toBe(true);
     const claims = await new TokenVerifier(cfg.livekitApiKey, cfg.livekitApiSecret).verify(grant.token);
     expect(JSON.parse(claims.roomConfig?.metadata ?? '{}')).toMatchObject({
-      layout: 'pip',
-      stage: ['g-ana'],
+      studio: { layout: 'pip', stage: ['g-ana'] },
+      recording: false,
+      live: null,
     });
   });
 
@@ -539,7 +542,11 @@ describe('studio', () => {
     const grant = await grantJoin(db(), cfg, meeting, { identity: 'g-1', displayName: 'G', role: 'guest' });
     expect(grant.studio).toBe(false);
     const claims = await new TokenVerifier(cfg.livekitApiKey, cfg.livekitApiSecret).verify(grant.token);
-    expect(claims.roomConfig?.metadata ?? '').toBe('');
+    expect(JSON.parse(claims.roomConfig?.metadata ?? '')).toEqual({
+      studio: null,
+      recording: false,
+      live: null,
+    });
 
     const studio = await updateRoom(db(), admin, meeting.slug, updateRoomInput.parse({ studio: true }), null);
     expect(studio.studio).toBe(true);

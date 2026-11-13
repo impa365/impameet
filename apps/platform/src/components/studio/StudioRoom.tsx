@@ -113,6 +113,8 @@ function Thumb(props: { trackRef: TrackReferenceOrPlaceholder | undefined; name:
 function Producer(props: {
   control: StudioControl;
   onPanel: () => void;
+  onLive?: () => void;
+  onAir: boolean;
   onError: (message: string) => void;
 }) {
   const t = useT();
@@ -169,10 +171,18 @@ function Producer(props: {
             </button>
           ))}
         </div>
-        <button type="button" className="btn tonal small" onClick={props.onPanel}>
-          <Icon name="title" size={18} />
-          {t('studio.bannersAndBrand')}
-        </button>
+        <span className="studio-actions">
+          <button type="button" className="btn tonal small" onClick={props.onPanel}>
+            <Icon name="title" size={18} />
+            {t('studio.bannersAndBrand')}
+          </button>
+          {props.onLive && (
+            <button type="button" className="btn danger small" onClick={props.onLive}>
+              <Icon name="sensors" size={18} />
+              {props.onAir ? t('live.menuOnAir') : t('live.menu')}
+            </button>
+          )}
+        </span>
       </div>
       <section className="studio-backstage" aria-label={t('studio.backstage')}>
         <h4>
@@ -246,10 +256,18 @@ export function StudioMain(props: {
   producer: boolean;
   control: StudioControl;
   onPanel: () => void;
+  onLive?: () => void;
+  onAir: boolean;
   onError: (message: string) => void;
 }) {
   return props.producer ? (
-    <Producer control={props.control} onPanel={props.onPanel} onError={props.onError} />
+    <Producer
+      control={props.control}
+      onPanel={props.onPanel}
+      onLive={props.onLive}
+      onAir={props.onAir}
+      onError={props.onError}
+    />
   ) : (
     <Guest />
   );

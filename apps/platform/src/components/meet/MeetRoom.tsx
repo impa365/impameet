@@ -25,6 +25,7 @@ import { CopilotView, useInsights } from './Copilot';
 import { type BoardChange, ChangeDigest } from '@/lib/board-text';
 import { api } from '../api';
 import { StudioMain, StudioPanel, useStudioControl } from '../studio/StudioRoom';
+import { LivePanel, useLive } from './LivePanel';
 import { Icon } from '../ui/Icon';
 import {
   A11yView,
@@ -185,6 +186,7 @@ export function MeetRoom(props: {
   const background = useBackground(room);
   const recording = useRecording(room, props.slug, props.signedIn, notify);
   const studio = useStudioControl(props.slug, props.token, notify);
+  const live = useLive(props.slug, props.signedIn, notify);
   const captionerRunning = captionerPresent(participants);
   const transcriber = useCaptionsControl(props.slug, props.signedIn, captionerRunning, notify);
 
@@ -562,6 +564,17 @@ export function MeetRoom(props: {
           },
         ]
       : []),
+    ...(live.view?.canLive || live.live
+      ? [
+          {
+            id: 'live',
+            icon: 'sensors' as const,
+            label: live.live ? t('live.menuOnAir') : t('live.menu'),
+            onSelect: () => openPanel('live'),
+            active: live.live !== null,
+          },
+        ]
+      : []),
     ...(transcriber.canControl
       ? [
           {
@@ -642,6 +655,8 @@ export function MeetRoom(props: {
               producer={isModerator}
               control={studio}
               onPanel={() => openPanel('studio')}
+              onLive={live.view?.canLive || live.live ? () => openPanel('live') : undefined}
+              onAir={live.live !== null}
               onError={notify}
             />
           ) : (
@@ -653,6 +668,11 @@ export function MeetRoom(props: {
             </div>
           )}
           <div className="meet-chips">
+            {live.live && (
+              <span className="chip-rec">
+                <span className="rec-dot" aria-hidden /> {t('live.chip')}
+              </span>
+            )}
             {recording.recording && recording.phase !== 'idle' ? (
               <span className="chip-rec">
                 <span className="rec-dot" aria-hidden /> {t('room.stage.recording')}
@@ -750,6 +770,14 @@ export function MeetRoom(props: {
           )}
           {panel === 'copilot' && <CopilotView insights={insights} />}
           {panel === 'studio' && props.studio && isModerator && <StudioPanel control={studio} />}
+          {panel === 'live' && (
+            <LivePanel
+              control={live}
+              roomName={props.roomName}
+              studio={props.studio === true}
+              isAdmin={canManage}
+            />
+          )}
           {panel === 'a11y' && (
             <A11yView prefs={prefs} onChange={updatePrefs} onShortcuts={() => setShortcutsOpen(true)} />
           )}

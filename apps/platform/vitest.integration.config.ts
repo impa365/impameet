@@ -19,7 +19,9 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: [
-        'src/server/{auth,rooms,lobby,moderation,users,admin,domains,superadmin}/**/*.ts',
+        'src/server/{auth,rooms,lobby,moderation,users,admin,domains,superadmin,studio}/**/*.ts',
+        'src/server/live/{service,youtube}.ts',
+        'src/server/room-state.ts',
         'src/server/tenants/repo.ts',
         'src/server/audit.ts',
         'src/server/plans.ts',

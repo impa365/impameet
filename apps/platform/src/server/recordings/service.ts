@@ -6,6 +6,7 @@ import type { LiveKitAdmin } from '../livekit-admin';
 import { livekitRoomName } from '../livekit';
 import { canModerate } from '../moderation/service';
 import { tenantLimits } from '../plans';
+import { publishRoomState, publishRoomStateById } from '../room-state';
 import { type Room, canManageAllRooms } from '../rooms/service';
 import type { RecordingEgress } from './egress';
 import { recordingFileName } from './files';
@@ -125,6 +126,7 @@ export async function beginRecording(
     ip,
     meta,
   });
+  await publishRoomState(sql, deps.lk, room);
   return (await activeRecording(sql, room))!;
 }
 
@@ -160,13 +162,18 @@ export async function endRecording(
     ip,
     meta,
   });
+  await publishRoomState(deps.sql, deps.lk, room);
 }
 
 interface Unfinished {
   id: string;
+  roomId: string;
+  status: RecordingStatus;
   egressId: string | null;
   startedAt: Date;
 }
+
+type SettleDeps = Pick<RecordingDeps, 'sql' | 'egress'> & { lk?: LiveKitAdmin };
 
 async function markFailed(sql: Sql, id: string, error: string): Promise<void> {
   await sql`
@@ -180,15 +187,17 @@ async function markFailed(sql: Sql, id: string, error: string): Promise<void> {
  * failed with the reason, which frees the room for a new recording. When Egress cannot be
  * reached nothing changes: an unreachable recorder may still be recording.
  */
-async function settle(
-  deps: Pick<RecordingDeps, 'sql' | 'egress'>,
-  rows: Unfinished[],
-  now = Date.now(),
-): Promise<void> {
+async function settle(deps: SettleDeps, rows: Unfinished[], now = Date.now()): Promise<void> {
+  /** Rooms whose recording just stopped on its own: everyone there is told. */
+  const stopped = new Set<string>();
   for (const row of rows) {
     const old = now - new Date(row.startedAt).getTime() > RECORDING_GRACE_MS;
+    const wasActive = ACTIVE.includes(row.status);
     if (!row.egressId) {
-      if (old) await markFailed(deps.sql, row.id, 'start_timeout');
+      if (old) {
+        await markFailed(deps.sql, row.id, 'start_timeout');
+        if (wasActive) stopped.add(row.roomId);
+      }
       continue;
     }
     let info: Awaited<ReturnType<RecordingEgress['info']>>;
@@ -198,7 +207,10 @@ async function settle(
       continue;
     }
     if (!info) {
-      if (old) await markFailed(deps.sql, row.id, 'egress_lost');
+      if (old) {
+        await markFailed(deps.sql, row.id, 'egress_lost');
+        if (wasActive) stopped.add(row.roomId);
+      }
       continue;
     }
     const done = info.state === 'ready' || info.state === 'failed';
@@ -208,34 +220,36 @@ async function settle(
         error = ${info.state === 'failed' ? (info.error ?? 'egress_failed').slice(0, 500) : null},
         ended_at = case when ${done}::boolean then coalesce(ended_at, now()) else ended_at end
       where id = ${row.id} and status in ${deps.sql(UNFINISHED)}`;
+    if (wasActive && info.state !== 'recording') stopped.add(row.roomId);
   }
+  if (deps.lk) for (const roomId of stopped) await publishRoomStateById(deps.sql, deps.lk, roomId);
 }
 
-async function refresh(deps: Pick<RecordingDeps, 'sql' | 'egress'>, tenantId: string): Promise<void> {
+async function refresh(deps: SettleDeps, tenantId: string): Promise<void> {
   await settle(
     deps,
     await deps.sql<Unfinished[]>`
-      select id, egress_id as "egressId", started_at as "startedAt" from recordings
+      select id, room_id as "roomId", status, egress_id as "egressId", started_at as "startedAt" from recordings
       where tenant_id = ${tenantId} and status in ${deps.sql(UNFINISHED)}`,
   );
 }
 
 /** Every unfinished recording of the installation (the background clock: files become ready). */
-export async function settleAll(deps: Pick<RecordingDeps, 'sql' | 'egress'>): Promise<void> {
+export async function settleAll(deps: SettleDeps): Promise<void> {
   await settle(
     deps,
     await deps.sql<Unfinished[]>`
-      select id, egress_id as "egressId", started_at as "startedAt" from recordings
+      select id, room_id as "roomId", status, egress_id as "egressId", started_at as "startedAt" from recordings
       where status in ${deps.sql(UNFINISHED)}`,
   );
 }
 
 /** Checks this room's unfinished recordings with Egress before deciding anything about it. */
-export async function settleRoom(deps: Pick<RecordingDeps, 'sql' | 'egress'>, room: Room, now?: number) {
+export async function settleRoom(deps: SettleDeps, room: Room, now?: number) {
   await settle(
     deps,
     await deps.sql<Unfinished[]>`
-      select id, egress_id as "egressId", started_at as "startedAt" from recordings
+      select id, room_id as "roomId", status, egress_id as "egressId", started_at as "startedAt" from recordings
       where room_id = ${room.id} and status in ${deps.sql(UNFINISHED)}`,
     now,
   );
@@ -251,10 +265,7 @@ export async function recentFailure(sql: Sql, room: Room): Promise<Recording | n
 }
 
 /** Admins and managers see the whole organization; everyone else, what they recorded. */
-export async function listRecordings(
-  deps: Pick<RecordingDeps, 'sql' | 'egress'>,
-  user: SessionUser,
-): Promise<Recording[]> {
+export async function listRecordings(deps: SettleDeps, user: SessionUser): Promise<Recording[]> {
   await refresh(deps, user.tenantId);
   const all = canManageAllRooms(user);
   return deps.sql<Recording[]>`

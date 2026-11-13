@@ -5681,6 +5681,99 @@ a.shell-user[aria-current='page'] {
   gap: 8px;
 }
 
+.studio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.live-dests {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-dests li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+
+.live-dest-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.live-dest-main small {
+  overflow-wrap: anywhere;
+}
+
+.live-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.live-on {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 600;
+  color: #f28b82;
+}
+
+.live-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-targets li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-targets li span {
+  flex: 1;
+  min-width: 0;
+}
+
+.live-targets a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.live-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.live-field textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
 .studio-layouts {
   display: flex;
   flex-wrap: wrap;

@@ -43,8 +43,8 @@ export type StorageKind = 's3' | 'gdrive';
 
 const PLATFORM_AAD = 'google:platform';
 const storageAad = (tenantId: string) => `storage:${tenantId}`;
-const stateAad = (state: string) => `oauth:${state}`;
-const STATE_TTL_MS = 10 * 60_000;
+export const stateAad = (state: string) => `oauth:${state}`;
+export const STATE_TTL_MS = 10 * 60_000;
 const MAX_ATTEMPTS = 6;
 const tests = new RateLimiter(5, 10 * 60_000);
 const connects = new RateLimiter(10, 10 * 60_000);
@@ -52,7 +52,7 @@ const connects = new RateLimiter(10, 10 * 60_000);
 export const redirectUriOf = (platformUrl: string) =>
   `${platformUrl.replace(/\/+$/, '')}/api/oauth/google/callback`;
 
-function needKey(deps: StorageDeps): Buffer {
+export function needKey(deps: Pick<StorageDeps, 'key'>): Buffer {
   if (!deps.key)
     throw new AppError(
       501,
@@ -81,7 +81,7 @@ export interface PlatformGoogleView {
   updatedAt: Date | null;
 }
 
-async function platformGoogleRow(sql: Sql) {
+export async function platformGoogleRow(sql: Sql) {
   const [row] = await sql<{ clientId: string; sealed: string; updatedAt: Date }[]>`
     select client_id as "clientId", client_secret_sealed as sealed, updated_at as "updatedAt"
     from platform_google where id`;
@@ -127,7 +127,8 @@ export async function savePlatformGoogle(
   return getPlatformGoogle(deps, actor);
 }
 
-async function googleClient(deps: StorageDeps): Promise<GoogleClient | null> {
+/** The platform's Google client (Drive, YouTube), or null when not configured. */
+export async function googleClient(deps: StorageDeps): Promise<GoogleClient | null> {
   const row = await platformGoogleRow(deps.sql);
   if (!row || !deps.key) return null;
   return {
@@ -364,6 +365,15 @@ export async function startDrive(
     values (${state}, ${actor.tenantId}, ${actor.id}, 'drive', ${sealSecret(key, verifier, stateAad(state))},
             ${returnUrl}, ${input.folderName}, ${input.keepLocal})`;
   return { url: authUrl(client, state, challenge, DRIVE_SCOPES) };
+}
+
+/** Which "Conectar com Google" a state belongs to (Drive or YouTube), without using it up. */
+export async function oauthPurpose(sql: Sql, state: string | null): Promise<'drive' | 'youtube' | null> {
+  if (!state || state.length > 100) return null;
+  const [row] = await sql<
+    { purpose: 'drive' | 'youtube' }[]
+  >`select purpose from oauth_states where id = ${state}`;
+  return row?.purpose ?? null;
 }
 
 const withStatus = (url: string, status: string) => {

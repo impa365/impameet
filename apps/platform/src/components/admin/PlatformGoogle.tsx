@@ -23,6 +23,7 @@ const STEPS: MessageKey[] = [
   'storage.step6',
   'storage.step7',
   'storage.step8',
+  'storage.step9',
 ];
 const SECURITY: MessageKey[] = ['storage.security1', 'storage.security2', 'storage.security3'];
 

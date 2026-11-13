@@ -6,6 +6,7 @@ import { AuditTab } from './AuditTab';
 import { MailTab } from './MailTab';
 import { SecurityTab } from './SecurityTab';
 import { StorageTab } from './StorageTab';
+import { StreamingTab } from './StreamingTab';
 import { BrandingTab } from './BrandingTab';
 import { DomainsTab } from './DomainsTab';
 import { IntegrationsTab } from './IntegrationsTab';
@@ -33,6 +34,7 @@ export function AdminPanel(props: {
       {tab === 'domains' && <DomainsTab />}
       {tab === 'email' && <MailTab />}
       {tab === 'storage' && <StorageTab />}
+      {tab === 'streaming' && <StreamingTab />}
       {tab === 'security' && <SecurityTab />}
       {tab === 'audit' && <AuditTab />}
     </>

@@ -4,18 +4,17 @@ import {
   type TrackReferenceOrPlaceholder,
   VideoTrack,
   isTrackReference,
-  useRoomInfo,
   useTracks,
 } from '@livekit/components-react';
 import { type Participant, RoomEvent, Track } from 'livekit-client';
 import type { CSSProperties } from 'react';
 import { displayName } from '@/lib/a11y';
-import { type StudioState, layoutShape, parseStudio } from '@/lib/studio';
+import { EMPTY_STUDIO, type StudioState, layoutShape } from '@/lib/studio';
+import { useRoomState } from '../meet/useRoomState';
 
 /** The stage as the producer last set it, live from the room's metadata. */
 export function useStudioState(): StudioState {
-  const { metadata } = useRoomInfo();
-  return parseStudio(metadata ?? '');
+  return useRoomState().studio ?? EMPTY_STUDIO;
 }
 
 /** Cameras and screen shares of everyone in the room, refreshed as people come and go. */

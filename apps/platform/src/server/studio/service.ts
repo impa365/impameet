@@ -3,8 +3,8 @@ import { audit } from '../audit';
 import type { Sql } from '../db';
 import { badRequest, forbidden } from '../errors';
 import type { LiveKitAdmin } from '../livekit-admin';
-import { livekitRoomName } from '../livekit';
 import type { RoomModerator } from '../moderation/service';
+import { publishRoomState } from '../room-state';
 import type { Room } from '../rooms/service';
 import type { studioStateInput } from '../validation';
 import { type StudioState, parseStudio } from '@/lib/studio';
@@ -35,7 +35,7 @@ export async function saveStudio(
   const before = await studioState(sql, room);
   const state = parseStudio(input);
   await sql`update rooms set studio_state = ${sql.json(state as never)} where id = ${room.id}`;
-  await lk.updateRoomMetadata?.(livekitRoomName(room.tenantId, room.slug), JSON.stringify(state));
+  await publishRoomState(sql, lk, room);
   const joined = state.stage.filter((s) => !before.stage.includes(s));
   const left = before.stage.filter((s) => !state.stage.includes(s));
   if (joined.length || left.length) {

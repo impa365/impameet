@@ -40,6 +40,14 @@ class FakeLiveKit implements LiveKitAdmin {
   async setAttributes() {}
   async dispatchAgent() {}
   async sendData() {}
+  metadata: string[] = [];
+  async updateRoomMetadata(_room: string, metadata: string) {
+    this.metadata.push(metadata);
+  }
+  /** Whether the room was last told it is being recorded. */
+  get toldRecording(): boolean {
+    return (JSON.parse(this.metadata.at(-1) ?? '{}') as { recording?: boolean }).recording === true;
+  }
 }
 
 class FakeEgress implements RecordingEgress {
@@ -100,14 +108,17 @@ beforeEach(async () => {
 
 describe('recordings', () => {
   it('records a room once at a time, then tracks it until the file is ready', async () => {
-    const { tenant, admin, room, egress, deps } = await setup();
+    const { tenant, admin, room, egress, deps, lk } = await setup();
     const rec = await startRecording(deps, room, admin, '10.0.0.1');
     expect(rec).toMatchObject({ status: 'recording', roomName: 'Vendas', startedByName: 'Admin' });
     expect(rec.fileName).toBe(`${tenant.id}_${rec.id}.mp4`);
     expect(egress.started).toEqual([{ room: `${tenant.id}.${room.slug}`, filepath: `/out/${rec.fileName}` }]);
+    // Everyone in the room is told it is recorded (LiveKit's own flag also covers live streams).
+    expect(lk.toldRecording).toBe(true);
     await expectAppError(startRecording(deps, room, admin, null), 409);
 
     await stopRecording(deps, room, admin, null);
+    expect(lk.toldRecording).toBe(false);
     expect(egress.stopped).toEqual(['EG_1']);
     expect(await activeRecording(db(), room)).toBeNull();
     await expectAppError(stopRecording(deps, room, admin, null), 404);

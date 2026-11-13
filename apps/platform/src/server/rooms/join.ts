@@ -3,7 +3,7 @@ import type { Config } from '../config';
 import type { Sql } from '../db';
 import { type ParticipantRole, issueJoinToken } from '../livekit';
 import { capParticipants, tenantLimits } from '../plans';
-import { studioState } from '../studio/service';
+import { roomStateOf } from '../room-state';
 import type { CollabPolicy, Room } from './service';
 
 export interface JoinGrant {
@@ -52,8 +52,8 @@ export async function grantJoin(
     agentName: agents.length > 0 ? cfg.agentName : undefined,
     agentMetadata: agents.map((a) => agentDispatchMetadata(room.tenantId, a, room)),
     maxParticipants: capParticipants(room.maxParticipants, limits.maxParticipants),
-    // A studio opens with its stage as the producer left it.
-    roomMetadata: room.studio ? JSON.stringify(await studioState(sql, room)) : undefined,
+    // The room opens knowing its stage (a studio) and whether it is recorded or live.
+    roomMetadata: JSON.stringify(await roomStateOf(sql, room)),
   });
   return {
     serverUrl: cfg.livekitUrl,

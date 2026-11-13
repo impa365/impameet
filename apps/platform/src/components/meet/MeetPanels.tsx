@@ -22,6 +22,7 @@ const TITLES: Record<PanelId, MessageKey> = {
   a11y: 'room.panels.a11y',
   copilot: 'room.panels.copilot',
   studio: 'studio.panel.title',
+  live: 'live.panel',
 };
 
 const SUBVIEWS: Partial<Record<PanelId, PanelId>> = { polls: 'activities' };

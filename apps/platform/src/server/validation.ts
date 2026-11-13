@@ -282,6 +282,41 @@ export const driveStartInput = z
 
 export const keepLocalInput = z.object({ keepLocal: z.boolean() }).strict();
 
+/** A live destination on any RTMP server; the key is sealed and never shown again. */
+export const rtmpDestinationInput = z
+  .object({
+    name: z.string().trim().min(1, 'Dê um nome ao destino').max(80),
+    url: z.string().trim().min(1, 'Informe o endereço do servidor').max(300),
+    streamKey: z
+      .string()
+      .trim()
+      .regex(/^[\x21-\x7e]{1,300}$/, 'Chave de transmissão inválida'),
+  })
+  .strict();
+
+export const youtubeStartInput = z.object({ name: z.string().trim().max(80).default('') }).strict();
+
+/** YouTube refuses "<" and ">" in a live's title and description. */
+const youtubeText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .refine((v) => !/[<>]/.test(v), 'Não use os caracteres < e > no título ou na descrição');
+
+export const liveStartInput = z
+  .object({
+    destinationIds: z
+      .array(z.string().uuid())
+      .min(1, 'Escolha pelo menos um destino')
+      .max(5, 'Até 5 destinos ao mesmo tempo')
+      .transform((ids) => [...new Set(ids)]),
+    title: youtubeText(100).pipe(z.string().min(1, 'Informe o título da live')),
+    description: youtubeText(5000).default(''),
+    privacy: z.enum(['public', 'unlisted', 'private']).optional(),
+  })
+  .strict();
+
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida');
 
 /** The studio stage the producer sets (see lib/studio.ts). */

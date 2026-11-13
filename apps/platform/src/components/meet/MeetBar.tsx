@@ -20,7 +20,8 @@ export type PanelId =
   | 'host'
   | 'a11y'
   | 'copilot'
-  | 'studio';
+  | 'studio'
+  | 'live';
 
 export interface MoreItem {
   id: string;

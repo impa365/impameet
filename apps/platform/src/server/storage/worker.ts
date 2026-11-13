@@ -1,4 +1,6 @@
 import 'server-only';
+import { liveDeps } from '../live/client';
+import { settleLives } from '../live/service';
 import { recordingDeps } from '../recordings/client';
 import { settleAll } from '../recordings/service';
 import { storageDeps } from './client';
@@ -19,6 +21,7 @@ export function startStorageWorker(): void {
       const recorder = recordingDeps();
       if (!recorder) return;
       await settleAll(recorder).catch(() => undefined);
+      await settleLives(liveDeps()).catch(() => undefined);
       while ((await storageTick(storageDeps())) > 0) {
         // Keep going while there is work; the next tick picks up anything new.
       }
