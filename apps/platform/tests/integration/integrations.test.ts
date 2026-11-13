@@ -277,6 +277,7 @@ describe('integrations', () => {
     const seen: string[] = [];
     const listing = (async (url: string, init: RequestInit) => {
       seen.push(`${url} ${new Headers(init.headers).get('authorization')}`);
+      if (url.endsWith('/models/embedding')) return new Response('{}', { status: 404 });
       return Response.json({
         data: [
           { id: 'models/gemini-2.5-flash' },
@@ -293,16 +294,21 @@ describe('integrations', () => {
     expect(await discoverModels(deps(listing), admin, typed)).toEqual({
       ok: true,
       models: ['gemini-2.5-flash', 'text-embedding-004'],
+      embeddings: ['text-embedding-004'],
     });
     expect(seen).toEqual([
       'https://generativelanguage.googleapis.com/v1beta/openai/models Bearer AIza-typed-0123456789',
+      'https://generativelanguage.googleapis.com/v1beta/openai/models/embedding Bearer AIza-typed-0123456789',
     ]);
 
     const llm = await createIntegration(deps(), admin, LLM(), null);
     seen.length = 0;
     const saved = { kind: 'llm' as const, baseUrl: 'https://openrouter.ai/api/v1', integrationId: llm.id };
     expect((await discoverModels(deps(listing), admin, saved)).ok).toBe(true);
-    expect(seen).toEqual(['https://openrouter.ai/api/v1/models Bearer sk-or-0123456789abcdef']);
+    expect(seen).toEqual([
+      'https://openrouter.ai/api/v1/models Bearer sk-or-0123456789abcdef',
+      'https://openrouter.ai/api/v1/models/embedding Bearer sk-or-0123456789abcdef',
+    ]);
 
     // A saved key never goes to another host, to another kind, or to someone else.
     seen.length = 0;
@@ -382,15 +388,19 @@ describe('integrations', () => {
     expect(await discoverModels(deps(plain), admin, input)).toEqual({
       ok: true,
       models: ['gpt-4o', 'text-embedding-3-small'],
+      embeddings: ['text-embedding-3-small'],
     });
-    // Chat integrations only read /models.
+    // LLM integrations ask for both lists too: the same key may also embed.
     const seen: string[] = [];
     const chat = (async (url: string) => {
       seen.push(url);
       return Response.json({ data: [{ id: 'gpt-4o' }] });
     }) as unknown as Fetch;
     await discoverModels(deps(chat), admin, { ...input, kind: 'llm' });
-    expect(seen).toEqual(['https://9router.example/v1/models']);
+    expect(seen).toEqual([
+      'https://9router.example/v1/models',
+      'https://9router.example/v1/models/embedding',
+    ]);
   });
 
   it('lists the models of a new integration even when the form sends no id and entries lack one', async () => {
@@ -419,9 +429,50 @@ describe('integrations', () => {
     expect(await discoverModels(deps(omni), admin, input)).toEqual({
       ok: true,
       models: ['gemini-embedding-001', 'gpt-5-mini'],
+      embeddings: ['gemini-embedding-001'],
     });
     for (const kind of ['llm', 'embedding'] as const)
       expect((await discoverModels(deps(omni), admin, { ...input, kind })).ok).toBe(true);
+  });
+
+  it('keeps embedding models and combos of a catalog longer than 500 models', async () => {
+    const { admin } = await org('acme');
+    // A gateway listing 700 chat models first, then Jina, Gemini and an embeddings combo.
+    const chatModels = Array.from({ length: 700 }, (_, n) => ({
+      id: `aaa/chat-${String(n).padStart(3, '0')}`,
+    }));
+    const big = (async (url: string) =>
+      url.endsWith('/models/embedding')
+        ? new Response('{}', { status: 404 })
+        : Response.json({
+            data: [
+              ...chatModels,
+              { id: 'jina/jina-embeddings-v3' },
+              { id: 'gemini/gemini-embedding-001' },
+              { id: 'combo/Kb-Jina-Gemini', type: 'embedding' },
+              { id: 'voyage/voyage-3' },
+              { id: 'zzz/router-alias', capabilities: { embeddings: true, chat: false } },
+              { id: 'jina/jina-reranker-v2-base-multilingual' },
+              { id: null },
+            ],
+          })) as unknown as Fetch;
+    for (const kind of ['embedding', 'llm'] as const) {
+      const res = await discoverModels(deps(big), admin, {
+        kind,
+        baseUrl: 'https://llm.starconteudos.cloud/v1',
+        apiKey: 'omni-0123456789',
+      });
+      if (!res.ok) throw new Error(res.error);
+      expect(res.models).toHaveLength(706);
+      expect(res.embeddings).toEqual([
+        'combo/Kb-Jina-Gemini',
+        'gemini/gemini-embedding-001',
+        'jina/jina-embeddings-v3',
+        'voyage/voyage-3',
+        'zzz/router-alias',
+      ]);
+      expect(res.rerankers).toEqual(['jina/jina-reranker-v2-base-multilingual']);
+    }
   });
 
   it('proves what one OpenAI-compatible key can do: chat, embeddings and reranking', async () => {

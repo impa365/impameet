@@ -446,6 +446,7 @@ export function IntegrationsTab() {
                 {(found.length > 0 || draft.models.length > 0) && (
                   <ModelPicker
                     available={found}
+                    embeddings={catalog?.state === 'ok' ? catalog.embeddings : undefined}
                     selected={draft.models}
                     principal={draft.defaultModel}
                     onSelected={(models) => set('models', models)}

@@ -1,4 +1,5 @@
 /** Live checks of provider credentials (used by "Testar conexão" and "Buscar modelos"). */
+import { isRerankModel, modelCategory } from '@/lib/models';
 
 export type Fetch = typeof fetch;
 
@@ -11,8 +12,10 @@ export type ProbeResult =
   | {
       ok: true;
       models: string[];
-      /** Models the provider lists as embedding models (routers such as 9router list them apart). */
+      /** Embedding models: the provider's metadata, its dedicated list, or their name. */
       embeddings?: string[];
+      /** Reranking models, the same way. */
+      rerankers?: string[];
       /** What the tested integration proved it can do ("Testar conexão" only). */
       capabilities?: ('chat' | 'embeddings' | 'rerank')[];
     }
@@ -35,21 +38,67 @@ const unreachable = (endpoint: string): ProbeResult => ({
   error: `${endpoint}: Não foi possível conectar ao provedor`,
 });
 
-/** The ids an OpenAI-compatible list gives; entries without a usable id are left out. */
-export function modelIds(body: unknown): string[] {
+/** How many models a catalog may list (gateways with combos and aliases list thousands). */
+export const MAX_DISCOVERED = 5000;
+/** How many entries are read at all, so a hostile endpoint cannot make this loop forever. */
+const MAX_ENTRIES = 20_000;
+const CAPABILITY_KEYS = ['type', 'mode', 'task', 'model_type', 'category', 'capabilities', 'endpoints'];
+
+export interface ModelCatalog {
+  models: string[];
+  /** Embedding models, by the provider's own metadata or by their name. */
+  embeddings: string[];
+  /** Reranking models, the same way. */
+  rerankers: string[];
+}
+
+/** Words a catalog entry uses to say what the model does (type, mode, capabilities, endpoints…). */
+function capabilityWords(entry: Record<string, unknown>): string {
+  const words: string[] = [];
+  const add = (v: unknown): void => {
+    if (typeof v === 'string') words.push(v);
+    else if (Array.isArray(v)) v.forEach(add);
+    else if (v && typeof v === 'object') {
+      for (const [k, on] of Object.entries(v))
+        if (on === true || typeof on === 'string') words.push(k, String(on));
+    }
+  };
+  for (const key of [...CAPABILITY_KEYS, 'supported_endpoints']) add(entry[key]);
+  const architecture = entry.architecture;
+  if (architecture && typeof architecture === 'object')
+    add((architecture as Record<string, unknown>).output_modalities);
+  return words.join(' ').toLowerCase();
+}
+
+/**
+ * An OpenAI-compatible model list, its capabilities read before anything is cut: entries
+ * without a usable id are skipped one by one, and embedding and reranking models (combos and
+ * aliases included) are always kept even when the catalog is longer than the limit.
+ */
+export function readCatalog(body: unknown): ModelCatalog {
   const data = (body as { data?: unknown } | null)?.data;
-  if (!Array.isArray(data)) return [];
-  const ids = data
-    .map((m) => (typeof m === 'object' && m !== null ? (m as { id?: unknown }).id : undefined))
-    .filter((id): id is string | number => typeof id === 'string' || typeof id === 'number')
-    // Gemini lists "models/gemini-…" but its chat endpoint takes the bare name.
-    .map((id) =>
-      String(id)
-        .trim()
-        .replace(/^models\//, ''),
-    )
-    .filter((id) => id.length > 0 && id.length <= 120);
-  return [...new Set(ids)].sort().slice(0, 500);
+  if (!Array.isArray(data)) return { models: [], embeddings: [], rerankers: [] };
+  const all = new Set<string>();
+  const embeddings = new Set<string>();
+  const rerankers = new Set<string>();
+  for (const entry of data.slice(0, MAX_ENTRIES)) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const raw = (entry as { id?: unknown }).id;
+    if (typeof raw !== 'string' && typeof raw !== 'number') continue;
+    // Gemini lists "models/gemini-…" but its endpoints take the bare name.
+    const id = String(raw)
+      .trim()
+      .replace(/^models\//, '');
+    if (id.length === 0 || id.length > 120) continue;
+    all.add(id);
+    const said = capabilityWords(entry as Record<string, unknown>);
+    if (/rerank/.test(said) || isRerankModel(id)) rerankers.add(id);
+    else if (/embed/.test(said) || modelCategory(id) === 'embedding') embeddings.add(id);
+  }
+  const special = [...embeddings, ...rerankers];
+  const others = [...all].filter((m) => !embeddings.has(m) && !rerankers.has(m)).sort();
+  const models = [...special, ...others.slice(0, Math.max(0, MAX_DISCOVERED - special.length))].sort();
+  return { models, embeddings: [...embeddings].sort(), rerankers: [...rerankers].sort() };
 }
 
 async function call(
@@ -79,7 +128,13 @@ export async function probeLlm(
   const res = await call(fetchImpl, `${baseUrl}${path}`, { authorization: `Bearer ${apiKey}` });
   if (!(res instanceof Response)) return unreachable(endpoint);
   if (!res.ok) return failure(res.status, endpoint);
-  return { ok: true, models: modelIds(await res.json().catch(() => null)) };
+  const catalog = readCatalog(await res.json().catch(() => null));
+  return {
+    ok: true,
+    models: catalog.models,
+    ...(catalog.embeddings.length ? { embeddings: catalog.embeddings } : {}),
+    ...(catalog.rerankers.length ? { rerankers: catalog.rerankers } : {}),
+  };
 }
 
 /** Fish Audio: the account's API credit only answers to a valid key. */

@@ -24,8 +24,11 @@ export function ModelPicker({
   principal,
   onSelected,
   onPrincipal,
+  embeddings,
 }: {
   available: string[];
+  /** The models the provider itself says embed (whatever their names). */
+  embeddings?: string[];
   selected: string[];
   principal: string;
   onSelected: (models: string[]) => void;
@@ -37,8 +40,14 @@ export function ModelPicker({
   const [category, setCategory] = useState<ModelCategory | 'all'>('all');
   const [onlySelected, setOnlySelected] = useState(false);
   const all = useMemo(() => [...new Set([...available, ...selected])].sort(), [available, selected]);
+  const embeds = useMemo(() => new Set(embeddings ?? []), [embeddings]);
   const chosen = new Set(selected);
-  const visible = filterModels(onlySelected ? all.filter((m) => chosen.has(m)) : all, query, category);
+  const visible = filterModels(
+    onlySelected ? all.filter((m) => chosen.has(m)) : all,
+    query,
+    category,
+    embeds,
+  );
 
   const toggle = (model: string, on: boolean) =>
     onSelected(on ? [...selected, model] : selected.filter((m) => m !== model));
@@ -66,7 +75,7 @@ export function ModelPicker({
         >
           {t('admin.integrations.catAll')} · {all.length}
         </button>
-        {categoryCounts(all).map(([c, n]) => (
+        {categoryCounts(all, embeds).map(([c, n]) => (
           <button
             key={c}
             type="button"
@@ -110,7 +119,7 @@ export function ModelPicker({
             <label>
               <input type="checkbox" checked={chosen.has(m)} onChange={(e) => toggle(m, e.target.checked)} />
               <span className="model-id">{m}</span>
-              <span className="chip">{t(CATEGORY_LABEL[modelCategory(m)])}</span>
+              <span className="chip">{t(CATEGORY_LABEL[modelCategory(m, embeds)])}</span>
             </label>
             {m === principal ? (
               <span className="pill ok">{t('admin.integrations.principal')}</span>

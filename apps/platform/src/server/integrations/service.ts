@@ -302,18 +302,21 @@ export async function discoverModels(
     apiKey = saved.apiKey;
   }
   const fetchImpl = deps.fetch ?? fetch;
-  if (input.kind === 'llm') return probeLlm(fetchImpl, baseUrl, apiKey);
-  // Routers such as 9router keep embedding models out of /models, on /models/embedding.
+  // Routers such as 9router and OmniRoute keep embedding models out of /models, on
+  // /models/embedding; asked for both kinds, since one LLM key may also embed.
   const [listed, dedicated] = await Promise.all([
     probeLlm(fetchImpl, baseUrl, apiKey),
     probeLlm(fetchImpl, baseUrl, apiKey, '/models/embedding'),
   ]);
   if (!dedicated.ok || dedicated.models.length === 0) return listed;
   const others = listed.ok ? listed.models : [];
+  const embeddings = [...new Set([...dedicated.models, ...((listed.ok && listed.embeddings) || [])])];
+  const rerankers = listed.ok ? listed.rerankers : undefined;
   return {
     ok: true,
     models: [...new Set([...dedicated.models, ...others])],
-    embeddings: dedicated.models,
+    embeddings,
+    ...(rerankers ? { rerankers } : {}),
   };
 }
 
