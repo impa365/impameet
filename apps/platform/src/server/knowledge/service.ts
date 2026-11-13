@@ -73,6 +73,7 @@ export interface KnowledgeBase {
   topK: number;
   minScore: number;
   rerankIntegrationId: string | null;
+  rerankModel: string | null;
   expandQueries: boolean;
   sources: number;
   chunks: number;
@@ -157,7 +158,7 @@ const BASE_COLUMNS = (sql: Sql) => sql`
   b.id, b.name, b.description, b.embedding_integration_id as "embeddingIntegrationId",
   b.embedding_model as "embeddingModel", b.dimensions, b.chunk_size as "chunkSize",
   b.chunk_overlap as "chunkOverlap", b.retrieval_mode as "retrievalMode", b.top_k as "topK",
-  b.min_score as "minScore", b.rerank_integration_id as "rerankIntegrationId",
+  b.min_score as "minScore", b.rerank_integration_id as "rerankIntegrationId", b.rerank_model as "rerankModel",
   b.expand_queries as "expandQueries", b.created_at as "createdAt",
   (select count(*)::int from knowledge_sources s where s.kb_id = b.id and s.parent_id is null) as sources,
   (select coalesce(sum(chunk_count), 0)::int from knowledge_sources s where s.kb_id = b.id and s.enabled) as chunks,
@@ -186,6 +187,7 @@ interface BaseRow {
   topK: number;
   minScore: number;
   rerankId: string | null;
+  rerankModel: string | null;
   expand: boolean;
 }
 
@@ -194,26 +196,51 @@ async function baseRow(sql: Sql, tenantId: string, id: string): Promise<BaseRow>
     select id, name, collection, embedding_integration_id as "integrationId", embedding_model as model,
            dimensions, chunk_size as "chunkSize", chunk_overlap as "chunkOverlap", retrieval_mode as mode,
            top_k as "topK", min_score as "minScore", rerank_integration_id as "rerankId",
-           expand_queries as expand
+           rerank_model as "rerankModel", expand_queries as expand
     from knowledge_bases where id = ${id} and tenant_id = ${tenantId}`;
   if (!row) throw notFound('Base de conhecimento não encontrada');
   return row;
 }
 
-/** The embedding settings of an integration of this organization (kind "embedding"). */
-async function embeddingConfig(deps: KnowledgeDeps, tenantId: string, integrationId: string | null) {
-  if (!integrationId) throw badRequest('Escolha a integração de embeddings da base');
-  const secret = await integrationSecret(deps.sql, deps.key!, tenantId, integrationId);
-  if (secret.kind !== 'embedding' || !secret.baseUrl || !secret.defaultModel)
-    throw badRequest('Escolha uma integração de embeddings');
-  return { baseUrl: secret.baseUrl, apiKey: secret.apiKey, model: secret.defaultModel };
+/**
+ * The model one use of an integration runs. A base keeps the model it was built with (vectors of
+ * another model are useless): an integration of that very kind starts it with its own model, an
+ * OpenAI-compatible LLM one serves the model the base chose among those the admin enabled in it.
+ */
+function modelFor(
+  secret: { kind: string; defaultModel: string | null; models: string[] },
+  kind: 'embedding' | 'rerank',
+  chosen: string | null | undefined,
+): string | null {
+  if (secret.kind === kind) return chosen || secret.defaultModel;
+  if (secret.kind === 'llm' && chosen && secret.models.includes(chosen)) return chosen;
+  return null;
 }
 
-async function rerankConfig(deps: KnowledgeDeps, tenantId: string, integrationId: string) {
+/** The embedding settings of a base: its integration (embeddings or a compatible LLM) and model. */
+async function embeddingConfig(
+  deps: KnowledgeDeps,
+  tenantId: string,
+  integrationId: string | null,
+  chosen: string | null | undefined,
+) {
+  if (!integrationId) throw badRequest('Escolha a integração de embeddings da base');
   const secret = await integrationSecret(deps.sql, deps.key!, tenantId, integrationId);
-  if (secret.kind !== 'rerank' || !secret.baseUrl || !secret.defaultModel)
-    throw badRequest('Escolha uma integração de reranqueamento');
-  return { baseUrl: secret.baseUrl, apiKey: secret.apiKey, model: secret.defaultModel };
+  const model = modelFor(secret, 'embedding', chosen);
+  if (!secret.baseUrl || !model) throw badRequest('Escolha uma integração e um modelo de embeddings');
+  return { baseUrl: secret.baseUrl, apiKey: secret.apiKey, model };
+}
+
+async function rerankConfig(
+  deps: KnowledgeDeps,
+  tenantId: string,
+  integrationId: string,
+  chosen: string | null | undefined,
+) {
+  const secret = await integrationSecret(deps.sql, deps.key!, tenantId, integrationId);
+  const model = modelFor(secret, 'rerank', chosen);
+  if (!secret.baseUrl || !model) throw badRequest('Escolha uma integração e um modelo de reranqueamento');
+  return { baseUrl: secret.baseUrl, apiKey: secret.apiKey, model };
 }
 
 async function dimensionsOf(deps: KnowledgeDeps, config: EmbeddingConfig): Promise<number> {
@@ -222,6 +249,15 @@ async function dimensionsOf(deps: KnowledgeDeps, config: EmbeddingConfig): Promi
     return vector.length;
   } catch (err) {
     throw badRequest(`Não foi possível gerar embeddings: ${err instanceof Error ? err.message : 'erro'}`);
+  }
+}
+
+/** A reranker the base did not use yet ranks two tiny documents first (a real call). */
+async function provesReranking(deps: KnowledgeDeps, config: RerankConfig): Promise<void> {
+  try {
+    await deps.reranker(config)('teste', ['teste', 'outro']);
+  } catch (err) {
+    throw badRequest(`Não foi possível reranquear: ${err instanceof Error ? err.message : 'erro'}`);
   }
 }
 
@@ -259,7 +295,12 @@ export async function createBase(
   const [{ count }] = await deps.sql<{ count: number }[]>`
     select count(*)::int as count from knowledge_bases where tenant_id = ${actor.tenantId}`;
   if (count >= MAX_BASES) throw badRequest(`Até ${MAX_BASES} bases de conhecimento por organização`);
-  const config = await embeddingConfig(deps, actor.tenantId, input.embeddingIntegrationId);
+  const config = await embeddingConfig(
+    deps,
+    actor.tenantId,
+    input.embeddingIntegrationId,
+    input.embeddingModel,
+  );
   const dimensions = await dimensionsOf(deps, config);
   const id = randomUUID();
   const collection = collectionName(id);
@@ -298,13 +339,25 @@ export async function updateBase(
 ): Promise<KnowledgeBase> {
   assertAdmin(actor);
   const current = await baseRow(deps.sql, actor.tenantId, id);
-  if (input.rerankIntegrationId) await rerankConfig(deps, actor.tenantId, input.rerankIntegrationId);
+  const rerankId = input.rerankIntegrationId === undefined ? current.rerankId : input.rerankIntegrationId;
+  let rerankModel: string | null = null;
+  if (rerankId) {
+    const sameReranker = rerankId === current.rerankId;
+    const chosen = input.rerankModel ?? (sameReranker ? current.rerankModel : null);
+    const config = await rerankConfig(deps, actor.tenantId, rerankId, chosen);
+    rerankModel = config.model;
+    if (!sameReranker || rerankModel !== current.rerankModel) await provesReranking(deps, config);
+  }
   let model = current.model;
   let dimensions = current.dimensions;
-  const embeddingChanged =
+  const integrationChanged =
     input.embeddingIntegrationId !== undefined && input.embeddingIntegrationId !== current.integrationId;
+  const embeddingChanged =
+    integrationChanged || (input.embeddingModel !== undefined && input.embeddingModel !== current.model);
   if (embeddingChanged) {
-    const config = await embeddingConfig(deps, actor.tenantId, input.embeddingIntegrationId!);
+    const integrationId = input.embeddingIntegrationId ?? current.integrationId;
+    const chosen = input.embeddingModel ?? (integrationChanged ? undefined : current.model);
+    const config = await embeddingConfig(deps, actor.tenantId, integrationId, chosen);
     model = config.model;
     dimensions = await dimensionsOf(deps, config);
   }
@@ -323,9 +376,9 @@ export async function updateBase(
         retrieval_mode = ${input.retrievalMode ?? current.mode},
         top_k = ${input.topK ?? current.topK},
         min_score = ${input.minScore ?? current.minScore},
-        rerank_integration_id = ${input.rerankIntegrationId === undefined ? current.rerankId : input.rerankIntegrationId},
+        rerank_integration_id = ${rerankId}, rerank_model = ${rerankModel},
         expand_queries = ${input.expandQueries ?? current.expand},
-        embedding_integration_id = ${embeddingChanged ? input.embeddingIntegrationId! : current.integrationId},
+        embedding_integration_id = ${input.embeddingIntegrationId ?? current.integrationId},
         embedding_model = ${model},
         dimensions = ${dimensions},
         updated_at = now()
@@ -834,7 +887,7 @@ export async function updateChunk(
   if (!chunk) throw notFound('Trecho não encontrado');
   const enabled = input.enabled ?? chunk.enabled;
   if (input.content !== undefined && input.content !== chunk.content) {
-    const config = await embeddingConfig(deps, actor.tenantId, base.integrationId);
+    const config = await embeddingConfig(deps, actor.tenantId, base.integrationId, base.model);
     const [dense] = await deps.embedder(config)([input.content]);
     if (dense.length !== base.dimensions) throw badRequest('O modelo de embeddings mudou de tamanho');
     await store.upsert(base.collection, [
@@ -981,7 +1034,7 @@ export async function processSource(deps: KnowledgeDeps, id: string): Promise<vo
     }
     await setProgress(sql, id, 25, 'cutting');
     const pieces = chunkText(text, base.chunkSize, base.chunkOverlap).slice(0, MAX_CHUNKS_PER_SOURCE);
-    const config = await embeddingConfig(deps, source.tenantId, base.integrationId);
+    const config = await embeddingConfig(deps, source.tenantId, base.integrationId, base.model);
     await setProgress(sql, id, 40, 'embedding');
     const vectors = await deps.embedder(config)(pieces.map((p) => p.content));
     if (vectors.some((v) => v.length !== base.dimensions))
@@ -1118,7 +1171,7 @@ export async function searchBases(
     const expanded = base.expand && base.mode !== 'keyword' ? expandQuery(query, opts.language) : query;
     let dense: VectorHit[] = [];
     if (base.mode !== 'keyword') {
-      const config = await embeddingConfig(deps, tenantId, base.integrationId);
+      const config = await embeddingConfig(deps, tenantId, base.integrationId, base.model);
       const [vector] = await deps.embedder(config)([expanded]);
       dense = await store.searchDense(base.collection, tenantId, vector, candidates, base.minScore);
     }
@@ -1134,7 +1187,7 @@ export async function searchBases(
     if (base.rerankId && ranked.length > 0) {
       const pool = ranked.slice(0, Math.max(base.topK * 3, 10));
       try {
-        const config = await rerankConfig(deps, tenantId, base.rerankId);
+        const config = await rerankConfig(deps, tenantId, base.rerankId, base.rerankModel);
         const rs = await deps.reranker(config)(
           query,
           pool.map((r) => r.hit.payload.content),

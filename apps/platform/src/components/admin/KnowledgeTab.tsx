@@ -7,8 +7,12 @@ import { Icon } from '../ui/Icon';
 import { api } from '../api';
 import type { Integration } from './IntegrationsTab';
 import { BaseView } from './knowledge/BaseView';
+import { SourcePicker } from './knowledge/SourcePicker';
+import { embeddingSources } from './knowledge/sources';
 import { type Base, type KnowledgeView, MODE_LABEL, urlFor, viewFromUrl } from './knowledge/types';
 import { messageOf, useLoad } from './useLoad';
+
+const EMPTY_DRAFT = { name: '', description: '', embeddingIntegrationId: '', embeddingModel: '' };
 
 /** Knowledge bases (RAG): what the organization's agents look things up in. */
 export function KnowledgeTab() {
@@ -18,9 +22,9 @@ export function KnowledgeTab() {
   );
   const integrations =
     useLoad<{ integrations: Integration[] }>('/api/admin/integrations').data?.integrations ?? [];
-  const embeddings = integrations.filter((i) => i.kind === 'embedding');
+  const embeddings = embeddingSources(integrations);
   const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState({ name: '', description: '', embeddingIntegrationId: '' });
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [view, setView] = useState<KnowledgeView>({});
   const [busy, setBusy] = useState(false);
 
@@ -55,9 +59,11 @@ export function KnowledgeTab() {
     e.preventDefault();
     setBusy(true);
     try {
-      const { base } = await api<{ base: Base }>('/api/admin/knowledge', { body: draft });
+      const { base } = await api<{ base: Base }>('/api/admin/knowledge', {
+        body: { ...draft, embeddingModel: draft.embeddingModel || undefined },
+      });
       setCreating(false);
-      setDraft({ name: '', description: '', embeddingIntegrationId: '' });
+      setDraft(EMPTY_DRAFT);
       await reload();
       go({ kb: base.id, part: 'add' });
     } catch (err) {
@@ -112,29 +118,23 @@ export function KnowledgeTab() {
               onChange={(e) => setDraft({ ...draft, description: e.target.value })}
             />
           </label>
-          <label>
-            {t('knowledge.list.embeddingLabel')}
-            <select
-              value={draft.embeddingIntegrationId}
-              onChange={(e) => setDraft({ ...draft, embeddingIntegrationId: e.target.value })}
-            >
-              <option value="" disabled>
-                {t('admin.agents.choose')}
-              </option>
-              {embeddings.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} · {i.defaultModel}
-                </option>
-              ))}
-            </select>
-            {embeddings.length === 0 && (
-              <span className="field-help">
-                {t('knowledge.list.noEmbedding')}{' '}
-                <Link href="/admin?tab=integrations">{t('knowledge.list.goIntegrations')}</Link>
-              </span>
-            )}
-            <span className="field-help">{t('knowledge.list.embeddingHelp')}</span>
-          </label>
+          <SourcePicker
+            label={t('knowledge.list.embeddingLabel')}
+            modelLabel={t('knowledge.list.embeddingModelLabel')}
+            sources={embeddings}
+            integrationId={draft.embeddingIntegrationId}
+            model={draft.embeddingModel}
+            onChange={(embeddingIntegrationId, embeddingModel) =>
+              setDraft({ ...draft, embeddingIntegrationId, embeddingModel })
+            }
+          />
+          {embeddings.length === 0 && (
+            <span className="field-help">
+              {t('knowledge.list.noEmbedding')}{' '}
+              <Link href="/admin?tab=integrations">{t('knowledge.list.goIntegrations')}</Link>
+            </span>
+          )}
+          <span className="field-help">{t('knowledge.list.embeddingHelp')}</span>
           <div className="row">
             <button className="btn" disabled={busy}>
               {busy ? t('knowledge.list.creating') : t('knowledge.list.create')}

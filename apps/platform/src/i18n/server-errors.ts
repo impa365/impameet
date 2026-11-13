@@ -183,6 +183,9 @@ const EN: Record<string, string> = {
   'Fonte não encontrada': 'Source not found',
   'Escolha a integração de embeddings da base': "Choose the base's embedding integration",
   'Escolha uma integração de embeddings': 'Choose an embedding integration',
+  'Escolha uma integração e um modelo de embeddings': 'Choose an embedding integration and model',
+  'Escolha uma integração e um modelo de reranqueamento': 'Choose a reranking integration and model',
+  'Não foi possível reranquear': 'Could not rerank',
   'Tipo de arquivo não suportado (use PDF, DOCX, TXT, MD, CSV, HTML ou JSON)':
     'File type not supported (use PDF, DOCX, TXT, MD, CSV, HTML or JSON)',
   'Arquivo muito grande (máx. {n} MB)': 'File too large (max. {n} MB)',
@@ -481,6 +484,9 @@ const ES: Record<string, string> = {
   'Fonte não encontrada': 'Fuente no encontrada',
   'Escolha a integração de embeddings da base': 'Elige la integración de embeddings de la base',
   'Escolha uma integração de embeddings': 'Elige una integración de embeddings',
+  'Escolha uma integração e um modelo de embeddings': 'Elige una integración y un modelo de embeddings',
+  'Escolha uma integração e um modelo de reranqueamento': 'Elige una integración y un modelo de reordenación',
+  'Não foi possível reranquear': 'No se pudo reordenar',
   'Tipo de arquivo não suportado (use PDF, DOCX, TXT, MD, CSV, HTML ou JSON)':
     'Tipo de archivo no admitido (usa PDF, DOCX, TXT, MD, CSV, HTML o JSON)',
   'Arquivo muito grande (máx. {n} MB)': 'Archivo demasiado grande (máx. {n} MB)',

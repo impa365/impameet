@@ -445,7 +445,8 @@ export const modelDiscoveryInput = z.object({
   kind: z.enum(['llm', 'embedding']),
   baseUrl: z.string().trim().min(1, 'Informe a URL da API').max(300),
   apiKey,
-  integrationId: z.string().uuid().optional(),
+  /** Absent (or null) while the integration is new: then the typed key is used. */
+  integrationId: z.string().uuid().nullish(),
 });
 
 export const meetingInput = z.object({
@@ -638,6 +639,8 @@ export const knowledgeBaseInput = z.object({
   name: z.string().trim().min(1, 'Informe o nome da base').max(80, 'Nome muito longo'),
   description: z.string().trim().max(500).default(''),
   embeddingIntegrationId: z.string({ error: 'Escolha a integração de embeddings da base' }).uuid(),
+  /** Required when the integration is an LLM one that also embeds (it offers several models). */
+  embeddingModel: z.string().trim().min(1).max(120).optional(),
 });
 
 /** Everything about a base that can change after it exists (all optional). */
@@ -645,12 +648,14 @@ export const knowledgeBaseSettings = z.object({
   name: z.string().trim().min(1, 'Informe o nome da base').max(80, 'Nome muito longo').optional(),
   description: z.string().trim().max(500).optional(),
   embeddingIntegrationId: z.string().uuid().optional(),
+  embeddingModel: z.string().trim().min(1).max(120).optional(),
   chunkSize: z.number().int().min(200, 'Trechos de pelo menos 200 caracteres').max(4000).optional(),
   chunkOverlap: z.number().int().min(0).max(1000).optional(),
   retrievalMode: z.enum(['hybrid', 'semantic', 'keyword']).optional(),
   topK: z.number().int().min(1).max(20).optional(),
   minScore: z.number().min(0).max(1).optional(),
   rerankIntegrationId: z.string().uuid().nullable().optional(),
+  rerankModel: z.string().trim().min(1).max(120).nullable().optional(),
   expandQueries: z.boolean().optional(),
 });
 

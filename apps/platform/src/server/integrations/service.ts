@@ -7,6 +7,7 @@ import { badRequest, conflict, forbidden, notFound } from '../errors';
 import { type Resolver, assertPublicHttpsUrl, systemResolver } from '../security/public-url';
 import { openSecret, sealSecret, secretHint } from '../security/secrets';
 import type { integrationInput, modelDiscoveryInput } from '../validation';
+import { isRerankModel, modelCategory } from '@/lib/models';
 import { type SpeechProvider, isSpeechProvider } from '@/lib/providers';
 import {
   type Fetch,
@@ -21,6 +22,8 @@ import {
 import { type VoiceQuery, type VoicesResult, fetchVoices } from './voices';
 
 export type IntegrationKind = 'llm' | 'embedding' | 'rerank' | SpeechProvider;
+/** What an OpenAI-compatible integration proved it can do in its last "Testar conexão". */
+export type Capability = 'chat' | 'embeddings' | 'rerank';
 export type IntegrationInput = z.infer<typeof integrationInput>;
 export type ModelDiscoveryInput = z.infer<typeof modelDiscoveryInput>;
 
@@ -35,7 +38,10 @@ export interface Integration {
   lastTestedAt: Date | null;
   lastTestOk: boolean | null;
   lastTestError: string | null;
+  capabilities: Capability[];
   usedBy: number;
+  /** Knowledge bases that embed or rerank with it. */
+  usedByBases: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,9 +58,12 @@ const COLUMNS = (sql: Sql) => sql`
   i.id, i.kind, i.name, i.base_url as "baseUrl", i.default_model as "defaultModel", i.models,
   i.secret_hint as "secretHint", i.last_tested_at as "lastTestedAt", i.last_test_ok as "lastTestOk",
   i.last_test_error as "lastTestError", i.created_at as "createdAt", i.updated_at as "updatedAt",
+  i.capabilities,
   (select count(*)::int from agents a
     where a.llm_integration_id = i.id or a.tts_integration_id = i.id
-       or a.stt_integration_id = i.id) as "usedBy"`;
+       or a.stt_integration_id = i.id) as "usedBy",
+  (select count(*)::int from knowledge_bases b
+    where b.embedding_integration_id = i.id or b.rerank_integration_id = i.id) as "usedByBases"`;
 
 /** Ties each ciphertext to its organization and record. */
 const aad = (tenantId: string, id: string) => `integration:${tenantId}:${id}`;
@@ -149,6 +158,7 @@ export async function updateIntegration(
         secret_sealed = coalesce(${sealed}, secret_sealed),
         secret_hint = coalesce(${input.apiKey ? secretHint(input.apiKey) : null}, secret_hint),
         last_test_ok = case when ${sealed !== null}::boolean then null else last_test_ok end,
+        capabilities = case when ${sealed !== null}::boolean then '{}' else capabilities end,
         updated_at = now()
       where id = ${id} and tenant_id = ${actor.tenantId}`;
   } catch (err) {
@@ -191,19 +201,50 @@ export async function integrationSecret(
   key: Buffer,
   tenantId: string,
   id: string,
-): Promise<{ kind: IntegrationKind; baseUrl: string | null; defaultModel: string | null; apiKey: string }> {
+): Promise<{
+  kind: IntegrationKind;
+  baseUrl: string | null;
+  defaultModel: string | null;
+  models: string[];
+  apiKey: string;
+}> {
   const [row] = await sql<
-    { kind: IntegrationKind; baseUrl: string | null; defaultModel: string | null; sealed: string }[]
+    {
+      kind: IntegrationKind;
+      baseUrl: string | null;
+      defaultModel: string | null;
+      models: string[];
+      sealed: string;
+    }[]
   >`
-    select kind, base_url as "baseUrl", default_model as "defaultModel", secret_sealed as sealed
+    select kind, base_url as "baseUrl", default_model as "defaultModel", models, secret_sealed as sealed
     from integrations where id = ${id} and tenant_id = ${tenantId}`;
   if (!row) throw notFound('Integração não encontrada');
   return {
     kind: row.kind,
     baseUrl: row.baseUrl,
     defaultModel: row.defaultModel,
+    models: row.models,
     apiKey: openSecret(key, row.sealed, aad(tenantId, id)),
   };
+}
+
+/**
+ * What an OpenAI-compatible key can do beyond chat, proved with a real call to the first model
+ * of each kind the admin enabled in it (nothing is assumed from a name alone).
+ */
+async function extraCapabilities(
+  fetchImpl: Fetch,
+  baseUrl: string,
+  apiKey: string,
+  models: readonly string[],
+): Promise<Capability[]> {
+  const found: Capability[] = [];
+  const embedding = models.find((m) => modelCategory(m) === 'embedding');
+  if (embedding && (await probeEmbedding(fetchImpl, baseUrl, apiKey, embedding)).ok) found.push('embeddings');
+  const reranker = models.find(isRerankModel);
+  if (reranker && (await probeRerank(fetchImpl, baseUrl, apiKey, reranker)).ok) found.push('rerank');
+  return found;
 }
 
 /** "Testar conexão": checks the key live and records the outcome (models are returned, not saved). */
@@ -216,15 +257,20 @@ export async function testIntegration(
   const secret = await integrationSecret(deps.sql, deps.key, actor.tenantId, id);
   const fetchImpl = deps.fetch ?? fetch;
   let result: ProbeResult;
+  let capabilities: Capability[] = [];
   if (secret.kind === 'llm') {
     const baseUrl = await assertPublicHttpsUrl(secret.baseUrl ?? '', deps.resolve ?? systemResolver);
     result = await probeLlm(fetchImpl, baseUrl, secret.apiKey);
+    if (result.ok)
+      capabilities = ['chat', ...(await extraCapabilities(fetchImpl, baseUrl, secret.apiKey, secret.models))];
   } else if (secret.kind === 'embedding') {
     const baseUrl = await assertPublicHttpsUrl(secret.baseUrl ?? '', deps.resolve ?? systemResolver);
     result = await probeEmbedding(fetchImpl, baseUrl, secret.apiKey, secret.defaultModel ?? '');
+    if (result.ok) capabilities = ['embeddings'];
   } else if (secret.kind === 'rerank') {
     const baseUrl = await assertPublicHttpsUrl(secret.baseUrl ?? '', deps.resolve ?? systemResolver);
     result = await probeRerank(fetchImpl, baseUrl, secret.apiKey, secret.defaultModel ?? '');
+    if (result.ok) capabilities = ['rerank'];
   } else if (secret.kind === 'deepgram') {
     result = await probeDeepgram(fetchImpl, secret.apiKey);
   } else if (secret.kind === 'elevenlabs') {
@@ -234,9 +280,9 @@ export async function testIntegration(
   }
   await deps.sql`
     update integrations set last_tested_at = now(), last_test_ok = ${result.ok},
-      last_test_error = ${result.ok ? null : result.error}
+      last_test_error = ${result.ok ? null : result.error}, capabilities = ${capabilities}
     where id = ${id} and tenant_id = ${actor.tenantId}`;
-  return result;
+  return result.ok ? { ...result, capabilities } : result;
 }
 
 /** "Buscar modelos" while filling the form, before anything is saved (nothing is recorded). */

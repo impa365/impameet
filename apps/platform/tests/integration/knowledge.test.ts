@@ -8,7 +8,7 @@ import type { SessionUser } from '@/server/auth/session';
 import type { Sql } from '@/server/db';
 import { AppError } from '@/server/errors';
 import type { Complete } from '@/server/insights/llm';
-import { createIntegration } from '@/server/integrations/service';
+import { createIntegration, listIntegrations } from '@/server/integrations/service';
 import { type Embed, webGet } from '@/server/knowledge/ingest';
 import {
   type SparseVector,
@@ -536,6 +536,73 @@ describe('knowledge bases', () => {
       updateBase(deps(), admin, base.id, { rerankIntegrationId: embedding.id }, null),
       400,
     );
+  });
+
+  it('reuses one OpenAI-compatible LLM key for embeddings and reranking, with the models chosen', async () => {
+    const { admin, embedding } = await org('acme');
+    const router = await createIntegration(
+      integrationDeps(),
+      admin,
+      integrationInput.parse({
+        kind: 'llm',
+        name: 'Router',
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'sk-router-0123456789',
+        defaultModel: 'gpt-5-mini',
+        models: ['gpt-5-mini', 'text-embedding-3-large', 'jina-reranker-v2-base-multilingual'],
+      }),
+      null,
+    );
+    const used: string[] = [];
+    const watched = (): KnowledgeDeps => ({
+      ...deps(),
+      embedder: (config) => (used.push(`embed ${config.baseUrl} ${config.model}`), embedder()),
+      reranker: (config) => (used.push(`rerank ${config.baseUrl} ${config.model}`), reranker()),
+    });
+    const parse = (extra: object) =>
+      knowledgeBaseInput.parse({ name: 'Reuso', embeddingIntegrationId: router.id, ...extra });
+    // The key offers several models: the base always says which one, among those enabled.
+    await expectAppError(createBase(watched(), admin, parse({}), null), 400, /modelo de embeddings/);
+    await expectAppError(createBase(watched(), admin, parse({ embeddingModel: 'gpt-4o' }), null), 400);
+    const base = await createBase(
+      watched(),
+      admin,
+      parse({ embeddingModel: 'text-embedding-3-large' }),
+      null,
+    );
+    expect(base).toMatchObject({
+      embeddingIntegrationId: router.id,
+      embeddingModel: 'text-embedding-3-large',
+    });
+    expect(used).toEqual(['embed https://router.example.com/v1 text-embedding-3-large']);
+
+    await expectAppError(
+      updateBase(watched(), admin, base.id, { rerankIntegrationId: router.id }, null),
+      400,
+      /reranqueamento/,
+    );
+    used.length = 0;
+    const tuned = await updateBase(
+      watched(),
+      admin,
+      base.id,
+      { rerankIntegrationId: router.id, rerankModel: 'jina-reranker-v2-base-multilingual' },
+      null,
+    );
+    expect(tuned).toMatchObject({ rerankModel: 'jina-reranker-v2-base-multilingual' });
+    expect(used).toEqual(['rerank https://router.example.com/v1 jina-reranker-v2-base-multilingual']);
+    used.length = 0;
+    expect((await testSearch(watched(), admin, base.id, 'qualquer coisa')).trace[0].reranked).toBeFalsy();
+    expect(used).toEqual(['embed https://router.example.com/v1 text-embedding-3-large']);
+
+    // The same key still serves chat, and the integration counts the base that uses it.
+    const listed = await listIntegrations(db(), admin);
+    expect(listed.find((i) => i.id === router.id)).toMatchObject({ usedByBases: 1 });
+    expect(listed.find((i) => i.id === embedding.id)).toMatchObject({ usedByBases: 0 });
+
+    // Moving back to a dedicated embeddings integration takes its own model.
+    const moved = await updateBase(watched(), admin, base.id, { embeddingIntegrationId: embedding.id }, null);
+    expect(moved).toMatchObject({ embeddingModel: 'text-embedding-3-small' });
   });
 
   it('answers in the test chat with the chosen model, citing the pieces it was given', async () => {

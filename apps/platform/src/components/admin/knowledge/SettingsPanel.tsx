@@ -7,6 +7,8 @@ import type { MessageKey } from '@/i18n/keys';
 import { api } from '../../api';
 import type { Integration } from '../IntegrationsTab';
 import { messageOf } from '../useLoad';
+import { SourcePicker } from './SourcePicker';
+import { embeddingSources, rerankSources } from './sources';
 import { type Base, type RetrievalMode, kbPath } from './types';
 
 const MODES: [RetrievalMode, MessageKey, MessageKey][] = [
@@ -26,18 +28,20 @@ export function SettingsPanel({
   onSaved: () => Promise<void>;
 }) {
   const t = useT();
-  const embeddings = integrations.filter((i) => i.kind === 'embedding');
-  const rerankers = integrations.filter((i) => i.kind === 'rerank');
+  const embeddings = embeddingSources(integrations);
+  const rerankers = rerankSources(integrations);
   const [draft, setDraft] = useState({
     name: base.name,
     description: base.description,
     embeddingIntegrationId: base.embeddingIntegrationId ?? '',
+    embeddingModel: base.embeddingModel,
     chunkSize: base.chunkSize,
     chunkOverlap: base.chunkOverlap,
     retrievalMode: base.retrievalMode,
     topK: base.topK,
     minScore: base.minScore,
     rerankIntegrationId: base.rerankIntegrationId ?? '',
+    rerankModel: base.rerankModel ?? '',
     expandQueries: base.expandQueries,
   });
   const [busy, setBusy] = useState(false);
@@ -48,7 +52,8 @@ export function SettingsPanel({
   const reindex =
     draft.chunkSize !== base.chunkSize ||
     draft.chunkOverlap !== base.chunkOverlap ||
-    (draft.embeddingIntegrationId || null) !== base.embeddingIntegrationId;
+    (draft.embeddingIntegrationId || null) !== base.embeddingIntegrationId ||
+    (!!draft.embeddingModel && draft.embeddingModel !== base.embeddingModel);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -62,7 +67,9 @@ export function SettingsPanel({
         body: {
           ...draft,
           embeddingIntegrationId: draft.embeddingIntegrationId || undefined,
+          embeddingModel: draft.embeddingModel || undefined,
           rerankIntegrationId: draft.rerankIntegrationId || null,
+          rerankModel: draft.rerankIntegrationId ? draft.rerankModel || undefined : null,
         },
       });
       setStatus(reindex ? t('knowledge.settings.savedReindex') : t('knowledge.settings.saved'));
@@ -92,23 +99,17 @@ export function SettingsPanel({
             onChange={(e) => set('description', e.target.value)}
           />
         </label>
-        <label>
-          {t('knowledge.settings.embedding')}
-          <select
-            value={draft.embeddingIntegrationId}
-            onChange={(e) => set('embeddingIntegrationId', e.target.value)}
-          >
-            <option value="" disabled>
-              {t('admin.agents.choose')}
-            </option>
-            {embeddings.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name} · {i.defaultModel}
-              </option>
-            ))}
-          </select>
-          <span className="field-help">{t('knowledge.settings.embeddingHelp')}</span>
-        </label>
+        <SourcePicker
+          label={t('knowledge.settings.embedding')}
+          modelLabel={t('knowledge.list.embeddingModelLabel')}
+          sources={embeddings}
+          integrationId={draft.embeddingIntegrationId}
+          model={draft.embeddingModel}
+          onChange={(embeddingIntegrationId, embeddingModel) =>
+            setDraft({ ...draft, embeddingIntegrationId, embeddingModel })
+          }
+        />
+        <span className="field-help">{t('knowledge.settings.embeddingHelp')}</span>
       </section>
 
       <section className="settings-section">
@@ -210,26 +211,23 @@ export function SettingsPanel({
           <h3>{t('knowledge.settings.rerank')}</h3>
           <p>{t('knowledge.settings.rerankHelp')}</p>
         </header>
-        <label>
-          {t('knowledge.settings.rerankLabel')}
-          <select
-            value={draft.rerankIntegrationId}
-            onChange={(e) => set('rerankIntegrationId', e.target.value)}
-          >
-            <option value="">{t('knowledge.settings.rerankNone')}</option>
-            {rerankers.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name} · {i.defaultModel}
-              </option>
-            ))}
-          </select>
-          {rerankers.length === 0 && (
-            <span className="field-help">
-              {t('knowledge.settings.noRerank')}{' '}
-              <Link href="/admin?tab=integrations">{t('knowledge.list.goIntegrations')}</Link>
-            </span>
-          )}
-        </label>
+        <SourcePicker
+          label={t('knowledge.settings.rerankLabel')}
+          modelLabel={t('knowledge.settings.rerankModelLabel')}
+          sources={rerankers}
+          integrationId={draft.rerankIntegrationId}
+          model={draft.rerankModel}
+          noneLabel={t('knowledge.settings.rerankNone')}
+          onChange={(rerankIntegrationId, rerankModel) =>
+            setDraft({ ...draft, rerankIntegrationId, rerankModel })
+          }
+        />
+        {rerankers.length === 0 && (
+          <span className="field-help">
+            {t('knowledge.settings.noRerank')}{' '}
+            <Link href="/admin?tab=integrations">{t('knowledge.list.goIntegrations')}</Link>
+          </span>
+        )}
       </section>
 
       <div className="save-bar">

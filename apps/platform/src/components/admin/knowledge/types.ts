@@ -19,6 +19,7 @@ export interface Base {
   topK: number;
   minScore: number;
   rerankIntegrationId: string | null;
+  rerankModel: string | null;
   expandQueries: boolean;
   sources: number;
   chunks: number;

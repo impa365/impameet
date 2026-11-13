@@ -22,8 +22,19 @@ export interface Integration {
   lastTestedAt: string | null;
   lastTestOk: boolean | null;
   lastTestError: string | null;
+  /** What the last "Testar conexão" proved this key can do. */
+  capabilities: Capability[];
   usedBy: number;
+  usedByBases: number;
 }
+
+export type Capability = 'chat' | 'embeddings' | 'rerank';
+const CAPABILITY_LABEL = {
+  chat: 'admin.integrations.capChat',
+  embeddings: 'admin.integrations.capEmbeddings',
+  rerank: 'admin.integrations.capRerank',
+} as const;
+const OPENAI_COMPATIBLE: readonly IntegrationKind[] = ['llm', 'embedding', 'rerank'];
 
 interface Draft {
   kind: IntegrationKind;
@@ -104,14 +115,15 @@ function useModelCatalog(editing: string | null, draft: Draft) {
 
   useEffect(() => {
     if (!key) return;
-    const [kind, url, typedKey, id] = JSON.parse(key) as [string, string, string, string | undefined];
+    // JSON turns the missing id of a new integration into null: send no id at all then.
+    const [kind, url, typedKey, id] = JSON.parse(key) as [string, string, string, string | null];
     let live = true;
     const timer = setTimeout(async () => {
       setCatalog({ key, state: 'loading' });
       try {
         const res = await api<{ ok: boolean; error?: string; models?: string[]; embeddings?: string[] }>(
           '/api/admin/integrations/models',
-          { body: { kind, baseUrl: url, apiKey: typedKey || undefined, integrationId: id } },
+          { body: { kind, baseUrl: url, apiKey: typedKey || undefined, integrationId: id || undefined } },
         );
         if (!live) return;
         setCatalog(
@@ -232,10 +244,17 @@ export function IntegrationsTab() {
             }
           : { kind: draft.kind, name: draft.name, apiKey: draft.apiKey || undefined };
     try {
-      if (editing === 'new') await api('/api/admin/integrations', { body });
-      else await api(`/api/admin/integrations/${editing}`, { method: 'PUT', body });
+      const { integration } =
+        editing === 'new'
+          ? await api<{ integration: Integration }>('/api/admin/integrations', { body })
+          : await api<{ integration: Integration }>(`/api/admin/integrations/${editing}`, {
+              method: 'PUT',
+              body,
+            });
       setEditing(null);
-      await reload();
+      // A real call right away tells what the key can do (chat, embeddings, reranking).
+      if (OPENAI_COMPATIBLE.includes(integration.kind)) await test(integration);
+      else await reload();
     } catch (err) {
       setError(messageOf(err, t('admin.integrations.couldNotSave')));
     } finally {
@@ -246,15 +265,18 @@ export function IntegrationsTab() {
   async function test(i: Integration) {
     setNotice(t('admin.integrations.testing', { name: i.name }));
     try {
-      const res = await api<{ ok: boolean; error?: string; models?: string[] }>(
-        `/api/admin/integrations/${i.id}/test`,
-        { body: {} },
-      );
+      const res = await api<{
+        ok: boolean;
+        error?: string;
+        models?: string[];
+        capabilities?: Capability[];
+      }>(`/api/admin/integrations/${i.id}/test`, { body: {} });
+      const serves = (res.capabilities ?? []).map((c) => t(CAPABILITY_LABEL[c])).join(', ');
       setNotice(
         !res.ok
           ? `${i.name}: ${serverMessage(res.error ?? '')}`
           : i.kind === 'llm' && res.models?.length
-            ? t('admin.integrations.testOkModels', { name: i.name, n: res.models.length })
+            ? `${t('admin.integrations.testOkModels', { name: i.name, n: res.models.length })} ${t('admin.integrations.serves', { list: serves })}`
             : t('admin.integrations.testOk', { name: i.name }),
       );
       await reload();
@@ -420,6 +442,7 @@ export function IntegrationsTab() {
                   </datalist>
                 </label>
                 {catalogStatus}
+                <span className="field-help">{t('admin.integrations.llmReuseHint')}</span>
                 {(found.length > 0 || draft.models.length > 0) && (
                   <ModelPicker
                     available={found}
@@ -651,7 +674,23 @@ export function IntegrationsTab() {
                             </dt>
                             <dd>{i.usedBy}</dd>
                           </div>
+                          {i.usedByBases > 0 && (
+                            <div>
+                              <dt>
+                                <Icon name="menu_book" size={16} />
+                                {t('admin.integrations.bases')}
+                              </dt>
+                              <dd>{i.usedByBases}</dd>
+                            </div>
+                          )}
                         </dl>
+                        {i.kind === 'llm' && i.capabilities.length > 0 && (
+                          <p className="tile-text">
+                            {t('admin.integrations.serves', {
+                              list: i.capabilities.map((c) => t(CAPABILITY_LABEL[c])).join(', '),
+                            })}
+                          </p>
+                        )}
                       </div>
                       <div className="tile-actions">
                         <button className="btn text small" onClick={() => test(i)}>

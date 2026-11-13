@@ -13,15 +13,43 @@ export type ProbeResult =
       models: string[];
       /** Models the provider lists as embedding models (routers such as 9router list them apart). */
       embeddings?: string[];
+      /** What the tested integration proved it can do ("Testar conexão" only). */
+      capabilities?: ('chat' | 'embeddings' | 'rerank')[];
     }
   | { ok: false; error: string };
 
-function failure(status: number): ProbeResult {
-  if (status === 401 || status === 403) return { ok: false, error: 'A chave foi recusada pelo provedor' };
-  if (status === 404) return { ok: false, error: 'Endereço não encontrado: confira a URL da API' };
-  if (status === 429)
-    return { ok: false, error: 'O provedor limitou as requisições (429); tente mais tarde' };
-  return { ok: false, error: `O provedor respondeu com erro ${status}` };
+function reason(status: number): string {
+  if (status === 401 || status === 403) return 'A chave foi recusada pelo provedor';
+  if (status === 404) return 'Endereço não encontrado: confira a URL da API';
+  if (status === 429) return 'O provedor limitou as requisições (429); tente mais tarde';
+  return `O provedor respondeu com erro ${status}`;
+}
+
+/** `endpoint` ("GET /models") says which call failed; the key never goes in a message. */
+function failure(status: number, endpoint?: string): ProbeResult {
+  return { ok: false, error: endpoint ? `${endpoint}: ${reason(status)}` : reason(status) };
+}
+
+const unreachable = (endpoint: string): ProbeResult => ({
+  ok: false,
+  error: `${endpoint}: Não foi possível conectar ao provedor`,
+});
+
+/** The ids an OpenAI-compatible list gives; entries without a usable id are left out. */
+export function modelIds(body: unknown): string[] {
+  const data = (body as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data)) return [];
+  const ids = data
+    .map((m) => (typeof m === 'object' && m !== null ? (m as { id?: unknown }).id : undefined))
+    .filter((id): id is string | number => typeof id === 'string' || typeof id === 'number')
+    // Gemini lists "models/gemini-…" but its chat endpoint takes the bare name.
+    .map((id) =>
+      String(id)
+        .trim()
+        .replace(/^models\//, ''),
+    )
+    .filter((id) => id.length > 0 && id.length <= 120);
+  return [...new Set(ids)].sort().slice(0, 500);
 }
 
 async function call(
@@ -47,19 +75,11 @@ export async function probeLlm(
   apiKey: string,
   path = '/models',
 ): Promise<ProbeResult> {
+  const endpoint = `GET ${path}`;
   const res = await call(fetchImpl, `${baseUrl}${path}`, { authorization: `Bearer ${apiKey}` });
-  if (!(res instanceof Response)) return res;
-  if (!res.ok) return failure(res.status);
-  const body = (await res.json().catch(() => null)) as { data?: unknown } | null;
-  const models = Array.isArray(body?.data)
-    ? body.data
-        .map((m) => (typeof m === 'object' && m && 'id' in m ? String((m as { id: unknown }).id) : ''))
-        // Gemini lists "models/gemini-…" but its chat endpoint takes the bare name.
-        .map((id) => id.trim().replace(/^models\//, ''))
-        .filter((id) => id.length > 0 && id.length <= 120)
-        .sort()
-    : [];
-  return { ok: true, models: [...new Set(models)].slice(0, 500) };
+  if (!(res instanceof Response)) return unreachable(endpoint);
+  if (!res.ok) return failure(res.status, endpoint);
+  return { ok: true, models: modelIds(await res.json().catch(() => null)) };
 }
 
 /** Fish Audio: the account's API credit only answers to a valid key. */
@@ -108,9 +128,9 @@ export async function probeRerank(
       redirect: 'error',
     });
   } catch {
-    return { ok: false, error: 'Não foi possível conectar ao provedor' };
+    return unreachable('POST /rerank');
   }
-  if (!res.ok) return failure(res.status);
+  if (!res.ok) return failure(res.status, 'POST /rerank');
   const body = (await res.json().catch(() => null)) as { results?: unknown[]; data?: unknown[] } | null;
   if (!Array.isArray(body?.results) && !Array.isArray(body?.data))
     return { ok: false, error: 'O provedor não devolveu uma classificação' };
@@ -138,9 +158,9 @@ export async function probeEmbedding(
       redirect: 'error',
     });
   } catch {
-    return { ok: false, error: 'Não foi possível conectar ao provedor' };
+    return unreachable('POST /embeddings');
   }
-  if (!res.ok) return failure(res.status);
+  if (!res.ok) return failure(res.status, 'POST /embeddings');
   const body = (await res.json().catch(() => null)) as { data?: { embedding?: unknown }[] } | null;
   const vector = body?.data?.[0]?.embedding;
   if (!Array.isArray(vector) || vector.length === 0)

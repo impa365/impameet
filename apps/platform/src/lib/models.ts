@@ -46,6 +46,9 @@ export function filterModels(
   );
 }
 
+/** Reranking models (Cohere, Jina, Voyage and the routers that serve them) say so in their name. */
+export const isRerankModel = (model: string) => /rerank/i.test(model);
+
 /** Embedding models first (for the embeddings form), each group keeping the given order. */
 export function embeddingsFirst(models: readonly string[]): string[] {
   const embedding = models.filter((m) => modelCategory(m) === 'embedding');

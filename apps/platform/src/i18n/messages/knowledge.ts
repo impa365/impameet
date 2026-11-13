@@ -19,6 +19,9 @@ export default defineMessages(
       embeddingHelp:
         'É o modelo que entende o significado dos textos. Dá para trocar depois (tudo é indexado de novo).',
       noEmbedding: 'Nenhuma integração de embeddings ainda.',
+      embeddingModelLabel: 'Modelo de embeddings',
+      modelCount: '{n} modelos',
+      untested: 'não testada',
       goIntegrations: 'Criar em Integrações',
       create: 'Criar base',
       creating: 'Criando…',
@@ -274,6 +277,7 @@ export default defineMessages(
       rerank: 'Reordenação',
       rerankLabel: 'Integração de reordenação (opcional)',
       rerankNone: 'Sem reordenação',
+      rerankModelLabel: 'Modelo de reordenação',
       rerankHelp:
         'Um modelo (Cohere, Jina, Voyage) relê os melhores candidatos e põe a resposta certa em primeiro. Melhora muito a precisão.',
       noRerank: 'Nenhuma integração de reordenação ainda.',
@@ -306,6 +310,9 @@ export default defineMessages(
         embeddingHelp:
           'The model that understands what texts mean. It can be changed later (everything is indexed again).',
         noEmbedding: 'No embedding integration yet.',
+        embeddingModelLabel: 'Embedding model',
+        modelCount: '{n} models',
+        untested: 'not tested',
         goIntegrations: 'Create one in Integrations',
         create: 'Create base',
         creating: 'Creating…',
@@ -562,6 +569,7 @@ export default defineMessages(
         rerank: 'Reranking',
         rerankLabel: 'Reranking integration (optional)',
         rerankNone: 'No reranking',
+        rerankModelLabel: 'Reranking model',
         rerankHelp:
           'A model (Cohere, Jina, Voyage) re-reads the best candidates and puts the right answer first. Greatly improves precision.',
         noRerank: 'No reranking integration yet.',
@@ -593,6 +601,9 @@ export default defineMessages(
         embeddingHelp:
           'Es el modelo que entiende el significado de los textos. Se puede cambiar después (todo se indexa de nuevo).',
         noEmbedding: 'Todavía no hay integraciones de embeddings.',
+        embeddingModelLabel: 'Modelo de embeddings',
+        modelCount: '{n} modelos',
+        untested: 'sin probar',
         goIntegrations: 'Crear en Integraciones',
         create: 'Crear base',
         creating: 'Creando…',
@@ -850,6 +861,7 @@ export default defineMessages(
         rerank: 'Reordenación',
         rerankLabel: 'Integración de reordenación (opcional)',
         rerankNone: 'Sin reordenación',
+        rerankModelLabel: 'Modelo de reordenación',
         rerankHelp:
           'Un modelo (Cohere, Jina, Voyage) relee los mejores candidatos y pone primero la respuesta correcta. Mejora mucho la precisión.',
         noRerank: 'Todavía no hay integraciones de reordenación.',

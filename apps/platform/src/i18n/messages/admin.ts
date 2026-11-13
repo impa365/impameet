@@ -313,6 +313,13 @@ export default defineMessages(
       testing: 'Testando {name}…',
       testOk: '{name}: conexão ok.',
       testOkModels: '{name}: conexão ok, {n} modelos disponíveis nesta chave.',
+      serves: 'Serve para: {list}.',
+      capChat: 'conversa',
+      capEmbeddings: 'embeddings',
+      capRerank: 'reordenação',
+      bases: 'Bases',
+      llmReuseHint:
+        'Esta mesma chave pode servir as bases de conhecimento: marque também os modelos de embeddings ou de reordenação dela. O teste de conexão confirma cada uso com uma chamada real, e cada base escolhe o modelo.',
       confirmDelete: 'Apagar a integração {name}?',
       agentsFallBack_one:
         '{count} agente fica sem esta integração e deixa de entrar nas reuniões até você escolher outra.',
@@ -846,6 +853,13 @@ export default defineMessages(
         testing: 'Testing {name}…',
         testOk: '{name}: connection OK.',
         testOkModels: '{name}: connection OK, {n} models available for this key.',
+        serves: 'Serves: {list}.',
+        capChat: 'chat',
+        capEmbeddings: 'embeddings',
+        capRerank: 'reranking',
+        bases: 'Bases',
+        llmReuseHint:
+          'This same key can serve the knowledge bases: also tick its embedding or reranking models. The connection test confirms each use with a real call, and each base picks its model.',
         confirmDelete: 'Delete the integration {name}?',
         agentsFallBack_one:
           '{count} agent loses this integration and stops joining meetings until you choose another.',
@@ -1381,6 +1395,13 @@ export default defineMessages(
         testing: 'Probando {name}…',
         testOk: '{name}: conexión correcta.',
         testOkModels: '{name}: conexión correcta, {n} modelos disponibles con esta clave.',
+        serves: 'Sirve para: {list}.',
+        capChat: 'conversación',
+        capEmbeddings: 'embeddings',
+        capRerank: 'reordenación',
+        bases: 'Bases',
+        llmReuseHint:
+          'Esta misma clave puede servir a las bases de conocimiento: marca también sus modelos de embeddings o de reordenación. La prueba de conexión confirma cada uso con una llamada real, y cada base elige el modelo.',
         confirmDelete: '¿Eliminar la integración {name}?',
         agentsFallBack_one:
           '{count} agente se queda sin esta integración y deja de entrar en las reuniones hasta que elijas otra.',

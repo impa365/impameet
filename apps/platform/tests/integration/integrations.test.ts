@@ -28,7 +28,13 @@ import {
 import { grantJoin } from '@/server/rooms/join';
 import { createRoom, updateRoom } from '@/server/rooms/service';
 import { hashPassword } from '@/server/security/password';
-import { agentInput, createRoomInput, integrationInput, updateRoomInput } from '@/server/validation';
+import {
+  agentInput,
+  createRoomInput,
+  integrationInput,
+  modelDiscoveryInput,
+  updateRoomInput,
+} from '@/server/validation';
 import { TokenVerifier } from 'livekit-server-sdk';
 import { type TestSql, freshDatabase } from './db';
 import { AGENT_TUNING } from './ready-agent';
@@ -252,6 +258,7 @@ describe('integrations', () => {
     expect(await testIntegration(deps(ok), admin, llm.id)).toEqual({
       ok: true,
       models: ['deepseek/deepseek-chat', 'qwen/qwen3'],
+      capabilities: ['chat'],
     });
     expect(seen).toEqual(['https://openrouter.ai/api/v1/models Bearer sk-or-0123456789abcdef']);
     const refused = (async () => new Response('{}', { status: 401 })) as unknown as Fetch;
@@ -316,7 +323,7 @@ describe('integrations', () => {
     const refused = (async () => new Response('{}', { status: 401 })) as unknown as Fetch;
     expect(await discoverModels(deps(refused), admin, typed)).toEqual({
       ok: false,
-      error: 'A chave foi recusada pelo provedor',
+      error: 'GET /models: A chave foi recusada pelo provedor',
     });
     // Nothing is recorded: the saved integration keeps its last test.
     expect((await listIntegrations(db(), admin))[0].lastTestOk).toBeNull();
@@ -384,6 +391,70 @@ describe('integrations', () => {
     }) as unknown as Fetch;
     await discoverModels(deps(chat), admin, { ...input, kind: 'llm' });
     expect(seen).toEqual(['https://9router.example/v1/models']);
+  });
+
+  it('lists the models of a new integration even when the form sends no id and entries lack one', async () => {
+    const { admin } = await org('acme');
+    // OmniRoute style: null and missing ids next to real ones, and no /models/embedding.
+    const omni = (async (url: string) =>
+      url.endsWith('/models/embedding')
+        ? new Response('{}', { status: 404 })
+        : Response.json({
+            data: [
+              { id: 'gemini-embedding-001' },
+              { id: null },
+              { object: 'model' },
+              null,
+              { id: 'gpt-5-mini' },
+            ],
+          })) as unknown as Fetch;
+    // The form of a new integration has no id: JSON turns it into null, which must be accepted.
+    const input = modelDiscoveryInput.parse({
+      kind: 'embedding',
+      baseUrl: 'https://llm.starconteudos.cloud/v1',
+      apiKey: 'omni-0123456789',
+      integrationId: null,
+    });
+    expect(input.integrationId).toBeNull();
+    expect(await discoverModels(deps(omni), admin, input)).toEqual({
+      ok: true,
+      models: ['gemini-embedding-001', 'gpt-5-mini'],
+    });
+    for (const kind of ['llm', 'embedding'] as const)
+      expect((await discoverModels(deps(omni), admin, { ...input, kind })).ok).toBe(true);
+  });
+
+  it('proves what one OpenAI-compatible key can do: chat, embeddings and reranking', async () => {
+    const { admin } = await org('acme');
+    const calls: string[] = [];
+    const router = (async (url: string, init?: RequestInit) => {
+      calls.push(`${init?.method ?? 'GET'} ${new URL(url).pathname}`);
+      if (url.endsWith('/embeddings')) return Response.json({ data: [{ embedding: [0.1, 0.2, 0.3] }] });
+      if (url.endsWith('/rerank')) return Response.json({ results: [{ index: 0, relevance_score: 0.9 }] });
+      return Response.json({ data: [{ id: 'gpt-5-mini' }] });
+    }) as unknown as Fetch;
+    const llm = await createIntegration(
+      deps(),
+      admin,
+      LLM({ models: ['gpt-5-mini', 'text-embedding-3-large', 'jina-reranker-v2-base-multilingual'] }),
+      null,
+    );
+    expect(llm.capabilities).toEqual([]);
+    expect(await testIntegration(deps(router), admin, llm.id)).toMatchObject({
+      ok: true,
+      capabilities: ['chat', 'embeddings', 'rerank'],
+    });
+    expect(calls).toEqual(['GET /api/v1/models', 'POST /api/v1/embeddings', 'POST /api/v1/rerank']);
+    expect((await listIntegrations(db(), admin))[0].capabilities).toEqual(['chat', 'embeddings', 'rerank']);
+
+    // A capability is only kept while its real call works; a new key starts unproven again.
+    const chatOnly = (async (url: string) =>
+      url.endsWith('/models')
+        ? Response.json({ data: [] })
+        : new Response('{}', { status: 404 })) as unknown as Fetch;
+    expect(await testIntegration(deps(chatOnly), admin, llm.id)).toMatchObject({ capabilities: ['chat'] });
+    await updateIntegration(deps(), admin, llm.id, LLM({ apiKey: 'sk-or-another-0123456789' }), null);
+    expect((await listIntegrations(db(), admin))[0].capabilities).toEqual([]);
   });
 
   it('asks for the key again when the API address moves to another host', async () => {
