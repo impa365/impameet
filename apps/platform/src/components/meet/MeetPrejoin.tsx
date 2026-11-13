@@ -50,7 +50,11 @@ export function MeetPrejoin(props: {
 }) {
   const t = useT();
   const [assisted, setAssisted] = useState(false);
+  // The saved choices live in this browser: rendering them on the server would show stale
+  // microphone and camera states (hydration keeps the server's attributes).
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    setMounted(true);
     if (wantsAssistance(window.location.search)) setAssisted(true);
   }, []);
   const {
@@ -130,6 +134,8 @@ export function MeetPrejoin(props: {
     e.preventDefault();
     join();
   }
+
+  if (!mounted) return <main className="green-room theme-dark" aria-busy="true" />;
 
   return (
     <main className="green-room theme-dark" aria-labelledby="green-title" style={{ position: 'relative' }}>
