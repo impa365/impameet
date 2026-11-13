@@ -1070,6 +1070,11 @@ code.record {
   background: var(--hover);
 }
 
+.menu-item[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 .menu-item.divided {
   margin-top: 8px;
   border-top: 1px solid var(--border-soft);

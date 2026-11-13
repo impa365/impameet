@@ -9,6 +9,13 @@ import { ApiError, api } from '../api';
 /** Egress opens a browser before it records; past this, a start that did not happen failed. */
 const START_CHECK_MS = 45_000;
 
+/**
+ * What the moderator sees, right when they click. The server accepts a start or a stop at once,
+ * but LiveKit only reports the change once the recorder really started (it opens a browser
+ * first) or finished the file, seconds later; waiting for that made the button look stuck.
+ */
+export type RecordingPhase = 'idle' | 'starting' | 'recording' | 'stopping';
+
 /** Everyone sees when the meeting is recorded; moderators of plans with recording can toggle it. */
 export function useRecording(
   room: Room,
@@ -17,25 +24,38 @@ export function useRecording(
   onError: (message: string) => void,
 ) {
   const t = useT();
+  const path = `/api/rooms/${encodeURIComponent(slug)}/recording`;
+  // Confirmed by LiveKit: drives the "recording" notice everyone sees.
   const [recording, setRecording] = useState(room.isRecording);
+  const [phase, setPhase] = useState<RecordingPhase>(room.isRecording ? 'recording' : 'idle');
   const [canRecord, setCanRecord] = useState(false);
   const [busy, setBusy] = useState(false);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  /** A stop someone asked for (so LiveKit's "stopped" is not taken for a failure). */
   const stopping = useRef(false);
 
   /** Asks the server (which checks with the recorder) whether the last recording failed. */
   const checkFailure = useCallback(async () => {
-    const r = await api<{ failure: { error: string | null } | null }>(
-      `/api/rooms/${encodeURIComponent(slug)}/recording`,
-    ).catch(() => null);
-    if (r?.failure && !room.isRecording) onError(t('room.errors.recordingFailed'));
-  }, [room, slug, onError, t]);
+    const r = await api<{ failure: { error: string | null } | null }>(path).catch(() => null);
+    if (r?.failure && !room.isRecording) {
+      setPhase('idle');
+      onError(t('room.errors.recordingFailed'));
+    }
+  }, [room, path, onError, t]);
 
   useEffect(() => {
     const update = (value: boolean) => {
       setRecording(value);
+      if (value) {
+        // A stop clicked while the recorder was still opening: the stop already went through.
+        if (phaseRef.current !== 'idle' || !stopping.current) setPhase('recording');
+        return;
+      }
       // Stopped without anyone asking: the recorder failed (a moderator can record again).
-      if (!value && !stopping.current && canRecord) void checkFailure();
-      if (!value) stopping.current = false;
+      if (!stopping.current && canRecord) void checkFailure();
+      stopping.current = false;
+      setPhase((p) => (p === 'starting' ? p : 'idle'));
     };
     room.on(RoomEvent.RecordingStatusChanged, update);
     return () => {
@@ -45,28 +65,43 @@ export function useRecording(
 
   useEffect(() => {
     if (!signedIn) return;
-    api<{ canRecord: boolean }>(`/api/rooms/${encodeURIComponent(slug)}/recording`)
-      .then((r) => setCanRecord(r.canRecord))
+    api<{ canRecord: boolean; active: { status: string } | null }>(path)
+      .then((r) => {
+        setCanRecord(r.canRecord);
+        // Someone already started it and the recorder is still opening.
+        if (r.active && !room.isRecording) setPhase('starting');
+      })
       .catch(() => setCanRecord(false));
-  }, [slug, signedIn]);
+  }, [path, signedIn, room]);
 
   const toggle = useCallback(async () => {
+    if (busy) return;
+    const start = phase === 'idle';
     setBusy(true);
-    stopping.current = recording;
+    setPhase(start ? 'starting' : 'stopping');
+    stopping.current = !start;
     try {
-      await api(`/api/rooms/${encodeURIComponent(slug)}/recording`, {
-        method: recording ? 'DELETE' : 'POST',
-        body: {},
-      });
-      // A recorder that fails while opening never reports "recording": check back on it.
-      if (!recording) setTimeout(() => void checkFailure(), START_CHECK_MS);
+      await api(path, { method: start ? 'POST' : 'DELETE', body: {} });
+      if (start) {
+        // Confirmed already (fast recorder), or wait for LiveKit; check back if it never comes.
+        if (room.isRecording) setPhase('recording');
+        setTimeout(() => {
+          if (phaseRef.current === 'starting') void checkFailure();
+        }, START_CHECK_MS);
+      } else {
+        // The server stopped it: for the moderator it is over now, LiveKit catches up later.
+        setPhase('idle');
+      }
     } catch (err) {
+      const conflict = err instanceof ApiError && (err.status === 409 || err.status === 404);
       stopping.current = false;
-      onError(err instanceof ApiError ? err.message : t('room.errors.recording'));
+      // "Already recording" / "not recording": someone else was faster; follow the real state.
+      setPhase(conflict ? (start ? 'starting' : 'idle') : start ? 'idle' : 'recording');
+      if (!conflict) onError(err instanceof ApiError ? err.message : t('room.errors.recording'));
     } finally {
       setBusy(false);
     }
-  }, [slug, recording, onError, t, checkFailure]);
+  }, [busy, phase, path, room, onError, t, checkFailure]);
 
-  return { recording, canRecord, busy, toggle };
+  return { recording, phase, canRecord, busy, toggle };
 }

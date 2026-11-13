@@ -28,6 +28,8 @@ export interface MoreItem {
   onSelect: () => void;
   active?: boolean;
   divided?: boolean;
+  /** Shown but not clickable (e.g. while the server is still answering the last click). */
+  disabled?: boolean;
 }
 
 function Clock() {
@@ -213,7 +215,9 @@ export function MeetBar(props: {
                 key={item.id}
                 className={item.divided ? 'menu-item divided' : 'menu-item'}
                 role="menuitem"
+                aria-disabled={item.disabled || undefined}
                 onClick={() => {
+                  if (item.disabled) return;
                   close();
                   item.onSelect();
                 }}

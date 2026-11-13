@@ -544,9 +544,17 @@ export function MeetRoom(props: {
           {
             id: 'record',
             icon: 'radio_button_checked' as const,
-            label: recording.recording ? t('room.more.stopRecording') : t('room.more.record'),
+            label:
+              recording.phase === 'starting'
+                ? t('room.more.recordingStarting')
+                : recording.phase === 'stopping'
+                  ? t('room.more.recordingStopping')
+                  : recording.phase === 'recording'
+                    ? t('room.more.stopRecording')
+                    : t('room.more.record'),
             onSelect: () => void recording.toggle(),
-            active: recording.recording,
+            active: recording.phase === 'recording' || recording.phase === 'starting',
+            disabled: recording.busy,
           },
         ]
       : []),
@@ -632,10 +640,18 @@ export function MeetRoom(props: {
             </div>
           )}
           <div className="meet-chips">
-            {recording.recording && (
+            {recording.recording && recording.phase !== 'idle' ? (
               <span className="chip-rec">
                 <span className="rec-dot" aria-hidden /> {t('room.stage.recording')}
               </span>
+            ) : recording.recording ? (
+              <span className="chip-soft">{t('room.stage.recordingFinishing')}</span>
+            ) : (
+              recording.phase === 'starting' && (
+                <span className="chip-soft" role="status">
+                  <span className="rec-dot" aria-hidden /> {t('room.stage.recordingStarting')}
+                </span>
+              )
             )}
             {captionerRunning && <span className="chip-soft">{t('room.stage.transcribing')}</span>}
             {aiSilent && (
