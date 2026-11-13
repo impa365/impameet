@@ -9,8 +9,10 @@ import {
 import { type LocalVideoTrack, Track, VideoPresets } from 'livekit-client';
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '@/i18n/client';
+import { wantsAssistance } from '@/lib/assisted-join';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { Icon } from '../ui/Icon';
+import { AssistedJoin } from './AssistedJoin';
 import { avatarColor, initial } from './Avatar';
 
 function DevicePicker(props: {
@@ -43,9 +45,14 @@ export function MeetPrejoin(props: {
   busy: boolean;
   error: string;
   extra?: ReactNode;
-  onJoin: (choices: LocalUserChoices) => void;
+  /** `assisted` when the person came in through the guided entry (the lobby then speaks too). */
+  onJoin: (choices: LocalUserChoices, assisted: boolean) => void;
 }) {
   const t = useT();
+  const [assisted, setAssisted] = useState(false);
+  useEffect(() => {
+    if (wantsAssistance(window.location.search)) setAssisted(true);
+  }, []);
   const {
     userChoices,
     saveAudioInputEnabled,
@@ -114,10 +121,14 @@ export function MeetPrejoin(props: {
 
   const name = (props.userName ?? username).trim();
 
+  function join() {
+    if (!name || props.busy) return;
+    props.onJoin({ username: name, audioEnabled, videoEnabled, audioDeviceId, videoDeviceId }, assisted);
+  }
+
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (!name || props.busy) return;
-    props.onJoin({ username: name, audioEnabled, videoEnabled, audioDeviceId, videoDeviceId });
+    join();
   }
 
   return (
@@ -185,29 +196,52 @@ export function MeetPrejoin(props: {
         )}
       </section>
 
-      <form className="green-join" onSubmit={submit}>
-        <h1 id="green-title">{t('room.prejoin.ready')}</h1>
-        <p className="muted">{props.roomName}</p>
-        {props.userName === null && (
-          <input
-            className="field"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder={t('room.prejoin.namePlaceholder')}
-            aria-label={t('room.prejoin.nameLabel')}
-            maxLength={80}
-            autoComplete="name"
-            required
-          />
-        )}
-        {props.extra}
-        <button className="btn large" disabled={!name || props.busy}>
-          {props.busy ? t('room.prejoin.joining') : t('room.prejoin.joinNow')}
-        </button>
-        <div className="error" role="alert">
-          {props.error}
-        </div>
-      </form>
+      {assisted ? (
+        <AssistedJoin
+          roomName={props.roomName}
+          fixedName={props.userName}
+          name={username}
+          onName={setUsername}
+          audioEnabled={audioEnabled}
+          onAudio={setAudioEnabled}
+          videoEnabled={videoEnabled}
+          onVideo={setVideoEnabled}
+          mediaError={mediaError}
+          busy={props.busy}
+          error={props.error}
+          extra={props.extra}
+          onJoin={join}
+          onCancel={() => setAssisted(false)}
+        />
+      ) : (
+        <form className="green-join" onSubmit={submit}>
+          <h1 id="green-title">{t('room.prejoin.ready')}</h1>
+          <p className="muted">{props.roomName}</p>
+          <button type="button" className="btn tonal" onClick={() => setAssisted(true)}>
+            <Icon name="accessibility_new" size={18} />
+            {t('room.assist.open')}
+          </button>
+          {props.userName === null && (
+            <input
+              className="field"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder={t('room.prejoin.namePlaceholder')}
+              aria-label={t('room.prejoin.nameLabel')}
+              maxLength={80}
+              autoComplete="name"
+              required
+            />
+          )}
+          {props.extra}
+          <button className="btn large" disabled={!name || props.busy}>
+            {props.busy ? t('room.prejoin.joining') : t('room.prejoin.joinNow')}
+          </button>
+          <div className="error" role="alert">
+            {props.error}
+          </div>
+        </form>
+      )}
     </main>
   );
 }

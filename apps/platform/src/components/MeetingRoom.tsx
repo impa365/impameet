@@ -4,7 +4,8 @@ import { type LocalUserChoices, LiveKitRoom } from '@livekit/components-react';
 import { type RoomOptions, VideoPresets } from 'livekit-client';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useT } from '@/i18n/client';
+import { useLocale, useT } from '@/i18n/client';
+import { SPEECH_LANG } from '@/lib/assisted-join';
 import { ApiError, api } from './api';
 import { MeetPrejoin } from './meet/MeetPrejoin';
 import { MeetRoom, type RoomPolicies } from './meet/MeetRoom';
@@ -29,6 +30,7 @@ export function MeetingRoom(props: {
   userName: string | null;
 }) {
   const t = useT();
+  const locale = useLocale();
   const tRef = useRef(t);
   tRef.current = t;
   const [choices, setChoices] = useState<LocalUserChoices | null>(null);
@@ -41,6 +43,19 @@ export function MeetingRoom(props: {
   const [breakout, setBreakout] = useState(0);
   const [joining, setJoining] = useState(false);
   const switching = useRef(false);
+  /** Came in through the guided entry: the waiting room also speaks what happens. */
+  const assistedRef = useRef(false);
+  const [lobbyState, setLobbyState] = useState<'sent' | 'waiting'>('sent');
+
+  const say = (text: string) => {
+    if (!assistedRef.current || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = SPEECH_LANG[locale];
+    window.speechSynthesis.speak(utterance);
+  };
+  const sayRef = useRef(say);
+  sayRef.current = say;
 
   async function switchRoom(target: number) {
     if (!session) return;
@@ -57,7 +72,8 @@ export function MeetingRoom(props: {
     }
   }
 
-  async function join(values: LocalUserChoices) {
+  async function join(values: LocalUserChoices, assisted = false) {
+    assistedRef.current = assisted;
     setChoices(values);
     setError('');
     setJoining(true);
@@ -66,11 +82,19 @@ export function MeetingRoom(props: {
         `/api/rooms/${encodeURIComponent(props.slug)}/join`,
         { body: { displayName: props.userName ?? values.username, password: password || undefined } },
       );
-      if ('lobby' in res) setTicket(res.lobby);
-      else setSession(res);
+      if ('lobby' in res) {
+        setLobbyState('sent');
+        setTicket(res.lobby);
+        say(`${t('room.meeting.lobbySent')} ${t('room.meeting.askingHelp', { room: props.roomName })}`);
+      } else {
+        say(t('room.meeting.entering'));
+        setSession(res);
+      }
     } catch (err) {
       if (err instanceof ApiError && err.code === 'room_password') setNeedsPassword(true);
-      setError(err instanceof ApiError ? err.message : t('room.meeting.joinFailed'));
+      const message = err instanceof ApiError ? err.message : t('room.meeting.joinFailed');
+      setError(message);
+      say(message);
     } finally {
       setJoining(false);
     }
@@ -87,6 +111,7 @@ export function MeetingRoom(props: {
             { body: ticket },
           );
           if (res.status === 'approved' && res.token && res.serverUrl) {
+            sayRef.current(tRef.current('room.meeting.lobbyApproved'));
             setSession(res as JoinResponse);
             setTicket(null);
             return;
@@ -94,8 +119,10 @@ export function MeetingRoom(props: {
           if (res.status === 'denied') {
             setTicket(null);
             setError(tRef.current('room.meeting.denied'));
+            sayRef.current(tRef.current('room.meeting.denied'));
             return;
           }
+          setLobbyState('waiting');
         } catch {
           /* transient network error: keep waiting */
         }
@@ -141,11 +168,20 @@ export function MeetingRoom(props: {
 
   if (ticket) {
     return (
-      <main className="call-screen theme-dark">
+      <main className="call-screen theme-dark" aria-labelledby="lobby-title">
         <span className="spinner" aria-hidden />
-        <h1>{t('room.meeting.asking')}</h1>
+        <h1 id="lobby-title">{t('room.meeting.asking')}</h1>
         <p className="muted">{t('room.meeting.askingHelp', { room: props.roomName })}</p>
-        <button className="btn tonal" onClick={() => setTicket(null)}>
+        <p role="status" aria-live="polite">
+          {lobbyState === 'sent' ? t('room.meeting.lobbySent') : t('room.meeting.lobbyWaiting')}
+        </p>
+        <button
+          className="btn tonal"
+          onClick={() => {
+            setTicket(null);
+            say(t('room.meeting.lobbyCancelled'));
+          }}
+        >
           {t('common.cancel')}
         </button>
       </main>
@@ -189,6 +225,8 @@ export function MeetingRoom(props: {
       options={options}
       onConnected={() => {
         switching.current = false;
+        say(t('room.meeting.inside', { room: session.roomName }));
+        assistedRef.current = false;
       }}
       onDisconnected={() => {
         if (!switching.current) setLeft(true);
