@@ -9,7 +9,9 @@ import {
 import { type LocalVideoTrack, Track, VideoPresets } from 'livekit-client';
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '@/i18n/client';
+import { A11Y_STORAGE_KEY, parseA11yPrefs } from '@/lib/a11y';
 import { wantsAssistance } from '@/lib/assisted-join';
+import { DEFAULT_WAKE_WORD } from '@/lib/voice-commands';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { Icon } from '../ui/Icon';
 import { AssistedJoin } from './AssistedJoin';
@@ -53,8 +55,10 @@ export function MeetPrejoin(props: {
   // The saved choices live in this browser: rendering them on the server would show stale
   // microphone and camera states (hydration keeps the server's attributes).
   const [mounted, setMounted] = useState(false);
+  const [wakeWord, setWakeWord] = useState(DEFAULT_WAKE_WORD);
   useEffect(() => {
     setMounted(true);
+    setWakeWord(parseA11yPrefs(window.localStorage.getItem(A11Y_STORAGE_KEY)).wakeWord);
     if (wantsAssistance(window.location.search)) setAssisted(true);
   }, []);
   const {
@@ -213,6 +217,7 @@ export function MeetPrejoin(props: {
           videoEnabled={videoEnabled}
           onVideo={setVideoEnabled}
           mediaError={mediaError}
+          wakeWord={wakeWord}
           busy={props.busy}
           error={props.error}
           extra={props.extra}

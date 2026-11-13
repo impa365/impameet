@@ -1,5 +1,6 @@
 import type { MessageKey } from '@/i18n/keys';
 import { BOARD_ANNOUNCE, type BoardAnnounce } from './board-text';
+import { DEFAULT_WAKE_WORD, MAX_WAKE_WORD, wakeKey } from './voice-commands';
 
 /** Theme of the call's side panels and dialogs; the call itself stays dark. */
 export const PANEL_THEMES = ['system', 'light', 'dark'] as const;
@@ -15,6 +16,10 @@ export interface A11yPrefs {
   panelTheme: PanelTheme;
   /** Whiteboard changes read out: every burst, a summary at most every 30 s, or never. */
   boardAnnounce: BoardAnnounce;
+  /** The local voice assistant listens during the call (only once the person turns it on). */
+  voiceCommands: boolean;
+  /** Its name, said before each command ("Star, desliga meu microfone"). */
+  wakeWord: string;
 }
 
 /** The call's own look, used when the system does not say which it prefers. */
@@ -38,6 +43,8 @@ export const DEFAULT_A11Y: A11yPrefs = {
   largeCaptions: false,
   panelTheme: 'system',
   boardAnnounce: 'summary',
+  voiceCommands: false,
+  wakeWord: DEFAULT_WAKE_WORD,
 };
 
 export const A11Y_STORAGE_KEY = 'impa-a11y';
@@ -46,8 +53,9 @@ export function parseA11yPrefs(raw: string | null): A11yPrefs {
   if (!raw) return DEFAULT_A11Y;
   try {
     const data = JSON.parse(raw) as Record<string, unknown>;
-    const pick = (k: Exclude<keyof A11yPrefs, 'panelTheme' | 'boardAnnounce'>) =>
+    const pick = (k: Exclude<keyof A11yPrefs, 'panelTheme' | 'boardAnnounce' | 'wakeWord'>) =>
       typeof data[k] === 'boolean' ? (data[k] as boolean) : DEFAULT_A11Y[k];
+    const wake = typeof data.wakeWord === 'string' ? data.wakeWord.trim().slice(0, MAX_WAKE_WORD) : '';
     const theme = (PANEL_THEMES as readonly unknown[]).includes(data.panelTheme)
       ? (data.panelTheme as PanelTheme)
       : DEFAULT_A11Y.panelTheme;
@@ -61,6 +69,8 @@ export function parseA11yPrefs(raw: string | null): A11yPrefs {
       boardAnnounce: (BOARD_ANNOUNCE as readonly unknown[]).includes(data.boardAnnounce)
         ? (data.boardAnnounce as BoardAnnounce)
         : DEFAULT_A11Y.boardAnnounce,
+      voiceCommands: pick('voiceCommands'),
+      wakeWord: wakeKey(wake) ? wake : DEFAULT_A11Y.wakeWord,
     };
   } catch {
     return DEFAULT_A11Y;

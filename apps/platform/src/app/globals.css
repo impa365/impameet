@@ -2779,6 +2779,42 @@ code.record {
   font-size: 18px;
 }
 
+.assist-question {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.08);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.assist-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.assist-row > .assist-big {
+  flex: 1 1 200px;
+  width: auto;
+}
+
+.voice-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.voice-wake {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 @media (max-width: 900px) {
   .green-room {
     grid-template-columns: minmax(0, 1fr);

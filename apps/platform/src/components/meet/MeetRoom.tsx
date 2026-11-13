@@ -26,6 +26,7 @@ import { type BoardChange, ChangeDigest } from '@/lib/board-text';
 import { api } from '../api';
 import { StudioMain, StudioPanel, useStudioControl } from '../studio/StudioRoom';
 import { LivePanel, useLive } from './LivePanel';
+import { useVoiceCommands } from './useVoiceCommands';
 import { Icon } from '../ui/Icon';
 import {
   A11yView,
@@ -187,6 +188,7 @@ export function MeetRoom(props: {
   const recording = useRecording(room, props.slug, props.signedIn, notify);
   const studio = useStudioControl(props.slug, props.token, notify);
   const live = useLive(props.slug, props.signedIn, notify);
+  const voice = useVoiceCommands(prefs.voiceCommands, prefs.wakeWord, announce);
   const captionerRunning = captionerPresent(participants);
   const transcriber = useCaptionsControl(props.slug, props.signedIn, captionerRunning, notify);
 
@@ -687,6 +689,11 @@ export function MeetRoom(props: {
               )
             )}
             {captionerRunning && <span className="chip-soft">{t('room.stage.transcribing')}</span>}
+            {voice === 'listening' && (
+              <span className="chip-soft" title={t('voice.enableHelp')}>
+                <Icon name="record_voice_over" size={16} /> {t('voice.chip', { name: prefs.wakeWord })}
+              </span>
+            )}
             {aiSilent && (
               <span className="chip-soft" title={t('room.stage.aiSilentTip')}>
                 <Icon name="smart_toy" size={16} />{' '}
@@ -779,7 +786,12 @@ export function MeetRoom(props: {
             />
           )}
           {panel === 'a11y' && (
-            <A11yView prefs={prefs} onChange={updatePrefs} onShortcuts={() => setShortcutsOpen(true)} />
+            <A11yView
+              prefs={prefs}
+              onChange={updatePrefs}
+              onShortcuts={() => setShortcutsOpen(true)}
+              voiceStatus={voice}
+            />
           )}
         </SidePanel>
       </div>

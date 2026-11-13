@@ -13,7 +13,9 @@ import {
   parseA11yPrefs,
 } from '@/lib/a11y';
 import { BOARD_ANNOUNCE, type BoardAnnounce } from '@/lib/board-text';
+import { DEFAULT_WAKE_WORD, MAX_WAKE_WORD, wakeKey } from '@/lib/voice-commands';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import type { VoiceStatus } from './useVoiceCommands';
 
 export { DEFAULT_A11Y, SHORTCUTS, parseA11yPrefs, type A11yPrefs } from '@/lib/a11y';
 
@@ -176,11 +178,12 @@ export function A11yView(props: {
   prefs: A11yPrefs;
   onChange: (change: Partial<A11yPrefs>) => void;
   onShortcuts: () => void;
+  voiceStatus?: VoiceStatus;
 }) {
   const { prefs, onChange } = props;
   const t = useT();
   const row = (
-    key: Exclude<keyof A11yPrefs, 'panelTheme' | 'boardAnnounce'>,
+    key: Exclude<keyof A11yPrefs, 'panelTheme' | 'boardAnnounce' | 'wakeWord'>,
     label: MessageKey,
     help: MessageKey,
   ) => (
@@ -227,6 +230,31 @@ export function A11yView(props: {
       {row('announceActivity', 'room.a11y.activity', 'room.a11y.activityHelp')}
       {row('sounds', 'room.a11y.sounds', 'room.a11y.soundsHelp')}
       {row('largeCaptions', 'room.a11y.largeCaptions', 'room.a11y.largeCaptionsHelp')}
+      <fieldset className="group voice-settings">
+        <legend>{t('voice.settingsTitle')}</legend>
+        {row('voiceCommands', 'voice.enable', 'voice.enableHelp')}
+        <label className="voice-wake">
+          {t('voice.wakeWordLabel')}
+          <input
+            key={prefs.wakeWord}
+            className="field"
+            maxLength={MAX_WAKE_WORD}
+            defaultValue={prefs.wakeWord}
+            onBlur={(e) => {
+              const value = e.target.value.trim();
+              onChange({ wakeWord: wakeKey(value) ? value : DEFAULT_WAKE_WORD });
+            }}
+          />
+          <small className="muted">{t('voice.wakeWordHelp')}</small>
+        </label>
+        <small className="muted">{t('voice.examples', { name: prefs.wakeWord })}</small>
+        {prefs.voiceCommands && props.voiceStatus === 'blocked' && (
+          <p className="error">{t('voice.listeningBlocked')}</p>
+        )}
+        {prefs.voiceCommands && props.voiceStatus === 'unsupported' && (
+          <p className="error">{t('voice.unsupported')}</p>
+        )}
+      </fieldset>
       <fieldset className="group theme-choice">
         <legend>{t('room.a11y.board')}</legend>
         <small className="muted">{t('room.a11y.boardHelp')}</small>
