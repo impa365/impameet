@@ -112,11 +112,12 @@ const INSIGHTS = {
   metrics: ['admin.agents.insightMetrics', 'admin.agents.insightMetricsHelp'],
 } as const satisfies Record<Insight, readonly [MessageKey, MessageKey]>;
 
-type Perception = 'board' | 'polls' | 'screen';
+type Perception = 'board' | 'polls' | 'screen' | 'present';
 const PERCEPTION = {
   board: ['admin.agents.seeBoard', 'admin.agents.seeBoardHelp'],
   polls: ['admin.agents.seePolls', 'admin.agents.seePollsHelp'],
   screen: ['admin.agents.seeScreen', 'admin.agents.seeScreenHelp'],
+  present: ['admin.agents.presentBoard', 'admin.agents.presentBoardHelp'],
 } as const satisfies Record<Perception, readonly [MessageKey, MessageKey]>;
 
 const EMPTY: Draft = {

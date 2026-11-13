@@ -276,7 +276,8 @@ export const tenantAdminInput = z
 /** Remove people, mute microphones, answer the waiting room, switch cameras off, record. */
 export const AGENT_MODERATION_TOOLS = ['remove', 'mute', 'lobby', 'camera', 'record'] as const;
 /** What in the meeting an agent may look at when asked. */
-export const AGENT_PERCEPTION = ['board', 'polls', 'screen'] as const;
+/** What the agent may look at, and "present": writing its own topics on the whiteboard. */
+export const AGENT_PERCEPTION = ['board', 'polls', 'screen', 'present'] as const;
 /** What an agent does for the meeting: minutes, "what did I miss?", a private copilot, metrics. */
 export const AGENT_INSIGHTS = ['minutes', 'catchup', 'copilot', 'metrics'] as const;
 /** Who may use the copilot and see the metrics. */

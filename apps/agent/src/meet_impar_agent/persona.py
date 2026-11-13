@@ -10,10 +10,10 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from livekit import rtc
-from livekit.agents import Agent, ModelSettings, StopResponse, llm, stt
+from livekit.agents import Agent, ModelSettings, StopResponse, get_job_context, llm, stt
 
 from .bargein import Engagement, should_interrupt
-from .chat import CHAT_INSTRUCTIONS
+from .chat import CHAT_INSTRUCTIONS, CHAT_TOPIC
 from .knowledge import KNOWLEDGE_NOTE, KnowledgeClient, knowledge_tools, training_note
 from .languages import guess_language, languages_note, main_language, pick_language, words
 from .listening import is_addressed
@@ -487,6 +487,17 @@ class VoiceAgent(Agent):
         await self.show_image(
             "[Imagem da tela que você está mostrando agora na reunião]", snapshot.image_b64
         )
+
+    async def post_text(self, text: str) -> None:
+        """Sends text to the room's chat, as this agent (outside a job there is no room)."""
+        try:
+            room = get_job_context().room
+        except RuntimeError:
+            return
+        try:
+            await room.local_participant.send_text(text, topic=CHAT_TOPIC)
+        except Exception as exc:
+            logger.warning("could not post to the chat", extra={"error": type(exc).__name__})
 
     async def show_image(self, label: str, image_b64: str) -> None:
         """One image in the conversation at a time: a new one replaces the last one."""

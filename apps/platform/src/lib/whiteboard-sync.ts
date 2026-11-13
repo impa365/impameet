@@ -57,6 +57,25 @@ function isElement(value: unknown): value is SyncElement {
   );
 }
 
+/** What an AI agent writes on the board: its own namespace, marked as the agent's. */
+export function agentOwned(e: SyncElement): boolean {
+  const custom = e.customData as { agent?: unknown } | undefined;
+  return e.id.startsWith('ai-') && custom?.agent === true;
+}
+
+/**
+ * The part of a message this browser accepts. People follow the room's drawing policy; an AI
+ * agent (which presents only when its admin allowed it and the room's moderators did not switch
+ * the AI off) may only add, change or remove its own elements, never anything a person drew.
+ */
+export function acceptedElements(
+  elements: readonly SyncElement[],
+  sender: { isAgent: boolean; mayDraw: boolean },
+): SyncElement[] {
+  if (sender.isAgent) return elements.filter(agentOwned);
+  return sender.mayDraw ? [...elements] : [];
+}
+
 export function encodeMessage(message: WhiteboardMessage): string {
   return JSON.stringify(message);
 }

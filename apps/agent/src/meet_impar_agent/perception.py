@@ -23,6 +23,7 @@ from livekit import rtc
 from livekit.agents import llm
 from livekit.agents.utils import images
 
+from . import board_present
 from .moderation import find
 
 logger = logging.getLogger("meet_impar_agent.perception")
@@ -41,6 +42,11 @@ SUBSCRIBE_TIMEOUT_S = 5.0
 ACTIONS_OFF = (
     "Os moderadores desligaram as ações da IA nesta sala: você não pode olhar o quadro, as "
     "enquetes nem as telas agora. Explique isso com educação."
+)
+
+ACTIONS_OFF_PRESENT = (
+    "Os moderadores desligaram as ações da IA nesta sala: você não pode escrever no quadro "
+    "agora. Explique isso com educação e diga os tópicos em voz."
 )
 
 TYPE_NAMES = {
@@ -123,6 +129,17 @@ class Board:
             self.authors[e["id"]] = sender_name
             changed = True
         return changed
+
+    def put(self, elements: list[dict[str, Any]], author: str) -> None:
+        """What this agent itself sent (LiveKit does not echo it back)."""
+        for e in elements:
+            if e["id"] not in self.elements:
+                self.order.append(e["id"])
+            self.elements[e["id"]] = e
+            self.authors[e["id"]] = author
+
+    def all(self) -> list[dict[str, Any]]:
+        return [self.elements[i] for i in self.order]
 
     def _live(self) -> list[dict[str, Any]]:
         return [self.elements[i] for i in self.order if not self.elements[i].get("isDeleted")]
@@ -372,6 +389,8 @@ class Perception:
     board: Board = field(default_factory=Board)
     polls: Polls = field(default_factory=Polls)
     grab: Grab = grab_frame
+    # The agent's name, shown as the author of what it writes on the board.
+    author: str = "IA"
 
     def _who(self, identity: str) -> tuple[str, str]:
         p = self.room.remote_participants.get(identity)
@@ -380,9 +399,32 @@ class Perception:
         return p.name or identity, (p.attributes or {}).get("role", "participant")
 
     def on_board(self, raw: str, identity: str) -> None:
-        if "board" in self.allowed:
+        # Presenting needs the board too: to place the topics beside what is drawn.
+        if "board" in self.allowed or "present" in self.allowed:
             name, role = self._who(identity)
             self.board.apply(raw, name, role)
+
+    async def _send_board(self, elements: list[dict[str, Any]]) -> None:
+        self.board.put(elements, self.author)
+        message = json.dumps({"type": "scene", "elements": elements}, ensure_ascii=False)
+        await self.room.local_participant.send_text(message, topic=BOARD_TOPIC)
+
+    async def present(self, title: str, topics: list[str]) -> bool:
+        """Writes title and topics on the board, replacing this agent's previous presentation."""
+        title, topics = board_present.clean(title, topics)
+        if not title or not topics:
+            return False
+        await self._send_board(
+            board_present.presentation(title, topics, self.board.all(), self.author)
+        )
+        return True
+
+    async def clear_presentation(self) -> bool:
+        """Removes what this agent wrote; nothing anybody else drew."""
+        retired = board_present.retire(self.board.all())
+        if retired:
+            await self._send_board(retired)
+        return bool(retired)
 
     def on_polls(self, raw: str, identity: str) -> None:
         if "polls" in self.allowed:
@@ -394,21 +436,35 @@ class Perception:
             self.board.policy = data["board"]
 
 
+PRESENT_NOTE = (
+    "APRESENTAR NO QUADRO: para mostrar um resumo, passos ou uma explicação em tópicos, use "
+    "apresentar_no_quadro. Os tópicos ficam escritos no quadro branco da reunião, que todos "
+    "conseguem ler, inclusive quem usa leitor de tela, e aparecem como seus. Prefira isso a "
+    "mostrar tópicos na tela compartilhada. Uma nova apresentação substitui a anterior; use "
+    "limpar_apresentacao_do_quadro quando terminar ou quando pedirem. Você nunca apaga nem "
+    "muda o que as pessoas desenharam. Sempre diga em voz o que apresentou."
+)
+
+
 def perception_note(allowed: tuple[str, ...]) -> str:
-    if not allowed:
-        return ""
     can = {
         "board": "o quadro branco (ver_quadro)",
         "polls": "as enquetes (ver_enquetes)",
         "screen": "a tela que alguém está compartilhando (ver_tela_compartilhada)",
     }
-    return (
-        "VER A REUNIÃO: quando pedirem, você pode olhar "
-        + "; ".join(can[a] for a in allowed)
-        + ". Só olhe quando alguém pedir. Ao descrever, diga de quem é o conteúdo (quem "
-        "desenhou ou quem está compartilhando) e fale de forma curta e clara, pensando em quem "
-        "não está vendo a tela. Nunca diga em quem uma pessoa votou."
-    )
+    seen = [a for a in allowed if a in can]
+    parts = []
+    if seen:
+        parts.append(
+            "VER A REUNIÃO: quando pedirem, você pode olhar "
+            + "; ".join(can[a] for a in seen)
+            + ". Só olhe quando alguém pedir. Ao descrever, diga de quem é o conteúdo (quem "
+            "desenhou ou quem está compartilhando) e fale de forma curta e clara, pensando em "
+            "quem não está vendo a tela. Nunca diga em quem uma pessoa votou."
+        )
+    if "present" in allowed:
+        parts.append(PRESENT_NOTE)
+    return "\n\n".join(parts)
 
 
 def perception_tools(view: Perception, host: Host) -> list[llm.FunctionTool[..., Any]]:
@@ -468,5 +524,36 @@ def perception_tools(view: Perception, host: Host) -> list[llm.FunctionTool[...,
             )
 
         tools.append(see_screen)
+
+    if "present" in view.allowed:
+
+        @llm.function_tool(name="apresentar_no_quadro")
+        async def present(titulo: str, topicos: list[str]) -> str:
+            """Escreve no quadro branco da reunião um título e tópicos curtos, para todos.
+
+            Args:
+                titulo: Título da apresentação.
+                topicos: De um a oito tópicos curtos, na ordem em que você vai falar.
+            """
+            if not host.actions_allowed():
+                return ACTIONS_OFF_PRESENT
+            if not await view.present(titulo, topicos):
+                return "Informe um título e pelo menos um tópico."
+            return (
+                "Os tópicos estão no quadro branco, em texto que todos conseguem ler: "
+                + board_present.outline(titulo, topicos).replace("\n", " ")
+                + ". Diga em voz o que apresentou e sugira abrir o quadro para acompanhar."
+            )
+
+        @llm.function_tool(name="limpar_apresentacao_do_quadro")
+        async def clear() -> str:
+            """Tira do quadro branco a sua apresentação (o que as pessoas desenharam fica)."""
+            if not host.actions_allowed():
+                return ACTIONS_OFF_PRESENT
+            if await view.clear_presentation():
+                return "Tirei a sua apresentação do quadro."
+            return "Não há apresentação sua no quadro."
+
+        tools += [present, clear]
 
     return tools

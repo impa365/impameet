@@ -1,7 +1,7 @@
 'use client';
 
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
-import type { Room } from 'livekit-client';
+import { ParticipantKind, type Room } from 'livekit-client';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/i18n/client';
@@ -9,6 +9,7 @@ import {
   type SyncElement,
   WHITEBOARD_TOPIC,
   type WhiteboardMessage,
+  acceptedElements,
   changedSince,
   decodeMessage,
   encodeMessage,
@@ -95,10 +96,15 @@ export function useWhiteboard(
         if (elements.current.length > 0) send({ type: 'scene', elements: elements.current });
         return;
       }
-      if (!allowed.current(sender.identity)) return;
-      record(message.elements, room.remoteParticipants.get(sender.identity)?.name || sender.identity, true);
-      rememberVersions(message.elements, known.current);
-      elements.current = mergeElements(elements.current, message.elements);
+      const from = room.remoteParticipants.get(sender.identity);
+      const incoming = acceptedElements(message.elements, {
+        isAgent: from?.kind === ParticipantKind.AGENT,
+        mayDraw: allowed.current(sender.identity),
+      });
+      if (incoming.length === 0) return;
+      record(incoming, from?.name || sender.identity, true);
+      rememberVersions(incoming, known.current);
+      elements.current = mergeElements(elements.current, incoming);
       if (api.current) api.current.updateScene({ elements: elements.current as never });
       else setUnseen(true);
     });

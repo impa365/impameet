@@ -9,6 +9,7 @@ from urllib.parse import quote
 import httpx
 from livekit.agents import llm
 
+from .board_present import outline
 from .config import ScreenSettings
 
 TIMEOUT_S = 30.0
@@ -73,6 +74,9 @@ class Snapshot:
 
 class Viewer(Protocol):
     async def see(self, snapshot: Snapshot) -> None: ...
+
+    async def post_text(self, text: str) -> None:
+        """Puts text in the room's chat: the readable twin of what the screen shows."""
 
 
 class ScreenClient:
@@ -195,7 +199,11 @@ def screen_tools(client: ScreenClient, viewer: Viewer) -> list[llm.FunctionTool[
         """
         if error := await client.show_topics(titulo, topicos):
             return error
-        return await _look(await client.snapshot(), viewer, "Os tópicos estão na tela.")
+        # A screen share is pixels: the same topics also go to the chat, as text anyone can read.
+        await viewer.post_text(f"[Na tela] {outline(titulo, topicos)}")
+        return await _look(
+            await client.snapshot(), viewer, "Os tópicos estão na tela e, em texto, no chat."
+        )
 
     @llm.function_tool(name="ver_tela")
     async def look() -> str:

@@ -38,7 +38,7 @@ KNOWLEDGE_HEADER = (
 LOOKUP_TIMEOUT_S = 5.0
 MODERATION_TOOLS = ("remove", "mute", "lobby", "camera", "record")
 MAX_RULES_CHARS = 4000
-PERCEPTION = ("board", "polls", "screen")
+PERCEPTION = ("board", "polls", "screen", "present")
 MAX_AGENT_ID_LENGTH = 64
 
 

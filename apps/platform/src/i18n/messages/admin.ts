@@ -158,6 +158,9 @@ export default defineMessages(
       seePollsHelp: 'Sabe as perguntas e quantos votos cada opção tem (nunca em quem cada pessoa votou).',
       seeScreen: 'Telas compartilhadas',
       seeScreenHelp: 'Olha a tela que alguém está compartilhando, no momento em que pedem.',
+      presentBoard: 'Apresentar no quadro branco',
+      presentBoardHelp:
+        'Escreve resumos e tópicos no quadro como texto, que todos leem, inclusive com leitor de tela, e aparecem com o nome do agente. Ele só mexe no que ele mesmo escreveu, e os moderadores podem desligar em cada sala.',
       trainingLegend: 'Treinamento do agente',
       trainingHint:
         'Funciona com qualquer provedor de LLM: regras de estilo que ele sempre segue, bases de conhecimento que ele consulta e, abaixo do formulário, respostas aprovadas que ele imita.',
@@ -696,6 +699,9 @@ export default defineMessages(
         seePollsHelp: 'Knows the questions and how many votes each option has (never who voted for what).',
         seeScreen: 'Shared screens',
         seeScreenHelp: 'Looks at the screen someone is sharing, at the moment they ask.',
+        presentBoard: 'Present on the whiteboard',
+        presentBoardHelp:
+          'Writes summaries and topics on the board as text everyone can read, screen readers included, shown with the agent’s name. It only touches what it wrote itself, and moderators can turn it off in each room.',
         trainingLegend: 'Agent training',
         trainingHint:
           'Works with any LLM provider: style rules it always follows, knowledge bases it looks things up in and, below the form, approved answers it imitates.',
@@ -1239,6 +1245,9 @@ export default defineMessages(
         seePollsHelp: 'Conoce las preguntas y cuántos votos tiene cada opción (nunca quién votó qué).',
         seeScreen: 'Pantallas compartidas',
         seeScreenHelp: 'Mira la pantalla que alguien está compartiendo, en el momento en que lo piden.',
+        presentBoard: 'Presentar en la pizarra',
+        presentBoardHelp:
+          'Escribe resúmenes y temas en la pizarra como texto que todos leen, incluso con lector de pantalla, con el nombre del agente. Solo toca lo que escribió él mismo, y los moderadores pueden desactivarlo en cada sala.',
         trainingLegend: 'Entrenamiento del agente',
         trainingHint:
           'Funciona con cualquier proveedor de LLM: reglas de estilo que siempre sigue, bases de conocimiento que consulta y, debajo del formulario, respuestas aprobadas que imita.',

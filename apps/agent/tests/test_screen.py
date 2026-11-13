@@ -52,9 +52,13 @@ class Recorder:
 class FakeViewer:
     def __init__(self) -> None:
         self.seen: list[Snapshot] = []
+        self.posted: list[str] = []
 
     async def see(self, snapshot: Snapshot) -> None:
         self.seen.append(snapshot)
+
+    async def post_text(self, text: str) -> None:
+        self.posted.append(text)
 
 
 def client(recorder: Recorder) -> ScreenClient:
@@ -89,6 +93,8 @@ async def test_topics_scroll_click_and_look() -> None:
     rec, viewer = Recorder(), FakeViewer()
     tools = tools_for(rec, viewer)
     assert "Os tópicos estão na tela" in await tools["mostrar_topicos"]("Plano", ["um", "dois"])
+    # The pixels on screen have a readable twin in the chat.
+    assert viewer.posted == ["[Na tela] Plano\n• um\n• dois"]
     assert "Rolei" in await tools["rolar_tela"]("baixo")
     await tools["rolar_tela"]("cima")
     assert "Cliquei" in await tools["clicar_na_tela"]("Preços")

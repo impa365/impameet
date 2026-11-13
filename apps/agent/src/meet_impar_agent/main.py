@@ -242,7 +242,10 @@ def _build_agent(
     perception = None
     if profile.perception:
         perception = Perception(
-            ctx.room, profile.perception, board=Board(policy=board_policy(ctx.job.metadata))
+            ctx.room,
+            profile.perception,
+            board=Board(policy=board_policy(ctx.job.metadata)),
+            author=profile.name,
         )
     return VoiceAgent(
         profile,
@@ -520,11 +523,11 @@ async def follow_meeting(room: rtc.Room, view: Perception) -> None:
 
     room.on("data_received", on_data)
     request = json.dumps({"type": "request"})
-    for topic, apply, kind in (
-        (BOARD_TOPIC, view.on_board, "board"),
-        (POLLS_TOPIC, view.on_polls, "polls"),
+    for topic, apply, kinds in (
+        (BOARD_TOPIC, view.on_board, ("board", "present")),
+        (POLLS_TOPIC, view.on_polls, ("polls",)),
     ):
-        if kind not in view.allowed:
+        if not set(kinds) & set(view.allowed):
             continue
         room.register_text_stream_handler(topic, reader(apply))
         with contextlib.suppress(Exception):

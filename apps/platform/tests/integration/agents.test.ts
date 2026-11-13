@@ -96,6 +96,16 @@ describe('agents', () => {
     });
 
     expect((await listAgents(db(), member)).map((a) => a.name)).toEqual(['Kaiser', 'Max']);
+    // Presenting on the board is its own permission, next to looking at it.
+    const presenter = await createAgent(
+      db(),
+      admin,
+      A({ name: 'Apresentador', perception: ['present'] }),
+      null,
+    );
+    expect((await agentForWorker(db(), null, presenter.id))?.perception).toEqual(['present']);
+    await deleteAgent(db(), admin, presenter.id, null);
+    expect(() => A({ name: 'X', perception: ['draw'] })).toThrow();
     await expectAppError(createAgent(db(), member, A({ name: 'Outro' }), null), 403);
     await expectAppError(createAgent(db(), admin, A({ name: 'Max' }), null), 409);
 

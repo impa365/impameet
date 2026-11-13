@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_MESSAGE_CHARS,
   type SyncElement,
+  acceptedElements,
+  agentOwned,
   changedSince,
   decodeMessage,
   encodeMessage,
@@ -19,6 +21,24 @@ const el = (
   version,
   versionNonce,
   ...extra,
+});
+
+describe('acceptedElements', () => {
+  const mine = el('ai-k1-0', 1, 1, { customData: { agent: true } });
+  const forged = el('ai-k1-1', 2, 1, { customData: { agent: false } });
+  const anas = el('ana-1', 9, 1, { isDeleted: true });
+
+  it('lets an AI agent touch only its own elements, whatever the drawing policy', () => {
+    expect(acceptedElements([mine, forged, anas], { isAgent: true, mayDraw: false })).toEqual([mine]);
+    expect(acceptedElements([anas], { isAgent: true, mayDraw: true })).toEqual([]);
+    expect(agentOwned(mine)).toBe(true);
+    expect(agentOwned(forged)).toBe(false);
+  });
+
+  it('keeps the room policy for people (who may also erase what the agent wrote)', () => {
+    expect(acceptedElements([mine, anas], { isAgent: false, mayDraw: true })).toEqual([mine, anas]);
+    expect(acceptedElements([mine, anas], { isAgent: false, mayDraw: false })).toEqual([]);
+  });
 });
 
 describe('mergeElements', () => {
