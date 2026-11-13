@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useLocale, useT } from '@/i18n/client';
+import { serverMessage, useLocale, useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
 import { api } from './api';
 import { messageOf, useLoad } from './admin/useLoad';
@@ -15,6 +15,28 @@ interface Recording {
   durationS: number | null;
   startedByName: string | null;
   startedAt: string;
+  storageKind: 's3' | 'gdrive' | null;
+  storageStatus: 'pending' | 'uploading' | 'done' | 'failed' | null;
+  storageLink: string | null;
+  storageError: string | null;
+}
+
+/** Where the recording went in the organization's storage, and how the upload is going. */
+function StorageLine({ r }: { r: Recording }) {
+  const t = useT();
+  if (!r.storageKind || !r.storageStatus) return null;
+  const where = r.storageKind === 'gdrive' ? t('storage.inDrive') : t('storage.inS3');
+  const text =
+    r.storageStatus === 'done'
+      ? where
+      : r.storageStatus === 'uploading'
+        ? t('storage.uploading')
+        : r.storageStatus === 'pending'
+          ? t('storage.pending')
+          : t('storage.uploadFailed', { error: serverMessage(r.storageError ?? '') });
+  return (
+    <div className={r.storageStatus === 'failed' ? 'error small-print' : 'muted small-print'}>{text}</div>
+  );
 }
 
 const STATUS: Record<Recording['status'], MessageKey> = {
@@ -106,14 +128,27 @@ export function RecordingsPanel() {
               <td>{new Date(r.startedAt).toLocaleString(locale)}</td>
               <td>{duration(r.durationS)}</td>
               <td>{size(r.sizeBytes)}</td>
-              <td>{t(STATUS[r.status])}</td>
+              <td>
+                {t(STATUS[r.status])}
+                <StorageLine r={r} />
+              </td>
               <td className="row">
                 {r.status === 'ready' && (
                   <a className="btn small" href={`/api/recordings/${r.id}`} download>
                     {t('common.download')}
                   </a>
                 )}
-                {(r.status === 'ready' || r.status === 'failed') && (
+                {r.storageStatus === 'done' && r.storageLink && (
+                  <a
+                    className="btn secondary small"
+                    href={r.storageLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {t('storage.openInDrive')}
+                  </a>
+                )}
+                {(r.status === 'ready' || r.status === 'failed') && r.storageStatus !== 'uploading' && (
                   <button className="btn danger small" onClick={() => remove(r.id)}>
                     {t('common.delete')}
                   </button>

@@ -8,8 +8,9 @@ import mail from './mail';
 import room from './room';
 import security from './security';
 import shell from './shell';
+import storage from './storage';
 
-const NAMESPACES = { common, shell, room, dashboard, admin, knowledge, mail, security };
+const NAMESPACES = { common, shell, room, dashboard, admin, knowledge, mail, security, storage };
 
 /** The Portuguese tree: the reference every translation is checked against. */
 export type AppMessages = { [N in keyof typeof NAMESPACES]: (typeof NAMESPACES)[N]['reference'] };

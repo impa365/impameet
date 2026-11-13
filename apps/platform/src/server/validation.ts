@@ -210,6 +210,75 @@ export const updateRoomInput = z
   .strict()
   .refine((p) => Object.keys(p).length > 0, 'Nada para alterar');
 
+/** The platform's Google OAuth client (Google Cloud Console → Credentials → OAuth client ID). */
+export const platformGoogleInput = z
+  .object({
+    clientId: z
+      .string()
+      .trim()
+      .regex(
+        /^[0-9]{6,30}-[a-z0-9]{8,64}\.apps\.googleusercontent\.com$/,
+        'Client ID inválido: copie o que termina em .apps.googleusercontent.com',
+      ),
+    /** Leave empty to keep the saved one. */
+    clientSecret: z
+      .string()
+      .trim()
+      .min(10, 'Client Secret inválido')
+      .max(200, 'Client Secret inválido')
+      .regex(/^[A-Za-z0-9_-]+$/, 'Client Secret inválido')
+      .optional()
+      .or(z.literal('').transform(() => undefined)),
+  })
+  .strict();
+
+/** S3 or a compatible service (R2, Wasabi, B2, MinIO) for an organization's recordings. */
+export const s3StorageInput = z
+  .object({
+    /** Empty for AWS itself; https:// for compatible services. */
+    endpoint: z
+      .string()
+      .trim()
+      .max(300)
+      .nullable()
+      .transform((v) => v || null),
+    region: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9-]{2,30}$/, 'Região inválida (ex.: us-east-1, sa-east-1 ou auto)'),
+    bucket: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, 'Nome de bucket inválido'),
+    prefix: z
+      .string()
+      .trim()
+      .max(200)
+      .regex(/^[A-Za-z0-9._\-/ ]*$/, 'Use letras, números, "-", "_", "." e "/" na pasta')
+      .refine((p) => !p.split('/').includes('..'), 'Pasta inválida')
+      .transform((p) => p.replace(/^\/+|\/+$/g, '')),
+    pathStyle: z.boolean(),
+    accessKey: z.string().trim().min(3, 'Informe a chave de acesso').max(200),
+    /** Leave empty to keep the saved one (same access key only). */
+    secretKey: z
+      .string()
+      .min(8, 'Chave secreta muito curta')
+      .max(200)
+      .optional()
+      .or(z.literal('').transform(() => undefined)),
+    keepLocal: z.boolean({ error: 'Escolha se uma cópia fica no servidor' }),
+  })
+  .strict();
+
+export const driveStartInput = z
+  .object({
+    folderName: z.string().trim().min(1, 'Informe o nome da pasta').max(120),
+    keepLocal: z.boolean({ error: 'Escolha se uma cópia fica no servidor' }),
+  })
+  .strict();
+
+export const keepLocalInput = z.object({ keepLocal: z.boolean() }).strict();
+
 /** What any moderator of the meeting may change while it runs (the rest stays the organizer's). */
 export const meetingControlsInput = z
   .object({

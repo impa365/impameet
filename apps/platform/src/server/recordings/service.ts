@@ -24,13 +24,21 @@ export interface Recording {
   startedByName: string | null;
   startedAt: Date;
   endedAt: Date | null;
+  /** Where it went in the organization's storage (S3 or Google Drive), and how that went. */
+  storageKind: 's3' | 'gdrive' | null;
+  storageStatus: 'pending' | 'uploading' | 'done' | 'failed' | null;
+  storageLink: string | null;
+  storageError: string | null;
+  /** Kept only in the organization's storage (no copy left on the server). */
+  localRemoved: boolean;
 }
 
 const COLUMNS = (sql: Sql) => sql`
   r.id, r.room_name as "roomName", r.status, r.file_name as "fileName",
   r.size_bytes::float8 as "sizeBytes", r.duration_s as "durationS", r.error,
   r.started_by as "startedBy", u.name as "startedByName", r.started_at as "startedAt",
-  r.ended_at as "endedAt"`;
+  r.ended_at as "endedAt", r.storage_kind as "storageKind", r.storage_status as "storageStatus",
+  r.storage_link as "storageLink", r.storage_error as "storageError", r.local_removed as "localRemoved"`;
 
 const ACTIVE: RecordingStatus[] = ['starting', 'recording'];
 const UNFINISHED: RecordingStatus[] = ['starting', 'recording', 'processing'];
@@ -209,6 +217,16 @@ async function refresh(deps: Pick<RecordingDeps, 'sql' | 'egress'>, tenantId: st
   );
 }
 
+/** Every unfinished recording of the installation (the background clock: files become ready). */
+export async function settleAll(deps: Pick<RecordingDeps, 'sql' | 'egress'>): Promise<void> {
+  await settle(
+    deps,
+    await deps.sql<Unfinished[]>`
+      select id, egress_id as "egressId", started_at as "startedAt" from recordings
+      where status in ${deps.sql(UNFINISHED)}`,
+  );
+}
+
 /** Checks this room's unfinished recordings with Egress before deciding anything about it. */
 export async function settleRoom(deps: Pick<RecordingDeps, 'sql' | 'egress'>, room: Room, now?: number) {
   await settle(
@@ -262,6 +280,7 @@ export async function deleteRecording(
   if (ACTIVE.includes(rec.status) || rec.status === 'processing') {
     throw conflict('Pare a gravação antes de apagar');
   }
+  if (rec.storageStatus === 'uploading') throw conflict('Espere o envio para o armazenamento terminar');
   if (rec.fileName) await removeFile(rec.fileName);
   await sql`delete from recordings where id = ${id}`;
   await audit(sql, {

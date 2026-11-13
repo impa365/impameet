@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/client';
 import { api } from '../api';
+import { PlatformGoogle } from './PlatformGoogle';
 import { PlatformMail } from './PlatformMail';
 import { messageOf, useLoad } from './useLoad';
 
@@ -160,6 +161,7 @@ export function SuperadminPanel({ selfTenantId }: { selfTenantId: string }) {
         </table>
       </div>
       <PlatformMail />
+      <PlatformGoogle />
     </>
   );
 }
