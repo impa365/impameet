@@ -1,4 +1,4 @@
-import { TokenVerifier } from 'livekit-server-sdk';
+import { AccessToken, TokenVerifier } from 'livekit-server-sdk';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { grantJoin } from '@/server/rooms/join';
 import { listAudit, liveRooms, updateBranding } from '@/server/admin/service';
@@ -17,7 +17,15 @@ import { AppError } from '@/server/errors';
 import type { LiveKitAdmin, LiveParticipant } from '@/server/livekit-admin';
 import { decide, entryStatus, pendingRequests, requestEntry } from '@/server/lobby/service';
 import { agentModerate, agentModerationView, identityUserId } from '@/server/moderation/agent';
-import { canModerate, listLiveParticipants, moderate } from '@/server/moderation/service';
+import {
+  type VerifyToken,
+  canModerate,
+  listLiveParticipants,
+  moderate,
+  roomModerator,
+  setMeetingControls,
+  tokenVerifier,
+} from '@/server/moderation/service';
 import { tenantLimits } from '@/server/plans';
 import {
   type Room,
@@ -337,6 +345,97 @@ describe('moderation', () => {
       `mute u-${member.id}-bbbbbb TR_u-${member.id}-bbbbbb`,
       'mute g-123456789abc TR_g-123456789abc',
     ]);
+  });
+
+  it('lets a promoted guest moderate this meeting while they are in it; promoting stays with the organizer', async () => {
+    const verify: VerifyToken = async (token) =>
+      token === 'tok-eva'
+        ? { identity: 'g-123456789abc', room: lkRoom, name: 'Eva' }
+        : token === 'tok-elsewhere'
+          ? { identity: 'g-123456789abc', room: `${tenant.id}.outra`, name: 'Eva' }
+          : null;
+    const eva = { token: 'tok-eva', verify };
+    const people = lk.rooms.get(lkRoom)!;
+    // A guest is no moderator until promoted.
+    await expectAppError(moderate(db(), lk, room, null, 'mute', `u-${member.id}-bbbbbb`, null, eva), 403);
+    people[2].role = 'moderator';
+    expect(await listLiveParticipants(lk, room, null, eva)).toMatchObject({
+      canModerate: true,
+      organizer: false,
+    });
+    expect(await listLiveParticipants(lk, room, admin)).toMatchObject({ canModerate: true, organizer: true });
+
+    await moderate(db(), lk, room, null, 'mute', `u-${member.id}-bbbbbb`, null, eva);
+    const { affected } = await moderate(db(), lk, room, null, 'mute_all', undefined, null, eva);
+    expect(affected).toBe(2); // the admin and Bia; never Eva herself nor the agent
+    await moderate(db(), lk, room, null, 'remove', 'g-silent', null, eva);
+    expect(lk.calls.at(-1)).toBe('remove g-silent');
+
+    // Promoting, demoting and removing a moderator stay with the organizer; never oneself.
+    await expectAppError(moderate(db(), lk, room, null, 'promote', `u-${member.id}-bbbbbb`, null, eva), 403);
+    await expectAppError(moderate(db(), lk, room, null, 'demote', `u-${admin.id}-aaaaaa`, null, eva), 403);
+    await expectAppError(moderate(db(), lk, room, null, 'remove', `u-${admin.id}-aaaaaa`, null, eva), 403);
+    await expectAppError(moderate(db(), lk, room, null, 'remove', 'g-123456789abc', null, eva), 400);
+    // Another room's token, a forged one or none prove nothing.
+    for (const token of ['tok-elsewhere', 'forged', null])
+      await expectAppError(
+        moderate(db(), lk, room, null, 'mute_all', undefined, null, { token, verify }),
+        403,
+      );
+
+    // The log keeps who the guest was (no account to point to).
+    const [row] = await sql<{ actor_id: string | null; meta: Record<string, unknown> }[]>`
+      select actor_id, meta from audit_log where action = 'moderation.remove' order by id desc limit 1`;
+    expect(row.actor_id).toBeNull();
+    expect(row.meta).toMatchObject({ by: 'g-123456789abc', identity: 'g-123456789abc' });
+
+    // Meeting controls: any moderator of the live meeting, audited, the rest stays the organizer's.
+    const who = await roomModerator(lk, room, null, { ...eva });
+    const changed = await setMeetingControls(
+      db(),
+      room,
+      who!,
+      { boardPolicy: 'moderators', agentActions: false },
+      null,
+    );
+    expect(changed).toMatchObject({
+      boardPolicy: 'moderators',
+      agentActions: false,
+      pollsPolicy: 'everyone',
+    });
+    const [controls] = await sql<{ actor_id: string | null; meta: Record<string, unknown> }[]>`
+      select actor_id, meta from audit_log where action = 'room.meeting_controls'`;
+    expect(controls).toMatchObject({
+      actor_id: null,
+      meta: { boardPolicy: 'moderators', by: 'g-123456789abc' },
+    });
+
+    // A signed-in member promoted in the meeting moderates too, and is logged by account.
+    people[1].role = 'moderator';
+    expect(await roomModerator(lk, room, member)).toMatchObject({ userId: member.id, organizer: false });
+    // Leaving the meeting ends the guest's permission: coming back, they are a guest again.
+    lk.rooms.set(
+      lkRoom,
+      people.filter((p) => p.identity !== 'g-123456789abc'),
+    );
+    await expectAppError(moderate(db(), lk, room, null, 'mute_all', undefined, null, eva), 403);
+    expect(await roomModerator(lk, room, null, eva)).toBeNull();
+  });
+
+  it('reads who a meeting token belongs to, and nothing from a bad or foreign one', async () => {
+    const secret = 'a-very-long-livekit-secret-for-tests-0123456789';
+    const token = new AccessToken('APIkey', secret, { identity: 'g-eva', name: 'Eva' });
+    token.addGrant({ room: lkRoom, roomJoin: true });
+    const jwt = await token.toJwt();
+    expect(await tokenVerifier('APIkey', secret)(jwt)).toEqual({
+      identity: 'g-eva',
+      room: lkRoom,
+      name: 'Eva',
+    });
+    expect(await tokenVerifier('APIkey', secret)('not-a-token')).toBeNull();
+    expect(await tokenVerifier('APIkey', `${secret}-other`)(jwt)).toBeNull();
+    const roomless = new AccessToken('APIkey', secret, { identity: 'g-eva' });
+    expect(await tokenVerifier('APIkey', secret)(await roomless.toJwt())).toBeNull();
   });
 
   it('refuses non-moderators, unknown targets and acting on oneself', async () => {

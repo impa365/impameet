@@ -210,6 +210,18 @@ export const updateRoomInput = z
   .strict()
   .refine((p) => Object.keys(p).length > 0, 'Nada para alterar');
 
+/** What any moderator of the meeting may change while it runs (the rest stays the organizer's). */
+export const meetingControlsInput = z
+  .object({
+    boardPolicy: collabPolicy,
+    pollsPolicy: collabPolicy,
+    thinkingSound: z.boolean(),
+    agentActions: z.boolean(),
+  })
+  .partial()
+  .strict()
+  .refine((p) => Object.keys(p).length > 0, 'Nada para alterar');
+
 export const moderationInput = z.object({
   action: z.enum(['mute', 'mute_all', 'remove', 'promote', 'demote']),
   identity: z.string().min(1).max(200).optional(),

@@ -105,6 +105,9 @@ const EN: Record<string, string> = {
   'Só moderadores abrem salas paralelas': 'Only moderators open breakout rooms',
   'Só moderadores ligam as legendas': 'Only moderators turn on captions',
   'Só moderadores podem fazer isso': 'Only moderators can do this',
+  'Só o organizador da sala pode promover ou remover moderadores':
+    'Only the room organizer can promote or demote moderators',
+  'Só o organizador da sala pode remover um moderador': 'Only the room organizer can remove a moderator',
   'Só moderadores podem gravar': 'Only moderators can record',
   'Só moderadores podem responder a sala de espera': 'Only moderators can answer the waiting room',
   'Transcrição não encontrada': 'Transcript not found',
@@ -407,6 +410,10 @@ const ES: Record<string, string> = {
   'Só moderadores abrem salas paralelas': 'Solo los moderadores abren salas paralelas',
   'Só moderadores ligam as legendas': 'Solo los moderadores activan los subtítulos',
   'Só moderadores podem fazer isso': 'Solo los moderadores pueden hacer esto',
+  'Só o organizador da sala pode promover ou remover moderadores':
+    'Solo el organizador de la sala puede nombrar o quitar moderadores',
+  'Só o organizador da sala pode remover um moderador':
+    'Solo el organizador de la sala puede sacar a un moderador',
   'Só moderadores podem gravar': 'Solo los moderadores pueden grabar',
   'Só moderadores podem responder a sala de espera':
     'Solo los moderadores pueden responder a la sala de espera',

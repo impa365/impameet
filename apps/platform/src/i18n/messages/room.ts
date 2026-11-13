@@ -378,9 +378,17 @@ export default defineMessages(
       start: 'Abrir salas e enviar participantes',
       none: 'Não há salas paralelas abertas.',
     },
+    controls: {
+      intro:
+        'Controles desta reunião. Acesso, senha, convidados e os agentes da sala ficam com o organizador.',
+      loadFailed: 'Não foi possível carregar os controles da reunião',
+      saveFailed: 'Não foi possível mudar o controle',
+    },
     moderation: {
       loadFailed: 'Não foi possível carregar os participantes',
       actionFailed: 'Ação não concluída',
+      nowModerator: 'Agora você é moderador desta reunião: os controles de moderação já estão liberados.',
+      noLongerModerator: 'Você não é mais moderador desta reunião.',
       loading: 'Carregando participantes…',
       asking: 'Pedindo para participar ({count})',
       admit: 'Aceitar',
@@ -791,9 +799,17 @@ export default defineMessages(
         start: 'Open rooms and send participants',
         none: 'There are no breakout rooms open.',
       },
+      controls: {
+        intro:
+          'Controls for this meeting. Access, password, invites and the room’s agents belong to the organizer.',
+        loadFailed: 'Could not load the meeting controls',
+        saveFailed: 'Could not change the control',
+      },
       moderation: {
         loadFailed: 'Could not load participants',
         actionFailed: 'Action not completed',
+        nowModerator: 'You are now a moderator of this meeting: the moderation controls are available.',
+        noLongerModerator: 'You are no longer a moderator of this meeting.',
         loading: 'Loading participants…',
         asking: 'Asking to join ({count})',
         admit: 'Admit',
@@ -1204,9 +1220,18 @@ export default defineMessages(
         start: 'Abrir las salas y enviar a los participantes',
         none: 'No hay salas para grupos abiertas.',
       },
+      controls: {
+        intro:
+          'Controles desta reunión. El acceso, la contraseña, los invitados y los agentes de la sala son del organizador.',
+        loadFailed: 'No se pudieron cargar los controles de la reunión',
+        saveFailed: 'No se pudo cambiar el control',
+      },
       moderation: {
         loadFailed: 'No se pudo cargar a los participantes',
         actionFailed: 'No se completó la acción',
+        nowModerator:
+          'Ahora eres moderador de esta reunión: los controles de moderación ya están disponibles.',
+        noLongerModerator: 'Ya no eres moderador de esta reunión.',
         loading: 'Cargando participantes…',
         asking: 'Pidiendo unirse ({count})',
         admit: 'Admitir',

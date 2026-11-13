@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '@/i18n/client';
 import { ApiError, api } from './api';
 import { Avatar } from './meet/Avatar';
@@ -24,24 +24,39 @@ interface LobbyRequest {
 
 interface State {
   canModerate: boolean;
+  /** Owner, admin or manager: may also promote and demote, and remove moderators. */
+  organizer: boolean;
   participants: Participant[];
   lobby: LobbyRequest[];
 }
 
-/** The moderator's view of the people panel; anyone the server does not let moderate sees `fallback`. */
-export function ModerationView({ slug, fallback }: { slug: string; fallback: ReactNode }) {
+/**
+ * The moderator's view of the people panel; anyone the server does not let moderate sees
+ * `fallback`. `token` is this person's meeting token: it is how a moderator promoted during the
+ * meeting without an account proves who they are (the permission ends when they leave).
+ */
+export function ModerationView({
+  slug,
+  token,
+  fallback,
+}: {
+  slug: string;
+  token: string;
+  fallback: ReactNode;
+}) {
   const t = useT();
   const base = `/api/rooms/${encodeURIComponent(slug)}`;
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState('');
+  const headers = useMemo(() => ({ 'x-room-token': token }), [token]);
 
   const refresh = useCallback(async () => {
     try {
-      setState(await api<State>(`${base}/moderation`));
+      setState(await api<State>(`${base}/moderation`, { headers }));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('room.moderation.loadFailed'));
     }
-  }, [base, t]);
+  }, [base, t, headers]);
 
   useEffect(() => {
     void refresh();
@@ -52,7 +67,7 @@ export function ModerationView({ slug, fallback }: { slug: string; fallback: Rea
   async function act(action: string, identity?: string) {
     setError('');
     try {
-      await api(`${base}/moderation`, { body: { action, identity } });
+      await api(`${base}/moderation`, { body: { action, identity }, headers });
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('room.moderation.actionFailed'));
@@ -62,7 +77,7 @@ export function ModerationView({ slug, fallback }: { slug: string; fallback: Rea
   async function decide(id: string, approve: boolean) {
     setError('');
     try {
-      await api(`${base}/lobby`, { body: { id, approve } });
+      await api(`${base}/lobby`, { body: { id, approve }, headers });
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('room.moderation.actionFailed'));
@@ -145,6 +160,7 @@ export function ModerationView({ slug, fallback }: { slug: string; fallback: Rea
                       </button>
                     )}
                     {!p.isAgent &&
+                      state.organizer &&
                       (p.role === 'moderator' ? (
                         <button
                           className="icon-btn"
@@ -164,17 +180,19 @@ export function ModerationView({ slug, fallback }: { slug: string; fallback: Rea
                           <Icon name="shield_person" size={20} />
                         </button>
                       ))}
-                    <button
-                      className="icon-btn danger"
-                      title={t('room.moderation.remove')}
-                      aria-label={t('room.moderation.removeName', { name: p.name })}
-                      onClick={() =>
-                        window.confirm(t('room.moderation.removeConfirm', { name: p.name })) &&
-                        act('remove', p.identity)
-                      }
-                    >
-                      <Icon name="person_remove" size={20} />
-                    </button>
+                    {(state.organizer || p.role !== 'moderator') && (
+                      <button
+                        className="icon-btn danger"
+                        title={t('room.moderation.remove')}
+                        aria-label={t('room.moderation.removeName', { name: p.name })}
+                        onClick={() =>
+                          window.confirm(t('room.moderation.removeConfirm', { name: p.name })) &&
+                          act('remove', p.identity)
+                        }
+                      >
+                        <Icon name="person_remove" size={20} />
+                      </button>
+                    )}
                   </span>
                 </div>
               ))}

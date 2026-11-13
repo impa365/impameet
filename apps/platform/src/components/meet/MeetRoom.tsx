@@ -8,7 +8,7 @@ import {
   useParticipants,
   useRoomContext,
 } from '@livekit/components-react';
-import { type Participant, RoomEvent, Track } from 'livekit-client';
+import { type Participant, ParticipantEvent, RoomEvent, Track } from 'livekit-client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type T, useT } from '@/i18n/client';
 import { resolvePanelTheme } from '@/lib/a11y';
@@ -39,6 +39,7 @@ import { ChatView } from './ChatView';
 import { MeetBar, type MoreItem, type PanelId } from './MeetBar';
 import { type Activity, ActivitiesView, InfoView, PeopleList, SidePanel } from './MeetPanels';
 import { MeetStage } from './MeetStage';
+import { MeetingControls } from './MeetingControls';
 import { AGENT_MUTED_ATTRIBUTE, HAND_ATTRIBUTE, displayName } from './MeetTile';
 import { useRecording } from './useRecording';
 
@@ -113,19 +114,35 @@ export function MeetRoom(props: {
   );
 
   const [policies, setPolicies] = useState(props.policies);
-  const isModerator = localParticipant.attributes?.role === 'moderator' || props.role === 'moderator';
+  // The role lives in the participant's attributes, which the server changes when someone is
+  // promoted or demoted; LiveKit's hooks do not re-render on that, so follow it here.
+  const [localRole, setLocalRole] = useState(localParticipant.attributes?.role ?? props.role);
+  useEffect(() => {
+    const update = () => setLocalRole(room.localParticipant.attributes?.role ?? props.role);
+    update();
+    room.localParticipant.on(ParticipantEvent.AttributesChanged, update);
+    return () => {
+      room.localParticipant.off(ParticipantEvent.AttributesChanged, update);
+    };
+  }, [room, props.role]);
+  const isModerator = localRole === 'moderator';
   const policiesRef = useRef(policies);
   policiesRef.current = policies;
   const allowedBy = useCallback(
     (kind: keyof RoomPolicies) => (identity: string) => {
       if (policiesRef.current[kind] === 'everyone') return true;
       if (identity === room.localParticipant.identity) {
-        return isModeratorParticipant(room.localParticipant) || props.role === 'moderator';
+        return (room.localParticipant.attributes?.role ?? props.role) === 'moderator';
       }
       return isModeratorParticipant(room.remoteParticipants.get(identity));
     },
     [room, props.role],
   );
+  const applyPolicies = useCallback((change: { boardPolicy?: CollabPolicy; pollsPolicy?: CollabPolicy }) => {
+    if (change.boardPolicy || change.pollsPolicy) {
+      setPolicies((p) => ({ board: change.boardPolicy ?? p.board, polls: change.pollsPolicy ?? p.polls }));
+    }
+  }, []);
   const mayDraw = useCallback((identity: string) => allowedBy('board')(identity), [allowedBy]);
   const mayCreatePoll = useCallback((identity: string) => allowedBy('polls')(identity), [allowedBy]);
   const canDraw = policies.board === 'everyone' || isModerator;
@@ -209,13 +226,24 @@ export function MeetRoom(props: {
     if (breakouts.notice) notify(breakouts.notice);
   }, [breakouts.notice, notify]);
 
-  // One request, only for signed-in moderators: may they open the organizer's controls?
+  // Signed-in moderators: may they open the organizer's controls? (Asked again on promotion.)
   useEffect(() => {
-    if (!props.signedIn || props.role !== 'moderator') return;
+    if (!props.signedIn || !isModerator) {
+      setCanManage(false);
+      return;
+    }
     api<{ canManage: boolean }>(`/api/rooms/${encodeURIComponent(props.slug)}/access`)
       .then((r) => setCanManage(r.canManage))
       .catch(() => setCanManage(false));
-  }, [props.signedIn, props.role, props.slug]);
+  }, [props.signedIn, isModerator, props.slug]);
+
+  // Promoted or demoted during the meeting: say so, and the controls follow right away.
+  const wasModerator = useRef(isModerator);
+  useEffect(() => {
+    if (wasModerator.current === isModerator) return;
+    wasModerator.current = isModerator;
+    notify(isModerator ? tr('room.moderation.nowModerator') : tr('room.moderation.noLongerModerator'));
+  }, [isModerator, notify, tr]);
 
   // Server messages: someone knocks, or the organizer changed who may draw / create polls.
   useEffect(() => {
@@ -649,8 +677,8 @@ export function MeetRoom(props: {
                 <Icon name="link" size={20} />
                 {t('room.stage.copyInviteLink')}
               </button>
-              {props.signedIn && isModerator ? (
-                <ModerationView slug={props.slug} fallback={<PeopleList />} />
+              {isModerator ? (
+                <ModerationView slug={props.slug} token={props.token} fallback={<PeopleList />} />
               ) : (
                 <PeopleList />
               )}
@@ -682,20 +710,13 @@ export function MeetRoom(props: {
               <BackgroundPanel background={background} />
             </div>
           )}
-          {panel === 'host' && canManage && (
+          {panel === 'host' && (canManage || isModerator) && (
             <div className="meet-panel-body">
-              <RoomSettingsEditor
-                slug={props.slug}
-                showAgent
-                onChanged={(change) => {
-                  if (change.boardPolicy || change.pollsPolicy) {
-                    setPolicies((p) => ({
-                      board: change.boardPolicy ?? p.board,
-                      polls: change.pollsPolicy ?? p.polls,
-                    }));
-                  }
-                }}
-              />
+              {canManage ? (
+                <RoomSettingsEditor slug={props.slug} showAgent onChanged={applyPolicies} />
+              ) : (
+                <MeetingControls slug={props.slug} token={props.token} onChanged={applyPolicies} />
+              )}
             </div>
           )}
           {panel === 'copilot' && <CopilotView insights={insights} />}
@@ -719,7 +740,7 @@ export function MeetRoom(props: {
         onReact={(emoji) => void react(emoji)}
         more={more}
         onEffects={effectsAvailable ? () => openPanel('effects') : undefined}
-        canManage={canManage}
+        canManage={canManage || isModerator}
         lobbyWaiting={lobbyWaiting}
         onLeave={() => void room.disconnect()}
       />
