@@ -12,6 +12,7 @@ import storage from './storage';
 import studio from './studio';
 import live from './live';
 import voice from './voice';
+import platform from './platform';
 
 const NAMESPACES = {
   common,
@@ -26,6 +27,7 @@ const NAMESPACES = {
   studio,
   live,
   voice,
+  platform,
 };
 
 /** The Portuguese tree: the reference every translation is checked against. */

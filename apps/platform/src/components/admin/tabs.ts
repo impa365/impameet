@@ -55,6 +55,25 @@ export function pickAdminTab(role: 'admin' | 'manager', requested: string | unde
   return tabs.find((t) => t === requested) ?? tabs[0];
 }
 
+/** The platform's own pages (super admins): above every organization. */
+export type PlatformTab = 'overview' | 'organizations' | 'email' | 'google';
+
+export const PLATFORM_TABS: Record<PlatformTab, { label: MessageKey; icon: IconName }> = {
+  overview: { label: 'shell.nav.platformTabs.overview', icon: 'dashboard' },
+  organizations: { label: 'shell.nav.platformTabs.organizations', icon: 'apartment' },
+  email: { label: 'shell.nav.platformTabs.email', icon: 'mail' },
+  google: { label: 'shell.nav.platformTabs.google', icon: 'hub' },
+};
+
+export function pickPlatformTab(requested: string | undefined): PlatformTab {
+  return (Object.keys(PLATFORM_TABS) as PlatformTab[]).find((t) => t === requested) ?? 'overview';
+}
+
+export const platformHref = (tab: PlatformTab, org?: string) =>
+  tab === 'overview'
+    ? '/superadmin'
+    : `/superadmin?tab=${tab}${org ? `&org=${encodeURIComponent(org)}` : ''}`;
+
 export type DashboardView = 'rooms' | 'meetings' | 'recordings' | 'transcripts' | 'reports';
 
 export const DASHBOARD_VIEWS: Record<DashboardView, { label: MessageKey; icon: IconName }> = {

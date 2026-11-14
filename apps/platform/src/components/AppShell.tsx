@@ -9,7 +9,15 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { LogoutButton } from './LogoutButton';
 import { NavDrawerToggle } from './NavDrawerToggle';
 import { ThemeToggle } from './ThemeToggle';
-import { ADMIN_TABS, DASHBOARD_VIEWS, type DashboardView, adminTabsFor } from './admin/tabs';
+import {
+  ADMIN_TABS,
+  DASHBOARD_VIEWS,
+  type DashboardView,
+  PLATFORM_TABS,
+  type PlatformTab,
+  adminTabsFor,
+  platformHref,
+} from './admin/tabs';
 import { Avatar } from './meet/Avatar';
 import { Icon, type IconName } from './ui/Icon';
 
@@ -76,12 +84,15 @@ export async function AppShell(props: {
           {user.isSuperadmin && (
             <>
               <p className="nav-section">{t('shell.nav.platform')}</p>
-              <NavLink
-                href="/superadmin"
-                icon="apartment"
-                label={t('shell.nav.organizations')}
-                active={active === 'superadmin'}
-              />
+              {(Object.keys(PLATFORM_TABS) as PlatformTab[]).map((tab) => (
+                <NavLink
+                  key={tab}
+                  href={platformHref(tab)}
+                  icon={PLATFORM_TABS[tab].icon}
+                  label={t(PLATFORM_TABS[tab].label)}
+                  active={active === `superadmin:${tab}`}
+                />
+              ))}
             </>
           )}
         </nav>

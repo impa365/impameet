@@ -16,7 +16,10 @@ export interface TenantOverview {
   name: string;
   status: 'active' | 'suspended';
   plan: string;
+  /** In force: the plan's, with this organization's own changes on top. */
   limits: TenantLimits;
+  /** Some limit differs from the plan's (set by a super admin). */
+  customLimits: boolean;
   users: number;
   rooms: number;
   domains: number;
@@ -31,7 +34,14 @@ export async function listTenants(sql: Sql, actor: SessionUser | null): Promise<
            (select count(*)::int from rooms r where r.tenant_id = t.id) as rooms,
            (select count(*)::int from tenant_domains d where d.tenant_id = t.id) as domains
     from tenants t order by t.created_at desc limit 5000`;
-  return rows.map(({ overrides, ...t }) => ({ ...t, limits: effectiveLimits(t.plan, overrides) }));
+  return rows.map(({ overrides, ...t }) => {
+    const parsed = limitOverrides.safeParse(overrides ?? {});
+    return {
+      ...t,
+      limits: effectiveLimits(t.plan, overrides),
+      customLimits: parsed.success && Object.keys(parsed.data).length > 0,
+    };
+  });
 }
 
 export async function updateTenant(

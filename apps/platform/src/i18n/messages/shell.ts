@@ -10,6 +10,12 @@ export default defineMessages(
       meetings: 'Reuniões',
       administration: 'Administração',
       platform: 'Plataforma',
+      platformTabs: {
+        overview: 'Visão geral',
+        organizations: 'Organizações',
+        email: 'E-mail da plataforma',
+        google: 'Google (Drive e YouTube)',
+      },
       organizations: 'Organizações',
       views: {
         rooms: 'Salas',
@@ -90,6 +96,12 @@ export default defineMessages(
         meetings: 'Meetings',
         administration: 'Administration',
         platform: 'Platform',
+        platformTabs: {
+          overview: 'Overview',
+          organizations: 'Organizations',
+          email: 'Platform e-mail',
+          google: 'Google (Drive and YouTube)',
+        },
         organizations: 'Organizations',
         views: {
           rooms: 'Rooms',
@@ -169,6 +181,12 @@ export default defineMessages(
         meetings: 'Reuniones',
         administration: 'Administración',
         platform: 'Plataforma',
+        platformTabs: {
+          overview: 'Resumen',
+          organizations: 'Organizaciones',
+          email: 'Correo de la plataforma',
+          google: 'Google (Drive y YouTube)',
+        },
         organizations: 'Organizaciones',
         views: {
           rooms: 'Salas',
