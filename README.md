@@ -17,8 +17,9 @@ Open source, auto-hospedada e pronta para Docker Swarm e Portainer.
 [Instalação](#instalação-em-10-minutos) ·
 [Arquitetura](#arquitetura) ·
 [Desenvolvimento](#desenvolvimento) ·
-[Apoie o projeto](#apoie-o-projeto) ·
-[English](README.en.md)
+[Apoie o projeto](#apoie-o-projeto)
+
+**Português** · [English](README.en.md) · [Español](README.es.md)
 
 <img src="docs/assets/room.png" alt="Sala de reunião do IMPA Meet no estilo Google Meet" width="900">
 
@@ -44,7 +45,24 @@ empresas.
 - Chat, reações, levantar a mão, **legendas ao vivo** e transcrição salva.
 - **Gravação** em MP4 (LiveKit Egress), **quadro branco** colaborativo (Excalidraw),
   **enquetes** e **salas paralelas** (breakout rooms).
-- Agendamento com convite por e-mail e arquivo de calendário (`.ics`).
+- **Moderação**: o organizador promove moderadores durante a reunião (silenciar, remover,
+  controles da reunião).
+- Agendamento com convite por e-mail, arquivo de calendário (`.ics`) e **Google Agenda**: cada
+  pessoa conecta a própria agenda, a reunião entra lá com o link e o Google convida os
+  convidados.
+
+### Estúdio e transmissões ao vivo
+- **Estúdio no estilo StreamYard**: palco e bastidores, levar e tirar pessoas do palco, layouts
+  (uma pessoa, grade, destaque, tela + pessoas, tela cheia), tela compartilhada no palco, nomes,
+  **banners** (faixa ou letreiro) e a sua marca (cores e logo).
+- **Transmissão ao vivo** para o **YouTube** (conectando a conta: a live é criada sozinha, sem
+  copiar chave) e para **qualquer servidor RTMP** (Facebook, Instagram, Twitch, LinkedIn...),
+  com **até 5 destinos ao mesmo tempo**.
+- A gravação e a live de um estúdio saem exatamente como o palco aparece.
+
+### Gravações na nuvem
+- As gravações vão sozinhas para um **S3 ou compatível** (Amazon S3, Cloudflare R2, Wasabi,
+  Backblaze B2, MinIO) ou para uma pasta do **Google Drive**, com ou sem cópia no servidor.
 
 ### Assistentes de IA
 - Até **4 assistentes por sala**, cada um com a sua persona, base de conhecimento e voz.
@@ -71,15 +89,25 @@ empresas.
 - **Várias organizações** na mesma instalação, cada uma com marca, cores, logo e idioma padrão.
 - **Domínio próprio por organização**, com certificado HTTPS automático (Traefik + Let's
   Encrypt).
-- Painel de **administração** (usuários, agentes, integrações, salas ao vivo, auditoria) e de
-  **super admin**.
-- Assistente guiado para criar salas.
+- Painel de **administração** (usuários, agentes, integrações, salas ao vivo, armazenamento,
+  transmissões, segurança, auditoria) e área da **plataforma** para o super admin (visão geral,
+  organizações com plano e limites, e-mail e Google).
+- Assistente guiado para criar salas (reunião ou estúdio).
 - Interface em **português, inglês e espanhol**, com tema claro e escuro.
-- **Acessível**: leitores de tela, atalhos de teclado e avisos sonoros.
+
+### Acessibilidade
+- Leitores de tela (NVDA, JAWS, VoiceOver, TalkBack), atalhos de teclado e avisos sonoros.
+- **Entrada assistida por voz**: a plataforma pergunta o nome, confirma com sim ou não, informa
+  o microfone e a câmera e só entra depois de uma confirmação final.
+- **Assistente de voz local** ("Star", com nome configurável): liga e desliga microfone e câmera
+  por comandos simples, com regras fixas e sem IA, e nunca grava o áudio.
 
 ### Segurança
 - Segredos como **Docker Swarm secrets**: nunca em arquivo, variável de ambiente ou log.
-- Chaves dos provedores salvas no banco com **AES-256-GCM**.
+- Chaves dos provedores, de armazenamento e de transmissão, e acessos ao Google, salvos no banco
+  com **AES-256-GCM**; nunca voltam para a tela.
+- Integrações com o Google por OAuth com PKCE, pedindo só a permissão necessária para cada uso.
+- Verificação em duas etapas (aplicativo autenticador, e-mail e passkeys).
 - Redes overlay criptografadas e isoladas por função.
 - Containers somente leitura e sem capabilities.
 - Imagens testadas e varridas (Trivy) a cada versão.
@@ -106,7 +134,7 @@ empresas.
 ## Instalação em 10 minutos
 
 ### Requisitos
-- Servidor Linux com **Docker Swarm** (4 vCPU e 8 GB de RAM para começar; gravação e
+- Servidor Linux com **Docker Swarm** (4 vCPU e 8 GB de RAM para começar; gravação, lives e
   compartilhamento de tela pela IA pedem mais).
 - **Traefik** com Let's Encrypt numa rede overlay externa, como na maioria das instalações
   com Portainer.
@@ -156,7 +184,8 @@ bash deploy/scripts/deploy.sh
 3. Em **Admin → Agentes de IA**, escolha o modelo, a transcrição e pelo menos uma voz.
 4. Clique em **Nova sala** e marque os assistentes que vão participar.
 
-O guia completo cobre domínios próprios, e-mail, atualização, backup e solução de problemas:
+O guia completo cobre domínios próprios, e-mail, Google (Drive, YouTube e Agenda), atualização,
+backup e solução de problemas:
 **[docs/deploy.md](docs/deploy.md)**.
 
 ## Arquitetura
@@ -175,7 +204,9 @@ flowchart LR
     agent -. chat .-> llm([LLM compatível com OpenAI])
     agent --> screen["screen<br/>navegador da IA"]
     screen -- compartilhamento de tela --> livekit
-    livekit --- redis[(Redis)] --- egress["egress<br/>gravação MP4"]
+    livekit --- redis[(Redis)] --- egress["egress<br/>gravação MP4 e lives RTMP"]
+    platform -. "Drive, YouTube, Agenda" .-> google([Google])
+    platform -. gravações .-> s3([S3 compatível])
 ```
 
 | Serviço | Pasta | Tecnologia |
