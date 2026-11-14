@@ -1,3 +1,4 @@
+import { finishCalendar } from '@/server/calendar/service';
 import { db } from '@/server/db';
 import { clientIp, handle } from '@/server/http';
 import { liveDeps } from '@/server/live/client';
@@ -20,10 +21,13 @@ export async function GET(req: Request): Promise<Response> {
       code: url.searchParams.get('code'),
       error: url.searchParams.get('error'),
     };
+    const purpose = await oauthPurpose(db(), params.state);
     const back =
-      (await oauthPurpose(db(), params.state)) === 'youtube'
+      purpose === 'youtube'
         ? await finishYoutube(liveDeps(), params, clientIp(req))
-        : await finishDrive(storageDeps(), params, clientIp(req));
+        : purpose === 'calendar'
+          ? await finishCalendar(storageDeps(), params, clientIp(req))
+          : await finishDrive(storageDeps(), params, clientIp(req));
     return new Response(null, {
       status: 303,
       headers: { location: back, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' },

@@ -13,6 +13,7 @@ import studio from './studio';
 import live from './live';
 import voice from './voice';
 import platform from './platform';
+import calendar from './calendar';
 
 const NAMESPACES = {
   common,
@@ -28,6 +29,7 @@ const NAMESPACES = {
   live,
   voice,
   platform,
+  calendar,
 };
 
 /** The Portuguese tree: the reference every translation is checked against. */

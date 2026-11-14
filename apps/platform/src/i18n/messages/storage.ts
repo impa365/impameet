@@ -84,7 +84,7 @@ export default defineMessages(
     step1:
       'Entre em console.cloud.google.com com a conta da empresa (de preferência com verificação em duas etapas) e crie um projeto, por exemplo "IMPA Meet".',
     step2:
-      'Em "APIs e serviços" → "Biblioteca", ative a "Google Drive API" (gravações no Drive) e a "YouTube Data API v3" (lives no YouTube).',
+      'Em "APIs e serviços" → "Biblioteca", ative a "Google Drive API" (gravações no Drive), a "YouTube Data API v3" (lives no YouTube) e a "Google Calendar API" (reuniões no Google Agenda).',
     step3:
       'Em "Google Auth Platform" (tela de consentimento OAuth), escolha o público "Externo" e preencha nome do app, e-mail de suporte e e-mail do desenvolvedor.',
     step4:
@@ -97,13 +97,13 @@ export default defineMessages(
     step8:
       'Em "Público", clique em "Publicar app". Enquanto o app fica "Em teste", só os e-mails adicionados como testadores conseguem conectar, e o Google desconecta a cada 7 dias.',
     step9:
-      'Lives no YouTube: em "Acesso a dados", adicione também o escopo .../auth/youtube. Ele é "sensível": com o app publicado, o Google pede uma verificação gratuita do app; até ela sair, adicione como testadores os e-mails das contas dos canais. Cada canal precisa ter as lives ativadas no YouTube Studio (na primeira vez o YouTube pode levar até 24 horas).',
+      'Lives no YouTube e Google Agenda: em "Acesso a dados", adicione também os escopos .../auth/youtube e .../auth/calendar.events. Eles são "sensíveis": com o app publicado, o Google pede uma verificação gratuita do app; até ela sair, adicione como testadores os e-mails das contas dos canais. Cada canal precisa ter as lives ativadas no YouTube Studio (na primeira vez o YouTube pode levar até 24 horas).',
     securityTitle: 'Segurança',
     security1:
       'Nunca envie o Client Secret por mensagem. Se ele vazar, crie um novo secret no Google Cloud Console, cole aqui e apague o antigo lá.',
     security2: 'Deixe só pessoas de confiança como donas ou editoras do projeto no Google Cloud.',
     security3:
-      'A plataforma pede só o necessário (drive.file para gravações, youtube só para quem conectar um canal), usa PKCE e um código de uso único que vale 10 minutos, e cada organização pode desconectar quando quiser (o acesso é revogado no Google).',
+      'A plataforma pede só o necessário (drive.file para gravações, youtube só para quem conectar um canal, calendar.events só para quem conectar a própria agenda), usa PKCE e um código de uso único que vale 10 minutos, e cada organização pode desconectar quando quiser (o acesso é revogado no Google).',
     inDrive: 'No Google Drive',
     inS3: 'No armazenamento S3',
     uploading: 'Enviando…',
@@ -196,7 +196,7 @@ export default defineMessages(
       step1:
         'Sign in to console.cloud.google.com with the company account (ideally with two-step verification) and create a project, e.g. "IMPA Meet".',
       step2:
-        'In "APIs & Services" → "Library", enable the "Google Drive API" (recordings in Drive) and the "YouTube Data API v3" (YouTube live streams).',
+        'In "APIs & Services" → "Library", enable the "Google Drive API" (recordings in Drive), the "YouTube Data API v3" (YouTube live streams) and the "Google Calendar API" (meetings in Google Calendar).',
       step3:
         'In "Google Auth Platform" (OAuth consent screen), choose the "External" audience and fill in the app name, support e-mail and developer e-mail.',
       step4:
@@ -209,13 +209,13 @@ export default defineMessages(
       step8:
         'In "Audience", click "Publish app". While the app is "Testing", only e-mails added as testers can connect, and Google disconnects them every 7 days.',
       step9:
-        'YouTube live streams: in "Data access", also add the scope .../auth/youtube. It is "sensitive": once the app is published, Google asks for a free app verification; until then, add the channel accounts’ e-mails as testers. Each channel must have live streaming enabled in YouTube Studio (the first time YouTube may take up to 24 hours).',
+        'YouTube live streams and Google Calendar: in "Data access", also add the scopes .../auth/youtube and .../auth/calendar.events. They are "sensitive": once the app is published, Google asks for a free app verification; until then, add the channel accounts’ e-mails as testers. Each channel must have live streaming enabled in YouTube Studio (the first time YouTube may take up to 24 hours).',
       securityTitle: 'Security',
       security1:
         'Never send the Client Secret in a message. If it leaks, create a new secret in the Google Cloud Console, paste it here and delete the old one there.',
       security2: 'Keep only trusted people as owners or editors of the Google Cloud project.',
       security3:
-        'The platform asks only for what it needs (drive.file for recordings, youtube only for whoever connects a channel), uses PKCE and a one-time code valid for 10 minutes, and each organization can disconnect at any time (access is revoked at Google).',
+        'The platform asks only for what it needs (drive.file for recordings, youtube only for whoever connects a channel, calendar.events only for whoever connects their own calendar), uses PKCE and a one-time code valid for 10 minutes, and each organization can disconnect at any time (access is revoked at Google).',
       inDrive: 'In Google Drive',
       inS3: 'In S3 storage',
       uploading: 'Uploading…',
@@ -307,7 +307,7 @@ export default defineMessages(
       step1:
         'Entra en console.cloud.google.com con la cuenta de la empresa (idealmente con verificación en dos pasos) y crea un proyecto, por ejemplo "IMPA Meet".',
       step2:
-        'En "APIs y servicios" → "Biblioteca", activa la "Google Drive API" (grabaciones en Drive) y la "YouTube Data API v3" (directos en YouTube).',
+        'En "APIs y servicios" → "Biblioteca", activa la "Google Drive API" (grabaciones en Drive), la "YouTube Data API v3" (directos en YouTube) y la "Google Calendar API" (reuniones en Google Calendar).',
       step3:
         'En "Google Auth Platform" (pantalla de consentimiento OAuth), elige el público "Externo" y completa el nombre de la app, el correo de soporte y el del desarrollador.',
       step4:
@@ -320,14 +320,14 @@ export default defineMessages(
       step8:
         'En "Público", haz clic en "Publicar app". Mientras la app esté "En prueba", solo los correos agregados como testers pueden conectar, y Google los desconecta cada 7 días.',
       step9:
-        'Directos en YouTube: en "Acceso a datos", añade también el alcance .../auth/youtube. Es "sensible": con la app publicada, Google pide una verificación gratuita de la app; hasta entonces, añade como testers los correos de las cuentas de los canales. Cada canal debe tener los directos activados en YouTube Studio (la primera vez YouTube puede tardar hasta 24 horas).',
+        'Directos en YouTube y Google Calendar: en "Acceso a datos", añade también los alcances .../auth/youtube y .../auth/calendar.events. Son "sensibles": con la app publicada, Google pide una verificación gratuita de la app; hasta entonces, añade como testers los correos de las cuentas de los canales. Cada canal debe tener los directos activados en YouTube Studio (la primera vez YouTube puede tardar hasta 24 horas).',
       securityTitle: 'Seguridad',
       security1:
         'Nunca envíes el Client Secret por mensaje. Si se filtra, crea un secret nuevo en Google Cloud Console, pégalo aquí y borra el antiguo allí.',
       security2:
         'Deja solo a personas de confianza como propietarias o editoras del proyecto de Google Cloud.',
       security3:
-        'La plataforma pide solo lo necesario (drive.file para grabaciones, youtube solo para quien conecte un canal), usa PKCE y un código de un solo uso válido por 10 minutos, y cada organización puede desconectar cuando quiera (el acceso se revoca en Google).',
+        'La plataforma pide solo lo necesario (drive.file para grabaciones, youtube solo para quien conecte un canal, calendar.events solo para quien conecte su propio calendario), usa PKCE y un código de un solo uso válido por 10 minutos, y cada organización puede desconectar cuando quiera (el acceso se revoca en Google).',
       inDrive: 'En Google Drive',
       inS3: 'En el almacenamiento S3',
       uploading: 'Subiendo…',

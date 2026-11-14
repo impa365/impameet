@@ -18,12 +18,16 @@ export interface Meeting {
   createdBy: string | null;
   createdByName: string | null;
   createdByEmail: string | null;
+  /** In the organizer's Google Calendar, or why it could not be put there. */
+  inGoogleCalendar: boolean;
+  googleError: string | null;
 }
 
 const COLUMNS = (sql: Sql) => sql`
   m.id, r.slug as "roomSlug", r.name as "roomName", m.title, m.description,
   m.starts_at as "startsAt", m.duration_min as "durationMin", m.invitees,
-  m.created_by as "createdBy", u.name as "createdByName", u.email as "createdByEmail"`;
+  m.created_by as "createdBy", u.name as "createdByName", u.email as "createdByEmail",
+  (m.google_event_id is not null) as "inGoogleCalendar", m.google_error as "googleError"`;
 
 /** Grace so a meeting "starting now" can still be scheduled from a slow form. */
 const PAST_GRACE_MS = 5 * 60_000;
@@ -87,10 +91,12 @@ export async function cancelMeeting(
   user: SessionUser,
   id: string,
   ip: string | null,
-): Promise<void> {
+): Promise<{ googleEventId: string | null; googleUserId: string | null }> {
   const meeting = await findVisibleMeeting(sql, user, id);
   if (!canManageAllRooms(user) && meeting.createdBy !== user.id) throw forbidden();
-  await sql`delete from meetings where id = ${id}`;
+  const [link] = await sql<{ googleEventId: string | null; googleUserId: string | null }[]>`
+    delete from meetings where id = ${id}
+    returning google_event_id as "googleEventId", google_user_id as "googleUserId"`;
   await audit(sql, {
     tenantId: user.tenantId,
     actorId: user.id,
@@ -98,4 +104,5 @@ export async function cancelMeeting(
     target: meeting.roomSlug,
     ip,
   });
+  return link ?? { googleEventId: null, googleUserId: null };
 }

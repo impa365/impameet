@@ -1,7 +1,7 @@
 'use client';
 
 import { type FormEvent, useState } from 'react';
-import { useLocale, useT } from '@/i18n/client';
+import { serverMessage, useLocale, useT } from '@/i18n/client';
 import { ApiError, api } from './api';
 import { messageOf, useLoad } from './admin/useLoad';
 import { EmptyState, Loading } from './ui/EmptyState';
@@ -15,7 +15,11 @@ interface Meeting {
   durationMin: number;
   invitees: string[];
   url: string;
+  inGoogleCalendar: boolean;
+  googleError: string | null;
 }
+
+type CalendarSync = { status: 'off' } | { status: 'synced' } | { status: 'failed'; error: string };
 
 function defaultStart(): string {
   const d = new Date(Date.now() + 60 * 60_000);
@@ -27,9 +31,11 @@ function defaultStart(): string {
 export function MeetingsPanel({ rooms }: { rooms: { slug: string; name: string }[] }) {
   const t = useT();
   const locale = useLocale();
-  const { data, error, setError, reload } = useLoad<{ mailEnabled: boolean; meetings: Meeting[] }>(
-    '/api/meetings',
-  );
+  const { data, error, setError, reload } = useLoad<{
+    mailEnabled: boolean;
+    calendarConnected: boolean;
+    meetings: Meeting[];
+  }>('/api/meetings');
   const [open, setOpen] = useState(false);
   const [roomSlug, setRoomSlug] = useState(rooms[0]?.slug ?? '');
   const [title, setTitle] = useState('');
@@ -65,7 +71,11 @@ export function MeetingsPanel({ rooms }: { rooms: { slug: string; name: string }
     setError('');
     setResult('');
     try {
-      const res = await api<{ inviteText: string; mail: { sent: number; failed: number } }>('/api/meetings', {
+      const res = await api<{
+        inviteText: string;
+        mail: { sent: number; failed: number };
+        calendar: CalendarSync;
+      }>('/api/meetings', {
         body: {
           roomSlug,
           title,
@@ -80,13 +90,18 @@ export function MeetingsPanel({ rooms }: { rooms: { slug: string; name: string }
       });
       setInvite(res.inviteText);
       const { sent, failed } = res.mail;
-      setResult(
-        failed
-          ? t('dashboard.meetings.mailPartial', { sent, failed })
-          : sent
-            ? t('dashboard.meetings.mailSent', { count: sent })
-            : t('dashboard.meetings.scheduled'),
-      );
+      const mailLine = failed
+        ? t('dashboard.meetings.mailPartial', { sent, failed })
+        : sent
+          ? t('dashboard.meetings.mailSent', { count: sent })
+          : t('dashboard.meetings.scheduled');
+      const calendarLine =
+        res.calendar.status === 'synced'
+          ? t('calendar.scheduledSynced')
+          : res.calendar.status === 'failed'
+            ? t('calendar.scheduledFailed', { error: serverMessage(res.calendar.error) })
+            : '';
+      setResult([mailLine, calendarLine].filter(Boolean).join(' '));
       setTitle('');
       setDescription('');
       setInvitees('');
@@ -180,6 +195,15 @@ export function MeetingsPanel({ rooms }: { rooms: { slug: string; name: string }
               {t('dashboard.meetings.noMail')}
             </p>
           )}
+          <p className="muted" style={{ margin: 0 }}>
+            {data?.calendarConnected ? (
+              t('calendar.formConnected')
+            ) : (
+              <>
+                {t('calendar.formNotConnected')} <a href="/account">{t('calendar.formConnectLink')}</a>
+              </>
+            )}
+          </p>
           <button className="btn" disabled={busy}>
             {t('dashboard.meetings.submit')}
           </button>
@@ -226,7 +250,18 @@ export function MeetingsPanel({ rooms }: { rooms: { slug: string; name: string }
               <tr key={m.id}>
                 <td>
                   <strong>{m.title}</strong>
-                  <div className="muted">{m.roomName}</div>
+                  <div className="muted">
+                    {m.roomName}
+                    {m.inGoogleCalendar ? (
+                      <span className="badge primary">{t('calendar.badge')}</span>
+                    ) : (
+                      m.googleError && (
+                        <span className="badge warn" title={serverMessage(m.googleError)}>
+                          {t('calendar.badgeFailed')}
+                        </span>
+                      )
+                    )}
+                  </div>
                 </td>
                 <td>
                   {new Date(m.startsAt).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })} ·{' '}

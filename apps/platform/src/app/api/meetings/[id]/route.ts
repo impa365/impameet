@@ -9,6 +9,8 @@ import { buildIcs } from '@/server/meetings/ics';
 import { inviteEvent, roomUrl } from '@/server/meetings/invite';
 import { cancelMeeting, findVisibleMeeting } from '@/server/meetings/service';
 import { currentTenant } from '@/server/request';
+import { removeMeetingEvent } from '@/server/calendar/service';
+import { storageDeps } from '@/server/storage/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +47,7 @@ export async function DELETE(
 ): Promise<Response> {
   return handle(async () => {
     const user = await writerUser(req);
-    await cancelMeeting(db(), user, await idOf(params), clientIp(req));
-    return json({ ok: true });
+    const link = await cancelMeeting(db(), user, await idOf(params), clientIp(req));
+    return json({ ok: true, googleCancelled: await removeMeetingEvent(storageDeps(), link) });
   });
 }

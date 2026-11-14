@@ -78,6 +78,8 @@ describe('invite delivery', () => {
     createdBy: 'u1',
     createdByName: null,
     createdByEmail: null,
+    inGoogleCalendar: false,
+    googleError: null,
   };
 
   it('builds the room link from the request host', () => {

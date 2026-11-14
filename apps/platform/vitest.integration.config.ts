@@ -22,6 +22,7 @@ export default defineConfig({
         'src/server/{auth,rooms,lobby,moderation,users,admin,domains,superadmin,studio}/**/*.ts',
         'src/server/live/{service,youtube}.ts',
         'src/server/room-state.ts',
+        'src/server/calendar/*.ts',
         'src/server/tenants/repo.ts',
         'src/server/audit.ts',
         'src/server/plans.ts',

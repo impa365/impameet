@@ -11,6 +11,8 @@ import { tenantMailer } from '@/server/mail/service';
 import { sendInvites } from '@/server/meetings/mailer';
 import { createMeeting, listMeetings } from '@/server/meetings/service';
 import { currentTenant } from '@/server/request';
+import { addMeetingEvent, getCalendar } from '@/server/calendar/service';
+import { storageDeps } from '@/server/storage/client';
 import { meetingInput } from '@/server/validation';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +24,7 @@ export async function GET(req: Request): Promise<Response> {
     const secure = config().secureCookies;
     return json({
       mailEnabled: (await tenantMailer(mailDeps(), user.tenantId)) !== null,
+      calendarConnected: (await getCalendar(storageDeps(), user)).connected !== null,
       meetings: meetings.map((m) => ({ ...m, url: roomUrl(req, m.roomSlug, secure) })),
     });
   });
@@ -36,10 +39,27 @@ export async function POST(req: Request): Promise<Response> {
     const meeting = await createMeeting(db(), user, await readJson(req, meetingInput), clientIp(req));
     const url = roomUrl(req, meeting.roomSlug, config().secureCookies);
     const event = inviteEvent(meeting, url, ctx.branding.productName, await getLocale());
+    const calendar = await addMeetingEvent(storageDeps(), user, meeting.id, {
+      title: meeting.title,
+      description: meeting.description,
+      start: meeting.startsAt,
+      durationMin: meeting.durationMin,
+      url,
+      attendees: meeting.invitees,
+      productName: ctx.branding.productName,
+    });
     const mailer = await tenantMailer(mailDeps(), ctx.tenant.id);
     const mail = mailer
       ? await sendInvites(mailer, meeting.invitees, (to) => inviteMail(event, to))
       : { sent: 0, failed: 0 };
-    return json({ meeting: { ...meeting, url }, inviteText: inviteText(event), mail }, 201);
+    return json(
+      {
+        meeting: { ...meeting, url, inGoogleCalendar: calendar.status === 'synced' },
+        inviteText: inviteText(event),
+        mail,
+        calendar,
+      },
+      201,
+    );
   });
 }

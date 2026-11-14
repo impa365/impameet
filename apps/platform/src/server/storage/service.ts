@@ -368,10 +368,13 @@ export async function startDrive(
 }
 
 /** Which "Conectar com Google" a state belongs to (Drive or YouTube), without using it up. */
-export async function oauthPurpose(sql: Sql, state: string | null): Promise<'drive' | 'youtube' | null> {
+export async function oauthPurpose(
+  sql: Sql,
+  state: string | null,
+): Promise<'drive' | 'youtube' | 'calendar' | null> {
   if (!state || state.length > 100) return null;
   const [row] = await sql<
-    { purpose: 'drive' | 'youtube' }[]
+    { purpose: 'drive' | 'youtube' | 'calendar' }[]
   >`select purpose from oauth_states where id = ${state}`;
   return row?.purpose ?? null;
 }
