@@ -38,7 +38,7 @@ function parseSnapshot(raw: string): WorkspaceSnapshot | null {
       plan: Array.isArray(data.plan) ? data.plan.map(String) : [],
       decisions: Array.isArray(data.decisions) ? data.decisions.map(String) : [],
       tasks: Array.isArray(data.tasks)
-        ? data.tasks
+        ? (data.tasks as unknown[])
             .map((t) => {
               const x = (t ?? {}) as Record<string, unknown>;
               return {
