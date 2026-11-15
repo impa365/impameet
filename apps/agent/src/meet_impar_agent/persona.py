@@ -14,6 +14,12 @@ from livekit.agents import Agent, ModelSettings, StopResponse, get_job_context, 
 
 from .bargein import Engagement, should_interrupt
 from .chat import CHAT_INSTRUCTIONS, CHAT_TOPIC
+from .health import (
+    SKIP_MUTED,
+    SKIP_NOT_ADDRESSED,
+    SKIP_PEERS,
+    HealthReporter,
+)
 from .knowledge import KNOWLEDGE_NOTE, KnowledgeClient, knowledge_tools, training_note
 from .languages import guess_language, languages_note, main_language, pick_language, words
 from .listening import is_addressed
@@ -47,8 +53,9 @@ MUTE_INSTRUCTIONS: dict[MutePolicy, str] = {
     "disabled": "",
 }
 MUTED_NOTE = (
-    "\n\nAGORA VOCÊ ESTÁ EM SILÊNCIO: não responda nada. Só chame ativar_voz se pedirem "
-    "para você voltar a falar."
+    "\n\nAGORA VOCÊ ESTÁ EM SILÊNCIO: não fale em voz alta. Suas respostas vão só para o "
+    "chat da reunião (sem áudio). Não chame enviar_no_chat só para repetir o que já vai "
+    "para o chat. Só chame ativar_voz se pedirem para você voltar a falar."
 )
 PEERS_NOTE = (
     "\n\nHÁ OUTROS ASSISTENTES DE IA NESTA REUNIÃO: {peers}. Cada um cuida da sua parte. "
@@ -109,10 +116,12 @@ class VoiceAgent(Agent):
         actions: bool = True,
         hearing: Callable[[Talker, str], None] | None = None,
         knowledge: KnowledgeClient | None = None,
+        health: HealthReporter | None = None,
     ) -> None:
         self._profile = profile
         self._speaker = speaker
         self._on_mute = on_mute
+        self._health = health
         self._handoff = handoff
         self._view_id: str | None = None
         self.muted = False
@@ -136,6 +145,7 @@ class VoiceAgent(Agent):
             tools += self._handoff_tools()
         parts: list[str] = []
         self._knowledge = knowledge
+        tools += self._chat_tools()
         if screen is not None:
             tools += screen_tools(screen, self)
             parts.append(SCREEN_INSTRUCTIONS)
@@ -296,6 +306,14 @@ class VoiceAgent(Agent):
         # each other: each one waits for its name (or for the floor to be handed to it).
         quiet = self.muted or self._profile.respond_mode == "when_named" or bool(self.peers)
         if quiet and not is_addressed(text, self._profile.name, self.peers):
+            if self._health is not None:
+                if self.muted:
+                    code = SKIP_MUTED
+                elif self.peers:
+                    code = SKIP_PEERS
+                else:
+                    code = SKIP_NOT_ADDRESSED
+                self._health.skip(code)
             raise StopResponse()
         if who := self._speaker():
             self._engagement.touch(who.identity)
@@ -464,8 +482,34 @@ class VoiceAgent(Agent):
     async def set_muted(self, muted: bool) -> None:
         self.muted = muted
         await self.update_instructions(self._current_instructions())
+        if self._health is not None:
+            if muted:
+                self._health.skip(SKIP_MUTED)
+            else:
+                self._health.unmuted()
         if self._on_mute is not None:
             await self._on_mute(muted)
+
+    def _chat_tools(self) -> list[llm.FunctionTool[..., Any]]:
+        @llm.function_tool(name="enviar_no_chat")
+        async def send_chat(mensagem: str) -> str:
+            """Envia um texto só no chat da reunião, sem falar em voz alta.
+
+            Use quando pedirem para mandar link, código, lista ou qualquer recado escrito.
+            Não use para repetir o que você acabou de falar (voz e chat são canais separados).
+            """
+            text = (mensagem or "").strip()
+            if not text:
+                return "Nada para enviar: a mensagem estava vazia."
+            if self.muted:
+                return (
+                    "Você já está em silêncio: a sua resposta falada já vai para o chat. "
+                    "Não precisa chamar esta ferramenta agora."
+                )
+            await self.post_text(text[:2000])
+            return "Mensagem enviada só no chat. Não fale essa mensagem em voz alta."
+
+        return [send_chat]
 
     def _mute_tools(self) -> list[llm.FunctionTool[..., Any]]:
         @llm.function_tool(name="silenciar_voz")
@@ -474,7 +518,9 @@ class VoiceAgent(Agent):
             if not self.may_change_mute():
                 return "Só moderadores podem pedir isso. Explique com educação."
             await self.set_muted(True)
-            return "Você está em silêncio agora. Não diga nada."
+            return (
+                "Você está em silêncio agora. Não fale; suas próximas respostas vão só para o chat."
+            )
 
         @llm.function_tool(name="ativar_voz")
         async def unmute() -> str:

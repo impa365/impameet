@@ -26,6 +26,7 @@ from . import redaction, telemetry
 from .captions import MODE_ATTRIBUTE, run_captions
 from .chat import follow_chat
 from .config import Settings, get_settings
+from .health import HealthReporter
 from .insights import (
     COPILOT_TOPIC,
     Copilot,
@@ -52,6 +53,7 @@ from .profile import (
     AgentProfile,
     ListenMode,
     agent_actions,
+    agent_id_from_metadata,
     board_policy,
     display_name,
     job_mode,
@@ -223,6 +225,7 @@ def _build_agent(
     *,
     record: MeetingRecord | None = None,
     knowledge: KnowledgeClient | None = None,
+    health: HealthReporter | None = None,
 ) -> VoiceAgent:
     """Screen sharing tools exist only when the optional screen service is configured."""
 
@@ -267,23 +270,19 @@ def _build_agent(
             else None
         ),
         knowledge=knowledge,
+        health=health,
     )
 
 
-async def entrypoint(ctx: JobContext) -> None:
-    settings = get_settings()
-    redaction.install(settings.secret_values())
-    if job_mode(ctx.job.metadata) == "captions":
-        ctx.log_context_fields = {"room": ctx.room.name, "agent": "captions"}
-        await run_captions(ctx, settings)
-        return
-    profile = await load_profile(settings, ctx.job.metadata)
-    if profile is None:
-        ctx.shutdown(reason="agent not fully configured")
-        return
-    ctx.log_context_fields = {"room": ctx.room.name, "agent": profile.name}
+def _report_rejected(settings: Settings, metadata: str | None, room_name: str) -> None:
+    if settings.platform and (aid := agent_id_from_metadata(metadata)):
+        HealthReporter(
+            platform=settings.platform, agent_id=aid, room_name=room_name
+        ).rejected("config_missing")
 
-    session: AgentSession[None] = AgentSession(
+
+def _voice_session(profile: AgentProfile, vad: Any) -> AgentSession[None]:
+    return AgentSession(
         stt=build_stt(
             profile.stt_provider,
             api_key=profile.stt_api_key or "",
@@ -304,7 +303,7 @@ async def entrypoint(ctx: JobContext) -> None:
             api_key=profile.tts_api_key or "",
             latency=profile.tts_latency,
         ),
-        vad=ctx.proc.userdata["vad"],
+        vad=vad,
         turn_handling=build_turn_handling(),
         conn_options=build_conn_options(profile.llm_timeout_s),
         tts_text_transforms=["filter_emoji", "filter_markdown"],
@@ -313,7 +312,28 @@ async def entrypoint(ctx: JobContext) -> None:
         max_tool_steps=MAX_TOOL_STEPS,
     )
 
-    telemetry.attach(session)
+
+async def entrypoint(ctx: JobContext) -> None:
+    settings = get_settings()
+    redaction.install(settings.secret_values())
+    if job_mode(ctx.job.metadata) == "captions":
+        ctx.log_context_fields = {"room": ctx.room.name, "agent": "captions"}
+        await run_captions(ctx, settings)
+        return
+    profile = await load_profile(settings, ctx.job.metadata)
+    if profile is None:
+        _report_rejected(settings, ctx.job.metadata, ctx.room.name)
+        ctx.shutdown(reason="agent not fully configured")
+        return
+    ctx.log_context_fields = {"room": ctx.room.name, "agent": profile.name}
+
+    health = HealthReporter(
+        platform=settings.platform,
+        agent_id=profile.agent_id,
+        room_name=ctx.room.name,
+    )
+    session = _voice_session(profile, ctx.proc.userdata["vad"])
+    telemetry.attach(session, health)
 
     async def _log_usage() -> None:
         logger.info("session usage: %s", session.usage)
@@ -338,11 +358,14 @@ async def entrypoint(ctx: JobContext) -> None:
         await load_tools(settings, profile, ctx.room.name),
         record=record,
         knowledge=knowledge,
+        health=health,
     )
-    # The room's chat is read by ollow_chat (everyone's messages, not only the linked person's).
+    # The room's chat is read by follow_chat (everyone's messages, not only the linked person's).
     await session.start(
         agent=agent, room=ctx.room, record=False, room_options=room_io.RoomOptions(text_input=False)
     )
+    health.bind(ctx.room.local_participant, session_id=ctx.room.local_participant.identity)
+    health.joined()
     follow_chat(ctx.room, agent.on_chat)
     follow_profile(ctx, settings, agent, knowledge)
     # Lets the platform tell the voice agent apart from captions and the AI screen.
@@ -470,7 +493,12 @@ def follow_record(
     *,
     agent: VoiceAgent | None = None,
 ) -> None:
-    """Who joins and leaves, who is talking, and the agent's own replies (mirrored to chat)."""
+    """Who joins and leaves, who is talking, and what the agent said (for the report).
+
+    Spoken answers are NOT mirrored to chat: voice and chat stay separate. The only
+    automatic chat post is when the agent is muted (it answers in writing instead of
+    speaking). Explicit "send to chat" uses the agent's tool.
+    """
 
     def joined(p: rtc.RemoteParticipant) -> None:
         if p.kind != rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
@@ -490,7 +518,8 @@ def follow_record(
         if not text:
             return
         record.said(agent_name, text)
-        if agent is not None:
+        # Muted → write the answer in chat instead of speaking (TTS is already empty).
+        if agent is not None and agent.muted:
             spawn(agent.post_text(text[:2000]))
 
     session.on("conversation_item_added", said)
@@ -568,7 +597,11 @@ async def on_request(request: JobRequest) -> None:
     of falling back to this worker's settings.
     """
     metadata = request.job.metadata
-    if await load_profile(get_settings(), metadata) is None:
+    settings = get_settings()
+    if await load_profile(settings, metadata) is None:
+        room = getattr(getattr(request.job, "room", None), "name", None) or "unknown"
+        _report_rejected(settings, metadata, str(room)[:200])
+        await asyncio.sleep(0.05)
         await request.reject()
         return
     await request.accept(name=display_name(metadata), attributes=join_attributes(metadata))

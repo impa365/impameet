@@ -24,7 +24,11 @@ MAX_CHAT_CHARS = 2000
 CHAT_INSTRUCTIONS = (
     "Você também lê o chat da reunião. Mensagens escritas chegam no formato "
     "'Nome (papel) no chat: texto'. Quando alguém mandar um link no chat, você pode abri-lo "
-    "na tela se tiver essa ferramenta. Nunca diga que não consegue ler o chat."
+    "na tela se tiver essa ferramenta. Nunca diga que não consegue ler o chat. "
+    "IMPORTANTE: voz e chat são canais separados. O que você fala em voz alta NÃO deve "
+    "aparecer no chat. Só use a ferramenta enviar_no_chat quando pedirem explicitamente "
+    "para mandar algo escrito (link, código, lista, recado). Nunca fale e escreva a mesma "
+    "resposta ao mesmo tempo."
 )
 
 #: Receives the author's identity, display name, room role and the message.

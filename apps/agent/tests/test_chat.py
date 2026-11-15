@@ -115,12 +115,34 @@ async def test_chat_messages_are_answered_with_who_wrote_them(
 ) -> None:
     agent, session, heard = live
     assert CHAT_INSTRUCTIONS in agent.instructions
+    assert "enviar_no_chat" in {t.id for t in agent.tools}
+    assert "canais separados" in agent.instructions or "enviar_no_chat" in agent.instructions
     await agent.on_chat("g-abrantes", "Abrantes", "guest", "Abre esse link: https://youtu.be/xyz")
     session.generate_reply.assert_called_once_with(
         user_input="Abrantes (convidado) no chat: Abre esse link: https://youtu.be/xyz"
     )
     assert heard == [("Abrantes", "[chat] Abre esse link: https://youtu.be/xyz")]
     assert [a.name for a in agent.turn_authors()] == ["Abrantes"]
+
+
+async def test_enviar_no_chat_posts_only_when_not_muted(
+    live: tuple[VoiceAgent, MagicMock, list[tuple[str, str]]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    agent, _, _ = live
+    posted: list[str] = []
+
+    async def fake_post(text: str) -> None:
+        posted.append(text)
+
+    monkeypatch.setattr(agent, "post_text", fake_post)
+    tool = next(t for t in agent.tools if t.info.name == "enviar_no_chat")
+    assert "chat" in (await tool("https://impa365.cloud")).lower()
+    assert posted == ["https://impa365.cloud"]
+    agent.muted = True
+    posted.clear()
+    assert "silêncio" in (await tool("não deve ir")).lower()
+    assert posted == []
 
 
 async def test_a_quiet_agent_only_answers_chat_that_names_it(

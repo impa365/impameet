@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from livekit.agents import AgentSession, llm
 from livekit.agents.voice.events import CloseEvent, ConversationItemAddedEvent, ErrorEvent
+
+if TYPE_CHECKING:
+    from .health import HealthReporter
 
 logger = logging.getLogger("meet_impar_agent.telemetry")
 
@@ -23,7 +26,7 @@ def turn_latency(metrics: Mapping[str, Any]) -> dict[str, float]:
     }
 
 
-def attach(session: AgentSession[Any]) -> None:
+def attach(session: AgentSession[Any], health: HealthReporter | None = None) -> None:
     @session.on("conversation_item_added")
     def _on_item(ev: ConversationItemAddedEvent) -> None:
         item = ev.item
@@ -31,14 +34,19 @@ def attach(session: AgentSession[Any]) -> None:
             latency = turn_latency(item.metrics)
             if latency:
                 logger.info("agent turn", extra={"latency": latency})
+            if health is not None:
+                health.answered()
 
     @session.on("error")
     def _on_error(ev: ErrorEvent) -> None:
-        logger.warning(
-            "pipeline error",
-            extra={"source": type(ev.source).__name__, "error": type(ev.error).__name__},
-        )
+        source = type(ev.source).__name__
+        error = type(ev.error).__name__
+        logger.warning("pipeline error", extra={"source": source, "error": error})
+        if health is not None:
+            health.pipeline_error(source, error)
 
     @session.on("close")
     def _on_close(ev: CloseEvent) -> None:
         logger.info("session closed", extra={"reason": str(ev.reason)})
+        if health is not None:
+            health.left(str(ev.reason)[:40] or "closed")

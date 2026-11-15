@@ -18,8 +18,34 @@ import { useParticipantVolumeOptional } from './ParticipantVolume';
 
 export const HAND_ATTRIBUTE = 'hand';
 export const AGENT_MUTED_ATTRIBUTE = 'impa.muted';
+export const AGENT_HEALTH_ATTRIBUTE = 'impa.health';
+export const AGENT_SKIP_ATTRIBUTE = 'impa.skip';
+export const AGENT_ERR_ATTRIBUTE = 'impa.err';
 
 export { displayName };
+
+function agentChipLabel(
+  t: ReturnType<typeof useT>,
+  attributes: Record<string, string> | undefined,
+  silent: boolean,
+): string {
+  const health = attributes?.[AGENT_HEALTH_ATTRIBUTE];
+  const skip = attributes?.[AGENT_SKIP_ATTRIBUTE];
+  const err = attributes?.[AGENT_ERR_ATTRIBUTE];
+  if (health === 'error' || err) {
+    if (err === 'stt') return t('room.status.aiErrStt');
+    if (err === 'llm') return t('room.status.aiErrLlm');
+    if (err === 'tts') return t('room.status.aiErrTts');
+    return t('room.status.aiError');
+  }
+  if (silent || health === 'silent' || skip) {
+    if (skip === 'not_addressed') return t('room.status.aiWaitName');
+    if (skip === 'peers') return t('room.status.aiWaitPeers');
+    if (skip === 'muted' || silent) return t('room.status.aiSilent');
+    return t('room.status.aiSilent');
+  }
+  return t('room.status.ai');
+}
 
 /** One person (or one shared screen) on the stage, drawn the way Meet draws it. */
 export function MeetTile() {
@@ -34,6 +60,7 @@ export function MeetTile() {
   const label = participant.isLocal ? t('room.nameYou', { name }) : name;
   const agent = participant.isAgent;
   const agentSilent = agent && attributes?.[AGENT_MUTED_ATTRIBUTE] === 'true';
+  const agentChip = agent ? agentChipLabel(t, attributes, !!agentSilent) : '';
   const hand = Boolean(attributes?.[HAND_ATTRIBUTE]);
   const volumes = useParticipantVolumeOptional();
   const localVolume = !participant.isLocal && volumes ? volumes.get(participant.identity) : 1;
@@ -58,7 +85,7 @@ export function MeetTile() {
     ? t('room.tile.presentationOf', { name })
     : [
         label,
-        agent ? (agentSilent ? t('room.tile.aiSilent') : t('room.tile.ai')) : '',
+        agent ? agentChip : '',
         agent ? (attributes?.['impa.about'] ?? '') : '',
         micMuted ? t('room.tile.micOff') : t('room.tile.micOn'),
         speaking && !micMuted ? t('room.tile.speaking') : '',
@@ -98,9 +125,7 @@ export function MeetTile() {
         {hand && <Icon name="back_hand" size={16} className="tile-hand" />}
         {screen && <Icon name="present_to_all" size={16} />}
         {screen ? t('room.tile.presentationOf', { name }) : label}
-        {agent && (
-          <span className="tile-chip">{agentSilent ? t('room.status.aiSilent') : t('room.status.ai')}</span>
-        )}
+        {agent && <span className="tile-chip">{agentChip}</span>}
         {!participant.isLocal && volumePct !== 100 && (
           <span className="tile-chip" title={t('room.volume.tileTip', { n: volumePct })}>
             {volumePct}%

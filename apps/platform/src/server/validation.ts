@@ -924,6 +924,27 @@ export const meetingReportInput = z.object({
   workspace: meetingWorkspaceInput,
 });
 
+/** Voice-agent runtime health (no transcripts). */
+export const agentHealthEventInput = z
+  .object({
+    room: z.string().trim().min(1).max(200),
+    sessionId: z.string().trim().min(1).max(120).optional().nullable(),
+    kind: z.enum([
+      'joined',
+      'left',
+      'rejected',
+      'pipeline_error',
+      'skipped_reply',
+      'muted',
+      'unmuted',
+      'answered',
+    ]),
+    code: z.string().trim().min(1).max(40),
+    source: z.string().trim().min(1).max(40).optional().nullable(),
+    detail: z.string().trim().max(200).optional().nullable(),
+  })
+  .strict();
+
 export const reportAskInput = z.object({
   question: z.string().trim().min(1, 'Escreva a pergunta').max(1000),
 });

@@ -13,6 +13,7 @@ import {
 import { Icon, type IconName } from '../ui/Icon';
 import { api } from '../api';
 import { AgentExamples } from './AgentExamples';
+import { AgentHealthPanel } from './AgentHealth';
 import { AgentTools } from './AgentTools';
 import type { Integration } from './IntegrationsTab';
 import { messageOf, useLoad } from './useLoad';
@@ -179,6 +180,7 @@ const AGENT_SECTIONS = [
   ['agent-brain', 'admin.agents.sectionBrainVoice', 'psychology', 'admin.agents.hintBrain'],
   ['agent-instructions', 'admin.agents.sectionInstructions', 'description', 'admin.agents.hintInstructions'],
   ['agent-behavior', 'admin.agents.sectionBehavior', 'tune', 'admin.agents.hintBehavior'],
+  ['agent-health', 'admin.agents.sectionHealth', 'sensors', 'admin.agents.hintHealth'],
   ['agent-moderation', 'admin.agents.moderationLegend', 'shield', 'admin.agents.hintModeration'],
   ['agent-insights', 'admin.agents.insightsLegend', 'summarize', 'admin.agents.hintInsights'],
   ['agent-perception', 'admin.agents.perceptionLegend', 'visibility', 'admin.agents.hintPerception'],
@@ -405,25 +407,25 @@ export function AgentsTab() {
     return (
       <div className="settings">
         <nav className="settings-nav" aria-label={t('admin.agents.sections')}>
-          {AGENT_SECTIONS.filter(([id]) => !(isNew && id === 'agent-tools-section')).map(
-            ([id, label, icon, hint]) => (
-              <button
-                key={id}
-                type="button"
-                aria-current={section === id ? 'page' : undefined}
-                onClick={() => {
-                  setSection(id);
-                  window.scrollTo({ top: 0 });
-                }}
-              >
-                <Icon name={icon} size={18} />
-                <span>
-                  {t(label)}
-                  <small>{t(hint)}</small>
-                </span>
-              </button>
-            ),
-          )}
+          {AGENT_SECTIONS.filter(
+            ([id]) => !(isNew && (id === 'agent-tools-section' || id === 'agent-health')),
+          ).map(([id, label, icon, hint]) => (
+            <button
+              key={id}
+              type="button"
+              aria-current={section === id ? 'page' : undefined}
+              onClick={() => {
+                setSection(id);
+                window.scrollTo({ top: 0 });
+              }}
+            >
+              <Icon name={icon} size={18} />
+              <span>
+                {t(label)}
+                <small>{t(hint)}</small>
+              </span>
+            </button>
+          ))}
         </nav>
         <div className="settings-body">
           <div className="settings-head">
@@ -744,6 +746,22 @@ export function AgentsTab() {
                 </span>
               </label>
             </section>
+
+            {!isNew && editing && (
+              <section
+                id="agent-health"
+                hidden={section !== 'agent-health'}
+                className="settings-section"
+                aria-labelledby="agent-health-h"
+              >
+                <SectionHead
+                  id="agent-health-h"
+                  title={t('admin.agents.sectionHealth')}
+                  hint={t('admin.agents.healthIntro')}
+                />
+                <AgentHealthPanel agentId={editing} locale={locale} />
+              </section>
+            )}
 
             <section
               id="agent-behavior"
