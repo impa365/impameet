@@ -140,6 +140,8 @@ export function MeetingRoom(props: {
     () => ({
       adaptiveStream: true,
       dynacast: true,
+      // Gain above 1.0 (boost a quiet mic for this listener only) needs the Web Audio path.
+      webAudioMix: true,
       videoCaptureDefaults: {
         deviceId: choices?.videoDeviceId || undefined,
         resolution: VideoPresets.h720.resolution,

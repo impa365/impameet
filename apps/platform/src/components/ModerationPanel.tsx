@@ -1,9 +1,11 @@
 'use client';
 
+import { useLocalParticipant } from '@livekit/components-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '@/i18n/client';
 import { ApiError, api } from './api';
 import { Avatar } from './meet/Avatar';
+import { PersonVolumeControl } from './meet/ParticipantVolume';
 import { displayName } from './meet/MeetTile';
 import { Icon } from './ui/Icon';
 
@@ -45,6 +47,7 @@ export function ModerationView({
   fallback: ReactNode;
 }) {
   const t = useT();
+  const { localParticipant } = useLocalParticipant();
   const base = `/api/rooms/${encodeURIComponent(slug)}`;
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState('');
@@ -126,6 +129,7 @@ export function ModerationView({
                 {t('room.moderation.muteAll')}
               </button>
             </div>
+            <p className="muted small-print">{t('room.volume.hint')}</p>
             {state.participants
               .map((raw) => ({ ...raw, name: displayName(raw, t('room.aiAssistant')) }))
               .map((p) => (
@@ -144,6 +148,9 @@ export function ModerationView({
                     </small>
                   </span>
                   <span className="person-actions">
+                    {p.identity !== localParticipant.identity && (
+                      <PersonVolumeControl identity={p.identity} name={p.name} />
+                    )}
                     {p.handRaised && <Icon name="back_hand" size={20} className="person-hand" />}
                     {p.audioMuted ? (
                       <span className="icon-btn ghost" title={t('room.status.micOff')}>

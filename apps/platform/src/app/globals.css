@@ -2407,6 +2407,34 @@ code.record {
   gap: 2px;
 }
 
+.person-volume {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.person-volume-slider {
+  display: flex;
+  align-items: center;
+  width: 88px;
+  max-width: 22vw;
+}
+
+.person-volume-slider input[type='range'] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--brand, #1a73e8);
+}
+
+.person-volume-value {
+  min-width: 2.75rem;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
 .person-hand {
   color: #e37400;
 }

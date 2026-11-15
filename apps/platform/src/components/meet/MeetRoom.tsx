@@ -44,6 +44,7 @@ import { MeetBar, type MoreItem, type PanelId } from './MeetBar';
 import { type Activity, ActivitiesView, InfoView, PeopleList, SidePanel } from './MeetPanels';
 import { MeetStage } from './MeetStage';
 import { MeetingControls } from './MeetingControls';
+import { ParticipantVolumeProvider } from './ParticipantVolume';
 import { AGENT_MUTED_ATTRIBUTE, HAND_ATTRIBUTE, displayName } from './MeetTile';
 import { useRecording } from './useRecording';
 
@@ -655,187 +656,189 @@ export function MeetRoom(props: {
   ];
 
   return (
-    <div className={prefs.largeCaptions ? 'meet theme-dark big-captions' : 'meet theme-dark'}>
-      <a className="skip-link" href="#meet-controls">
-        {t('room.stage.skipToControls')}
-      </a>
-      <LiveRegions polite={polite} urgent={urgent} />
-      <div className="meet-body">
-        <main className="meet-main" aria-label={t('room.stage.participants')}>
-          {props.studio ? (
-            <StudioMain
-              producer={isModerator}
-              control={studio}
-              onPanel={() => openPanel('studio')}
-              onLive={live.view?.canLive || live.live ? () => openPanel('live') : undefined}
-              onAir={live.live !== null}
-              onError={notify}
-            />
-          ) : (
-            <MeetStage />
-          )}
-          {boardOpen && (
-            <div className="meet-board">
-              <WhiteboardPanel board={board} readOnly={!canDraw} onClose={() => setBoardOpen(false)} />
-            </div>
-          )}
-          <div className="meet-chips">
-            {live.live && (
-              <span className="chip-rec">
-                <span className="rec-dot" aria-hidden /> {t('live.chip')}
-              </span>
-            )}
-            {recording.recording && recording.phase !== 'idle' ? (
-              <span className="chip-rec">
-                <span className="rec-dot" aria-hidden /> {t('room.stage.recording')}
-              </span>
-            ) : recording.recording ? (
-              <span className="chip-soft">{t('room.stage.recordingFinishing')}</span>
+    <ParticipantVolumeProvider>
+      <div className={prefs.largeCaptions ? 'meet theme-dark big-captions' : 'meet theme-dark'}>
+        <a className="skip-link" href="#meet-controls">
+          {t('room.stage.skipToControls')}
+        </a>
+        <LiveRegions polite={polite} urgent={urgent} />
+        <div className="meet-body">
+          <main className="meet-main" aria-label={t('room.stage.participants')}>
+            {props.studio ? (
+              <StudioMain
+                producer={isModerator}
+                control={studio}
+                onPanel={() => openPanel('studio')}
+                onLive={live.view?.canLive || live.live ? () => openPanel('live') : undefined}
+                onAir={live.live !== null}
+                onError={notify}
+              />
             ) : (
-              recording.phase === 'starting' && (
-                <span className="chip-soft" role="status">
-                  <span className="rec-dot" aria-hidden /> {t('room.stage.recordingStarting')}
+              <MeetStage />
+            )}
+            {boardOpen && (
+              <div className="meet-board">
+                <WhiteboardPanel board={board} readOnly={!canDraw} onClose={() => setBoardOpen(false)} />
+              </div>
+            )}
+            <div className="meet-chips">
+              {live.live && (
+                <span className="chip-rec">
+                  <span className="rec-dot" aria-hidden /> {t('live.chip')}
                 </span>
-              )
-            )}
-            {captionerRunning && <span className="chip-soft">{t('room.stage.transcribing')}</span>}
-            {voice === 'listening' && (
-              <span className="chip-soft" title={t('voice.enableHelp')}>
-                <Icon name="record_voice_over" size={16} /> {t('voice.chip', { name: prefs.wakeWord })}
-              </span>
-            )}
-            {aiSilent && (
-              <span className="chip-soft" title={t('room.stage.aiSilentTip')}>
-                <Icon name="smart_toy" size={16} />{' '}
-                {t('room.status.aiSilentNamed', { name: silentAgents.join(', ') })}
-              </span>
-            )}
-            {raised.length > 0 && (
-              <span className="chip-soft">
-                <Icon name="back_hand" size={16} /> {raised.join(', ')}
-              </span>
-            )}
-          </div>
-          {captionsShown && <CaptionsOverlay captions={captions} />}
-          <div className="reactions" aria-hidden>
-            {reactions.map((r) => (
-              <span key={r.key} className="reaction">
-                <span className="reaction-emoji">{r.emoji}</span>
-                <small>{r.from}</small>
-              </span>
-            ))}
-          </div>
-        </main>
-
-        <SidePanel panel={panel} onPanel={openPanel} theme={surface}>
-          <ChatView visible={panel === 'chat'} onCount={setChatCount} onIncoming={onIncomingChat} />
-          {panel === 'info' && (
-            <InfoView
-              roomName={props.roomName}
-              breakout={props.breakout}
-              copied={copied}
-              onCopy={() => void copyInvite()}
-            />
-          )}
-          {panel === 'people' && (
-            <div className="meet-panel-body">
-              <button className="btn tonal" onClick={() => void copyInvite()}>
-                <Icon name="link" size={20} />
-                {t('room.stage.copyInviteLink')}
-              </button>
-              {isModerator ? (
-                <ModerationView slug={props.slug} token={props.token} fallback={<PeopleList />} />
+              )}
+              {recording.recording && recording.phase !== 'idle' ? (
+                <span className="chip-rec">
+                  <span className="rec-dot" aria-hidden /> {t('room.stage.recording')}
+                </span>
+              ) : recording.recording ? (
+                <span className="chip-soft">{t('room.stage.recordingFinishing')}</span>
               ) : (
-                <PeopleList />
+                recording.phase === 'starting' && (
+                  <span className="chip-soft" role="status">
+                    <span className="rec-dot" aria-hidden /> {t('room.stage.recordingStarting')}
+                  </span>
+                )
+              )}
+              {captionerRunning && <span className="chip-soft">{t('room.stage.transcribing')}</span>}
+              {voice === 'listening' && (
+                <span className="chip-soft" title={t('voice.enableHelp')}>
+                  <Icon name="record_voice_over" size={16} /> {t('voice.chip', { name: prefs.wakeWord })}
+                </span>
+              )}
+              {aiSilent && (
+                <span className="chip-soft" title={t('room.stage.aiSilentTip')}>
+                  <Icon name="smart_toy" size={16} />{' '}
+                  {t('room.status.aiSilentNamed', { name: silentAgents.join(', ') })}
+                </span>
+              )}
+              {raised.length > 0 && (
+                <span className="chip-soft">
+                  <Icon name="back_hand" size={16} /> {raised.join(', ')}
+                </span>
               )}
             </div>
-          )}
-          {panel === 'activities' && <ActivitiesView items={activities} />}
-          {panel === 'polls' && (
-            <div className="meet-panel-body">
-              <PollsView
-                polls={polls}
-                myName={localParticipant.name || t('room.participant')}
-                canCreate={canCreatePoll}
-              />
+            {captionsShown && <CaptionsOverlay captions={captions} />}
+            <div className="reactions" aria-hidden>
+              {reactions.map((r) => (
+                <span key={r.key} className="reaction">
+                  <span className="reaction-emoji">{r.emoji}</span>
+                  <small>{r.from}</small>
+                </span>
+              ))}
             </div>
-          )}
-          {panel === 'breakouts' && (
-            <div className="meet-panel-body">
-              <BreakoutsView
-                slug={props.slug}
-                current={props.breakout}
-                breakouts={breakouts}
-                participants={participants}
-                onSwitch={props.onSwitchRoom}
-              />
-            </div>
-          )}
-          {panel === 'effects' && (
-            <div className="meet-panel-body">
-              <BackgroundPanel background={background} />
-            </div>
-          )}
-          {panel === 'host' && (canManage || isModerator) && (
-            <div className="meet-panel-body">
-              {canManage ? (
-                <RoomSettingsEditor slug={props.slug} showAgent onChanged={applyPolicies} />
-              ) : (
-                <MeetingControls slug={props.slug} token={props.token} onChanged={applyPolicies} />
-              )}
-            </div>
-          )}
-          {panel === 'copilot' && <CopilotView insights={insights} />}
-          {panel === 'workspace' && <WorkspaceView snapshot={workspace} />}
-          {panel === 'studio' && props.studio && isModerator && <StudioPanel control={studio} />}
-          {panel === 'live' && (
-            <LivePanel
-              control={live}
-              roomName={props.roomName}
-              studio={props.studio === true}
-              isAdmin={canManage}
-            />
-          )}
-          {panel === 'a11y' && (
-            <A11yView
-              prefs={prefs}
-              onChange={updatePrefs}
-              onShortcuts={() => setShortcutsOpen(true)}
-              voiceStatus={voice}
-            />
-          )}
-        </SidePanel>
-      </div>
+          </main>
 
-      <MeetBar
-        roomName={props.roomName}
-        breakout={props.breakout}
-        panel={panel}
-        onPanel={togglePanel}
-        people={participants.length}
-        unreadChat={unreadChat}
-        activitiesDot={board.unseen || unseenPolls}
-        captions={captionsControl}
-        handUp={handUp}
-        onHand={() => void toggleHand()}
-        onReact={(emoji) => void react(emoji)}
-        more={more}
-        onEffects={effectsAvailable ? () => openPanel('effects') : undefined}
-        canManage={canManage || isModerator}
-        producer={props.studio === true && isModerator}
-        lobbyWaiting={lobbyWaiting}
-        onLeave={() => void room.disconnect()}
-      />
-
-      {toast && (
-        <div className="meet-toast" aria-hidden>
-          {toast}
+          <SidePanel panel={panel} onPanel={openPanel} theme={surface}>
+            <ChatView visible={panel === 'chat'} onCount={setChatCount} onIncoming={onIncomingChat} />
+            {panel === 'info' && (
+              <InfoView
+                roomName={props.roomName}
+                breakout={props.breakout}
+                copied={copied}
+                onCopy={() => void copyInvite()}
+              />
+            )}
+            {panel === 'people' && (
+              <div className="meet-panel-body">
+                <button className="btn tonal" onClick={() => void copyInvite()}>
+                  <Icon name="link" size={20} />
+                  {t('room.stage.copyInviteLink')}
+                </button>
+                {isModerator ? (
+                  <ModerationView slug={props.slug} token={props.token} fallback={<PeopleList />} />
+                ) : (
+                  <PeopleList />
+                )}
+              </div>
+            )}
+            {panel === 'activities' && <ActivitiesView items={activities} />}
+            {panel === 'polls' && (
+              <div className="meet-panel-body">
+                <PollsView
+                  polls={polls}
+                  myName={localParticipant.name || t('room.participant')}
+                  canCreate={canCreatePoll}
+                />
+              </div>
+            )}
+            {panel === 'breakouts' && (
+              <div className="meet-panel-body">
+                <BreakoutsView
+                  slug={props.slug}
+                  current={props.breakout}
+                  breakouts={breakouts}
+                  participants={participants}
+                  onSwitch={props.onSwitchRoom}
+                />
+              </div>
+            )}
+            {panel === 'effects' && (
+              <div className="meet-panel-body">
+                <BackgroundPanel background={background} />
+              </div>
+            )}
+            {panel === 'host' && (canManage || isModerator) && (
+              <div className="meet-panel-body">
+                {canManage ? (
+                  <RoomSettingsEditor slug={props.slug} showAgent onChanged={applyPolicies} />
+                ) : (
+                  <MeetingControls slug={props.slug} token={props.token} onChanged={applyPolicies} />
+                )}
+              </div>
+            )}
+            {panel === 'copilot' && <CopilotView insights={insights} />}
+            {panel === 'workspace' && <WorkspaceView snapshot={workspace} />}
+            {panel === 'studio' && props.studio && isModerator && <StudioPanel control={studio} />}
+            {panel === 'live' && (
+              <LivePanel
+                control={live}
+                roomName={props.roomName}
+                studio={props.studio === true}
+                isAdmin={canManage}
+              />
+            )}
+            {panel === 'a11y' && (
+              <A11yView
+                prefs={prefs}
+                onChange={updatePrefs}
+                onShortcuts={() => setShortcutsOpen(true)}
+                voiceStatus={voice}
+              />
+            )}
+          </SidePanel>
         </div>
-      )}
-      {shortcutsOpen && <ShortcutsDialog theme={surface} onClose={() => setShortcutsOpen(false)} />}
-      <StartAudio label={t('room.stage.startAudio')} className="meet-start-audio" />
-      <ConnectionStateToast />
-      <RoomAudioRenderer />
-    </div>
+
+        <MeetBar
+          roomName={props.roomName}
+          breakout={props.breakout}
+          panel={panel}
+          onPanel={togglePanel}
+          people={participants.length}
+          unreadChat={unreadChat}
+          activitiesDot={board.unseen || unseenPolls}
+          captions={captionsControl}
+          handUp={handUp}
+          onHand={() => void toggleHand()}
+          onReact={(emoji) => void react(emoji)}
+          more={more}
+          onEffects={effectsAvailable ? () => openPanel('effects') : undefined}
+          canManage={canManage || isModerator}
+          producer={props.studio === true && isModerator}
+          lobbyWaiting={lobbyWaiting}
+          onLeave={() => void room.disconnect()}
+        />
+
+        {toast && (
+          <div className="meet-toast" aria-hidden>
+            {toast}
+          </div>
+        )}
+        {shortcutsOpen && <ShortcutsDialog theme={surface} onClose={() => setShortcutsOpen(false)} />}
+        <StartAudio label={t('room.stage.startAudio')} className="meet-start-audio" />
+        <ConnectionStateToast />
+        <RoomAudioRenderer />
+      </div>
+    </ParticipantVolumeProvider>
   );
 }

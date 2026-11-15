@@ -11,8 +11,10 @@ import {
 import { LocalParticipant, Track } from 'livekit-client';
 import { useT } from '@/i18n/client';
 import { displayName } from '@/lib/a11y';
+import { volumePercent } from '@/lib/participant-volume';
 import { Icon } from '../ui/Icon';
 import { avatarColor, initial } from './Avatar';
+import { useParticipantVolumeOptional } from './ParticipantVolume';
 
 export const HAND_ATTRIBUTE = 'hand';
 export const AGENT_MUTED_ATTRIBUTE = 'impa.muted';
@@ -33,6 +35,9 @@ export function MeetTile() {
   const agent = participant.isAgent;
   const agentSilent = agent && attributes?.[AGENT_MUTED_ATTRIBUTE] === 'true';
   const hand = Boolean(attributes?.[HAND_ATTRIBUTE]);
+  const volumes = useParticipantVolumeOptional();
+  const localVolume = !participant.isLocal && volumes ? volumes.get(participant.identity) : 1;
+  const volumePct = volumePercent(localVolume);
 
   if (screen && participant instanceof LocalParticipant) {
     return (
@@ -58,6 +63,7 @@ export function MeetTile() {
         micMuted ? t('room.tile.micOff') : t('room.tile.micOn'),
         speaking && !micMuted ? t('room.tile.speaking') : '',
         hand ? t('room.tile.hand') : '',
+        !participant.isLocal && volumePct !== 100 ? t('room.tile.volume', { n: volumePct }) : '',
       ]
         .filter(Boolean)
         .join(', ');
@@ -94,6 +100,11 @@ export function MeetTile() {
         {screen ? t('room.tile.presentationOf', { name }) : label}
         {agent && (
           <span className="tile-chip">{agentSilent ? t('room.status.aiSilent') : t('room.status.ai')}</span>
+        )}
+        {!participant.isLocal && volumePct !== 100 && (
+          <span className="tile-chip" title={t('room.volume.tileTip', { n: volumePct })}>
+            {volumePct}%
+          </span>
         )}
       </span>
     </>

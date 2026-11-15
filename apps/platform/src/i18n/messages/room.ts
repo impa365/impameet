@@ -142,6 +142,16 @@ export default defineMessages(
       raisedHands: 'Mãos levantadas ({count})',
       inMeeting: 'Na reunião ({count})',
     },
+    volume: {
+      hint: 'O volume de cada pessoa vale só para você (0% a 200%). Os outros não ouvem diferença.',
+      label: 'Volume de {name}, só no seu áudio',
+      percent: '{n} por cento',
+      mute: 'Silenciar {name} só para você',
+      unmute: 'Voltar a ouvir {name}',
+      muteHint: 'Silenciar só para você',
+      unmuteHint: 'Voltar a ouvir',
+      tileTip: 'Volume só para você: {n}%',
+    },
     tile: {
       presenting: 'Você está apresentando para todos',
       presentationOf: 'Apresentação de {name}',
@@ -151,6 +161,7 @@ export default defineMessages(
       micOn: 'microfone ativado',
       speaking: 'falando',
       hand: 'mão levantada',
+      volume: 'volume só para você {n} por cento',
     },
     prejoin: {
       blocked:
@@ -215,7 +226,7 @@ export default defineMessages(
     },
     a11y: {
       intro:
-        'Avisos falados pelo leitor de tela (NVDA, JAWS, VoiceOver, TalkBack) e sons curtos para o que acontece na reunião.',
+        'Avisos falados pelo leitor de tela (NVDA, JAWS, VoiceOver, TalkBack) e sons curtos para o que acontece na reunião. Na lista Pessoas você também controla o volume de cada um (até 200%), só no seu fone.',
       languageHelp: 'Muda o idioma da tela e dos avisos falados.',
       joins: 'Anunciar entradas e saídas',
       joinsHelp: 'Diz quem entrou e quem saiu da reunião.',
@@ -575,6 +586,16 @@ export default defineMessages(
         raisedHands: 'Raised hands ({count})',
         inMeeting: 'In the meeting ({count})',
       },
+      volume: {
+        hint: 'Each person’s volume is only for you (0% to 200%). Others hear no change.',
+        label: 'Volume for {name}, only in your audio',
+        percent: '{n} percent',
+        mute: 'Mute {name} for you only',
+        unmute: 'Hear {name} again',
+        muteHint: 'Mute for you only',
+        unmuteHint: 'Hear again',
+        tileTip: 'Volume for you only: {n}%',
+      },
       tile: {
         presenting: 'You are presenting to everyone',
         presentationOf: "{name}'s presentation",
@@ -584,6 +605,7 @@ export default defineMessages(
         micOn: 'microphone on',
         speaking: 'speaking',
         hand: 'hand raised',
+        volume: 'volume for you only {n} percent',
       },
       prejoin: {
         blocked:
@@ -648,7 +670,7 @@ export default defineMessages(
       },
       a11y: {
         intro:
-          'Screen reader announcements (NVDA, JAWS, VoiceOver, TalkBack) and short sounds for what happens in the meeting.',
+          'Screen reader announcements (NVDA, JAWS, VoiceOver, TalkBack) and short sounds for what happens in the meeting. In People you can also raise or lower each person’s volume (up to 200%), only in your headset.',
         languageHelp: 'Changes the language of the screen and of the spoken announcements.',
         joins: 'Announce joins and leaves',
         joinsHelp: 'Says who joined and who left the meeting.',
@@ -1008,6 +1030,16 @@ export default defineMessages(
         raisedHands: 'Manos levantadas ({count})',
         inMeeting: 'En la reunión ({count})',
       },
+      volume: {
+        hint: 'El volumen de cada persona vale solo para ti (0% a 200%). Los demás no notan diferencia.',
+        label: 'Volumen de {name}, solo en tu audio',
+        percent: '{n} por ciento',
+        mute: 'Silenciar a {name} solo para ti',
+        unmute: 'Volver a oír a {name}',
+        muteHint: 'Silenciar solo para ti',
+        unmuteHint: 'Volver a oír',
+        tileTip: 'Volumen solo para ti: {n}%',
+      },
       tile: {
         presenting: 'Estás presentando a todos',
         presentationOf: 'Presentación de {name}',
@@ -1017,6 +1049,7 @@ export default defineMessages(
         micOn: 'micrófono activado',
         speaking: 'hablando',
         hand: 'mano levantada',
+        volume: 'volumen solo para ti {n} por ciento',
       },
       prejoin: {
         blocked:
@@ -1081,7 +1114,7 @@ export default defineMessages(
       },
       a11y: {
         intro:
-          'Avisos hablados por el lector de pantalla (NVDA, JAWS, VoiceOver, TalkBack) y sonidos cortos para lo que pasa en la reunión.',
+          'Avisos hablados por el lector de pantalla (NVDA, JAWS, VoiceOver, TalkBack) y sonidos cortos para lo que pasa en la reunión. En Personas también controlas el volumen de cada uno (hasta 200%), solo en tus auriculares.',
         languageHelp: 'Cambia el idioma de la pantalla y de los avisos hablados.',
         joins: 'Anunciar entradas y salidas',
         joinsHelp: 'Dice quién entró y quién salió de la reunión.',

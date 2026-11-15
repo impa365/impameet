@@ -8,6 +8,7 @@ import type { MessageKey } from '@/i18n/keys';
 import { Icon, type IconName } from '../ui/Icon';
 import { Avatar } from './Avatar';
 import type { PanelId } from './MeetBar';
+import { PersonVolumeControl } from './ParticipantVolume';
 import { HAND_ATTRIBUTE, displayName } from './MeetTile';
 
 const TITLES: Record<PanelId, MessageKey> = {
@@ -114,6 +115,7 @@ export function PeopleList() {
       )}
       <section className="people-section">
         <h4>{t('room.people.inMeeting', { count: participants.length })}</h4>
+        <p className="muted small-print">{t('room.volume.hint')}</p>
         {participants.map((p) => (
           <div key={p.identity} className="person-row">
             <Avatar name={nameOf(p)} agent={p.isAgent} />
@@ -122,6 +124,7 @@ export function PeopleList() {
               {role(p, t) && <small>{role(p, t)}</small>}
             </span>
             <span className="person-actions">
+              {!p.isLocal && <PersonVolumeControl identity={p.identity} name={nameOf(p)} />}
               <span
                 className="icon-btn ghost"
                 title={p.isMicrophoneEnabled ? t('room.status.micOn') : t('room.status.micOff')}
