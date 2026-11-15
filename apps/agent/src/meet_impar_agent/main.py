@@ -472,7 +472,7 @@ def follow_record(
     *,
     agent: VoiceAgent | None = None,
 ) -> None:
-    """Who joins and leaves, who is talking and what the agent itself says (also mirrored to chat)."""
+    """Who joins and leaves, who is talking, and the agent's own replies (mirrored to chat)."""
 
     def joined(p: rtc.RemoteParticipant) -> None:
         if p.kind != rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:

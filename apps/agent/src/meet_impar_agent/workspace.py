@@ -194,7 +194,7 @@ ACTIONS_OFF = "As ações da IA estão desligadas nesta sala. Explique com educa
 
 def workspace_tools(board: Workspace, host: Host) -> list[llm.FunctionTool[..., Any]]:
     @llm.function_tool(name="atualizar_workspace")
-    async def update_workspace(
+    async def update_workspace(  # noqa: PLR0917 — each field is a separate tool argument for the model
         titulo: str = "",
         plano: list[str] | None = None,
         decisoes: list[str] | None = None,
