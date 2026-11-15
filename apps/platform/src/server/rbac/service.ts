@@ -143,7 +143,9 @@ export async function createOrgRole(
   }
   const perms = input.permissions.filter((c) => (ORG_PERMISSIONS as readonly string[]).includes(c));
   try {
-    const [role] = await sql<{ id: string; key: string; name: string; description: string; isSystem: boolean }[]>`
+    const [role] = await sql<
+      { id: string; key: string; name: string; description: string; isSystem: boolean }[]
+    >`
       insert into org_roles (tenant_id, key, name, description, is_system)
       values (${actor.tenantId}, ${key}, ${input.name.trim()}, ${input.description?.trim() ?? ''}, false)
       returning id, key, name, description, is_system as "isSystem"`;
@@ -180,7 +182,11 @@ export async function updateOrgRolePermissions(
   const perms = [...new Set(permissions.filter((c) => (ORG_PERMISSIONS as readonly string[]).includes(c)))];
   // Member may stay empty; admin must keep panel.access + roles.manage so the org is not locked out.
   if (roleKey === 'admin') {
-    if (!perms.includes('panel.access') || !perms.includes('roles.manage') || !perms.includes('users.assign_admin')) {
+    if (
+      !perms.includes('panel.access') ||
+      !perms.includes('roles.manage') ||
+      !perms.includes('users.assign_admin')
+    ) {
       throw badRequest(
         'O papel Administrador precisa manter acesso ao painel, gestão de papéis e atribuição de admin',
       );

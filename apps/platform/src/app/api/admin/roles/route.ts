@@ -1,11 +1,7 @@
 import { db } from '@/server/db';
 import { readerUser, writerUser } from '@/server/guard';
 import { clientIp, handle, json, readJson } from '@/server/http';
-import {
-  createOrgRole,
-  listOrgPermissionDefs,
-  listOrgRoles,
-} from '@/server/rbac/service';
+import { createOrgRole, listOrgPermissionDefs, listOrgRoles } from '@/server/rbac/service';
 import type { OrgPermission } from '@/server/rbac/permissions';
 import { orgRoleCreateInput } from '@/server/validation';
 
@@ -14,10 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(): Promise<Response> {
   return handle(async () => {
     const actor = await readerUser();
-    const [roles, permissions] = await Promise.all([
-      listOrgRoles(db(), actor),
-      listOrgPermissionDefs(db()),
-    ]);
+    const [roles, permissions] = await Promise.all([listOrgRoles(db(), actor), listOrgPermissionDefs(db())]);
     return json({ roles, permissions });
   });
 }

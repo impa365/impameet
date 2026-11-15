@@ -198,7 +198,12 @@ export function RolesTab() {
               ))}
               <div className="row">
                 {creating ? (
-                  <button className="btn" type="button" disabled={busy || !newKey || !newName} onClick={() => void create()}>
+                  <button
+                    className="btn"
+                    type="button"
+                    disabled={busy || !newKey || !newName}
+                    onClick={() => void create()}
+                  >
                     {t('common.save')}
                   </button>
                 ) : (
@@ -207,7 +212,12 @@ export function RolesTab() {
                       {t('common.save')}
                     </button>
                     {selected && !roles.find((r) => r.key === selected)?.isSystem && (
-                      <button className="btn text" type="button" disabled={busy} onClick={() => void remove(selected)}>
+                      <button
+                        className="btn text"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void remove(selected)}
+                      >
                         {t('common.delete')}
                       </button>
                     )}

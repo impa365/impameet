@@ -103,11 +103,18 @@ export function SuperadminsTab({ selfId }: { selfId: string }) {
                 {r.name}
                 <small>
                   {r.email} · {r.tenantName} ({r.tenantSlug})
-                  {r.grantedByEmail ? ` · ${t('admin.superadmins.grantedBy', { email: r.grantedByEmail })}` : ''}
+                  {r.grantedByEmail
+                    ? ` · ${t('admin.superadmins.grantedBy', { email: r.grantedByEmail })}`
+                    : ''}
                 </small>
               </span>
               {r.userId !== selfId && (
-                <button className="btn text small" type="button" disabled={busy} onClick={() => void revoke(r.userId)}>
+                <button
+                  className="btn text small"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void revoke(r.userId)}
+                >
                   {t('admin.superadmins.revoke')}
                 </button>
               )}
@@ -126,7 +133,12 @@ export function SuperadminsTab({ selfId }: { selfId: string }) {
             placeholder={t('admin.superadmins.searchPlaceholder')}
             aria-label={t('admin.superadmins.searchPlaceholder')}
           />
-          <button className="btn tonal" type="button" disabled={busy || q.trim().length < 2} onClick={() => void search()}>
+          <button
+            className="btn tonal"
+            type="button"
+            disabled={busy || q.trim().length < 2}
+            onClick={() => void search()}
+          >
             <Icon name="search" size={20} />
             {t('common.search')}
           </button>

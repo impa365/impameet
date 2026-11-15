@@ -24,7 +24,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <AppShell branding={ctx.branding} user={user} active={`admin:${tab}`} title={t(ADMIN_TABS[tab].label)}>
-      <AdminPanel tab={tab} role={user.role} permissions={user.permissions ?? []} selfId={user.id} branding={ctx.branding} />
+      <AdminPanel
+        tab={tab}
+        role={user.role}
+        permissions={user.permissions ?? []}
+        selfId={user.id}
+        branding={ctx.branding}
+      />
     </AppShell>
   );
 }
