@@ -204,7 +204,9 @@ describe('organization e-mail', () => {
 describe('platform e-mail', () => {
   it('is set by the super admin, may live on the private network, and is offered to organizations', async () => {
     const { tenant, admin } = await org('acme');
-    await expectAppError(getPlatformMail(deps(), admin), 403);
+    // First signup may already be platform super admin — assert with the flag cleared.
+    const orgOnly = { ...admin, isSuperadmin: false };
+    await expectAppError(getPlatformMail(deps(), orgOnly), 403);
     const root = { ...admin, isSuperadmin: true };
     const legacyDeps = deps({ legacy: { url: 'smtp://user:pass@mail.local:25', from: 'meet@impa.local' } });
     expect(await getPlatformMail(legacyDeps, root)).toMatchObject({ server: null, legacy: true });

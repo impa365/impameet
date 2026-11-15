@@ -1,5 +1,10 @@
 import type { SessionUser } from '../auth/session';
-import type { OrgPermission } from './permissions';
+import {
+  DEFAULT_ROLE_PERMISSIONS,
+  type OrgPermission,
+  SYSTEM_ROLE_KEYS,
+  type SystemRoleKey,
+} from './permissions';
 
 /** Sync check against permissions loaded on the session (preferred). */
 export function sessionHas(
@@ -8,12 +13,11 @@ export function sessionHas(
 ): boolean {
   if (!user) return false;
   if (user.permissions?.includes(permission)) return true;
-  // Legacy fallback before sessions carry permissions (should be rare).
-  if (!user.permissions?.length) {
-    if (permission === 'rooms.manage_all' || permission === 'panel.access' || permission === 'users.view') {
-      return user.role === 'admin' || user.role === 'manager';
-    }
-    return user.role === 'admin';
+  // Explicit empty list means “no powers” (do not fall back to role defaults).
+  if (user.permissions && user.permissions.length === 0) return false;
+  // Tests and older SessionUser shapes: use the built-in matrix for system roles.
+  if ((SYSTEM_ROLE_KEYS as readonly string[]).includes(user.role)) {
+    return DEFAULT_ROLE_PERMISSIONS[user.role as SystemRoleKey].includes(permission);
   }
   return false;
 }

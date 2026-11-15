@@ -175,7 +175,8 @@ async function readyRecording(tenantId: string, endedAt = new Date(Date.now() + 
 describe('the platform Google client', () => {
   it('is set by the super admin only, and its secret is never shown again', async () => {
     const { admin, root } = await org('acme');
-    await expectAppError(getPlatformGoogle(deps(), admin), 403);
+    // First signup may already be platform super admin — assert with the flag cleared.
+    await expectAppError(getPlatformGoogle(deps(), { ...admin, isSuperadmin: false }), 403);
     expect(await getPlatformGoogle(deps(), root)).toMatchObject({
       clientId: null,
       hasSecret: false,
