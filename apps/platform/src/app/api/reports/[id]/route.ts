@@ -3,7 +3,12 @@ import { db } from '@/server/db';
 import { notFound } from '@/server/errors';
 import { readerUser, writerUser } from '@/server/guard';
 import { clientIp, handle, json } from '@/server/http';
-import { deleteReport, findReport, minutesText } from '@/server/insights/reports';
+import {
+  deleteReport,
+  findReport,
+  minutesText,
+  reportTranscriptText,
+} from '@/server/insights/reports';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +23,23 @@ async function idOf(params: Promise<{ id: string }>): Promise<string> {
 /** The report as JSON, or `?format=text` to download the minutes. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
   return handle(async () => {
-    const report = await findReport(db(), await readerUser(), await idOf(params));
-    if (new URL(req.url).searchParams.get('format') !== 'text') return json({ report });
+    const user = await readerUser();
+    const id = await idOf(params);
+    const format = new URL(req.url).searchParams.get('format');
+    if (format === 'transcript') {
+      const report = await findReport(db(), user, id);
+      const text = await reportTranscriptText(db(), user, id);
+      const name = `Transcricao ${report.roomName.replace(/[^\p{L}\p{N} _-]/gu, '').trim()} ${new Date(report.startedAt).toISOString().slice(0, 10)}.txt`;
+      return new Response(text, {
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'content-disposition': `attachment; filename="transcricao.txt"; filename*=UTF-8''${encodeURIComponent(name)}`,
+          'cache-control': 'private, no-store',
+        },
+      });
+    }
+    const report = await findReport(db(), user, id);
+    if (format !== 'text') return json({ report });
     const name = `Ata ${report.roomName.replace(/[^\p{L}\p{N} _-]/gu, '').trim()} ${new Date(report.startedAt).toISOString().slice(0, 10)}.txt`;
     return new Response(minutesText(report), {
       headers: {

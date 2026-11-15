@@ -15,13 +15,14 @@ import { resolvePanelTheme } from '@/lib/a11y';
 import { REACTION_TOPIC, type Reaction, parseReaction } from '@/lib/reactions';
 import { BackgroundPanel, useBackground } from '../BackgroundMenu';
 import { BreakoutsView, useBreakouts } from '../Breakouts';
-import { CaptionsOverlay, captionerPresent, useCaptions, useCaptionsControl } from '../Captions';
+import { CaptionsOverlay, captionerPresent, useCaptions } from '../Captions';
 import { ModerationView } from '../ModerationPanel';
 import { PollsView, usePolls } from '../Polls';
 import { type CollabPolicy, RoomSettingsEditor } from '../RoomSettings';
 import { WhiteboardPanel, useWhiteboard } from '../Whiteboard';
 import { changeSentence } from '../BoardText';
 import { CopilotView, useInsights } from './Copilot';
+import { WorkspaceView, useWorkspace, workspaceOffered } from './Workspace';
 import { type BoardChange, ChangeDigest } from '@/lib/board-text';
 import { api } from '../api';
 import { StudioMain, StudioPanel, useStudioControl } from '../studio/StudioRoom';
@@ -190,9 +191,24 @@ export function MeetRoom(props: {
   const live = useLive(props.slug, props.signedIn, notify);
   const voice = useVoiceCommands(prefs.voiceCommands, prefs.wakeWord, announce);
   const captionerRunning = captionerPresent(participants);
-  const transcriber = useCaptionsControl(props.slug, props.signedIn, captionerRunning, notify);
 
   const [panel, setPanel] = useState<PanelId | null>(null);
+  const workspace = useWorkspace(room);
+  const hasWorkspace = workspaceOffered(participants);
+  const [workspaceSeen, setWorkspaceSeen] = useState(false);
+  useEffect(() => {
+    if (workspaceSeen) return;
+    if (
+      workspace.title ||
+      workspace.plan.length ||
+      workspace.decisions.length ||
+      workspace.tasks.length ||
+      workspace.notes.trim()
+    ) {
+      setWorkspaceSeen(true);
+      setPanel('workspace');
+    }
+  }, [workspace, workspaceSeen]);
   const [boardOpen, setBoardOpen] = useState(false);
   const [captionsShown, setCaptionsShown] = useState(true);
   const [handUp, setHandUp] = useState(false);
@@ -505,22 +521,17 @@ export function MeetRoom(props: {
     return () => window.removeEventListener('keydown', onKey);
   }, [panel, shortcutsOpen, openPanel, togglePanel, toggleHand, whoIsSpeaking, summary]);
 
+  // Overlay only: whether the meeting is transcribed is the room's autoTranscript policy.
   const captionsControl = {
-    available: captionerRunning || transcriber.canControl,
+    available: captionerRunning,
     on: captionerRunning && captionsShown,
     label: captionerRunning
       ? captionsShown
         ? t('room.captions.off')
         : t('room.captions.on')
-      : transcriber.canControl
-        ? t('room.captions.start')
-        : t('room.captions.unavailable'),
+      : t('room.captions.unavailable'),
     toggle: () => {
       if (captionerRunning) setCaptionsShown(!captionsShown);
-      else if (transcriber.canControl && !transcriber.busy) {
-        setCaptionsShown(true);
-        void transcriber.toggleWorker();
-      }
     },
   };
 
@@ -534,6 +545,16 @@ export function MeetRoom(props: {
             icon: 'auto_awesome' as const,
             label: t('room.panels.copilot'),
             onSelect: () => openPanel('copilot'),
+          },
+        ]
+      : []),
+    ...(hasWorkspace
+      ? [
+          {
+            id: 'workspace',
+            icon: 'description' as const,
+            label: t('room.panels.workspace'),
+            onSelect: () => openPanel('workspace'),
           },
         ]
       : []),
@@ -574,17 +595,6 @@ export function MeetRoom(props: {
             label: live.live ? t('live.menuOnAir') : t('live.menu'),
             onSelect: () => openPanel('live'),
             active: live.live !== null,
-          },
-        ]
-      : []),
-    ...(transcriber.canControl
-      ? [
-          {
-            id: 'transcribe',
-            icon: 'subtitles' as const,
-            label: captionerRunning ? t('room.more.stopTranscription') : t('room.more.transcribe'),
-            onSelect: () => void transcriber.toggleWorker(),
-            active: captionerRunning,
           },
         ]
       : []),
@@ -776,6 +786,7 @@ export function MeetRoom(props: {
             </div>
           )}
           {panel === 'copilot' && <CopilotView insights={insights} />}
+          {panel === 'workspace' && <WorkspaceView snapshot={workspace} />}
           {panel === 'studio' && props.studio && isModerator && <StudioPanel control={studio} />}
           {panel === 'live' && (
             <LivePanel

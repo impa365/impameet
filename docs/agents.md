@@ -23,6 +23,21 @@ vale também para as salas paralelas.
 - A gravação pela IA vale só para a sala principal e segue as mesmas regras de uma gravação feita por
   pessoas: plano com gravação, uma gravação por vez por sala e tratamento de falhas do Egress.
 
+## Recursos da reunião (insights)
+
+Liga-se por agente em **Administração → Agentes**:
+
+| Recurso | O que faz |
+| --- | --- |
+| Ata automática | Guarda a conversa e gera resumo, decisões, tarefas e próximos passos ao fim |
+| O que eu perdi? | Resumo privado de quem chegou atrasado |
+| Copiloto privado | Perguntas em texto só para quem pergunta |
+| Métricas | Tempo de fala ao vivo e no relatório |
+| Quadro de trabalho | Plano, decisões, tarefas e notas que todos veem na call; vai para a ata |
+
+A **transcrição completa** da reunião (independente de alguém olhar as legendas) liga-se na **sala**:
+**Configurações → Transcrever a reunião automaticamente**. O botão de legendas na call só mostra ou oculta o texto ao vivo.
+
 ## O que a IA pode ver
 
 Liga-se por agente: **quadro branco**, **enquetes** e **telas compartilhadas**.

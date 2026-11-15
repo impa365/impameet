@@ -69,10 +69,11 @@ export default defineMessages(
       hands: 'mãos levantadas: {names}',
     },
     captions: {
-      off: 'Desativar as legendas',
-      on: 'Ativar as legendas',
-      start: 'Ativar as legendas (inicia a transcrição)',
-      unavailable: 'Legendas indisponíveis: peça ao moderador para transcrever',
+      off: 'Ocultar as legendas',
+      on: 'Mostrar as legendas',
+      start: 'Mostrar as legendas',
+      unavailable:
+        'Legendas indisponíveis: a transcrição automática precisa estar ligada nas configurações da sala',
     },
     more: {
       stopRecording: 'Parar a gravação',
@@ -129,6 +130,7 @@ export default defineMessages(
       host: 'Controles do organizador',
       a11y: 'Acessibilidade',
       copilot: 'Copiloto IA',
+      workspace: 'Trabalho da IA',
     },
     info: {
       inBreakout: 'Você está na Sala paralela {n}.',
@@ -295,6 +297,13 @@ export default defineMessages(
       errOff: 'Os moderadores desligaram as ações da IA nesta sala.',
       errEmpty: 'Escreva a pergunta.',
       errFailed: 'Não foi possível responder agora. Tente de novo.',
+    },
+    workspace: {
+      empty: 'Ainda não há plano, decisões ou tarefas neste quadro. Peça à IA para montar.',
+      plan: 'Plano',
+      decisions: 'Decisões',
+      tasks: 'Tarefas',
+      notes: 'Notas',
     },
     whiteboard: {
       loading: 'Carregando o quadro…',
@@ -494,10 +503,11 @@ export default defineMessages(
         hands: 'raised hands: {names}',
       },
       captions: {
-        off: 'Turn off captions',
-        on: 'Turn on captions',
-        start: 'Turn on captions (starts transcription)',
-        unavailable: 'Captions unavailable: ask the moderator to transcribe',
+        off: 'Hide captions',
+        on: 'Show captions',
+        start: 'Show captions',
+        unavailable:
+          'Captions unavailable: automatic transcription must be on in the room settings',
       },
       more: {
         stopRecording: 'Stop recording',
@@ -554,6 +564,7 @@ export default defineMessages(
         host: 'Host controls',
         a11y: 'Accessibility',
         copilot: 'AI copilot',
+        workspace: 'AI work board',
       },
       info: {
         inBreakout: 'You are in breakout room {n}.',
@@ -720,6 +731,13 @@ export default defineMessages(
         errOff: 'The moderators switched the AI’s actions off in this room.',
         errEmpty: 'Write the question.',
         errFailed: 'Could not answer right now. Try again.',
+      },
+      workspace: {
+        empty: 'No plan, decisions or tasks on this board yet. Ask the AI to build one.',
+        plan: 'Plan',
+        decisions: 'Decisions',
+        tasks: 'Tasks',
+        notes: 'Notes',
       },
       whiteboard: {
         loading: 'Loading the whiteboard…',
@@ -918,10 +936,11 @@ export default defineMessages(
         hands: 'manos levantadas: {names}',
       },
       captions: {
-        off: 'Desactivar los subtítulos',
-        on: 'Activar los subtítulos',
-        start: 'Activar los subtítulos (inicia la transcripción)',
-        unavailable: 'Subtítulos no disponibles: pide al moderador que transcriba',
+        off: 'Ocultar los subtítulos',
+        on: 'Mostrar los subtítulos',
+        start: 'Mostrar los subtítulos',
+        unavailable:
+          'Subtítulos no disponibles: la transcripción automática debe estar activada en la configuración de la sala',
       },
       more: {
         stopRecording: 'Detener la grabación',
@@ -978,6 +997,7 @@ export default defineMessages(
         host: 'Controles del organizador',
         a11y: 'Accesibilidad',
         copilot: 'Copiloto IA',
+      workspace: 'Trabalho da IA',
       },
       info: {
         inBreakout: 'Estás en la sala para grupos {n}.',
@@ -1145,6 +1165,13 @@ export default defineMessages(
         errOff: 'Los moderadores desactivaron las acciones de la IA en esta sala.',
         errEmpty: 'Escribe la pregunta.',
         errFailed: 'No se pudo responder ahora. Inténtalo de nuevo.',
+      },
+      workspace: {
+        empty: 'Todavía no hay plan, decisiones ni tareas en este cuadro. Pídele a la IA que lo arme.',
+        plan: 'Plan',
+        decisions: 'Decisiones',
+        tasks: 'Tareas',
+        notes: 'Notas',
       },
       whiteboard: {
         loading: 'Cargando la pizarra…',

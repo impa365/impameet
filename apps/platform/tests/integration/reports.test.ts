@@ -10,6 +10,7 @@ import type { CompletionRequest } from '@/server/insights/llm';
 import {
   type ReportDeps,
   cleanMinutes,
+  cleanWorkspace,
   deleteReport,
   findReport,
   listReports,
@@ -293,13 +294,30 @@ describe('meeting reports and minutes', () => {
     expect(clean.summary).toHaveLength(4000);
     expect(clean.decisions).toEqual(['ok']);
     expect(clean.tasks).toEqual([{ task: 't', owner: '', due: '' }]);
-    expect(cleanMinutes(null)).toEqual({ summary: '', decisions: [], tasks: [], topics: [] });
+    expect(clean.nextSteps).toBe('');
+    expect(cleanMinutes({ nextSteps: '  seguir  ' }).nextSteps).toBe('seguir');
+    expect(cleanMinutes(null)).toEqual({
+      summary: '',
+      decisions: [],
+      tasks: [],
+      topics: [],
+      nextSteps: '',
+    });
+    expect(cleanWorkspace(null)).toBeNull();
+    expect(cleanWorkspace({ title: 'Plano', plan: ['a', ''], tasks: [{ task: 'x' }] })).toEqual({
+      title: 'Plano',
+      plan: ['a'],
+      decisions: [],
+      tasks: [{ task: 'x', owner: '', due: '' }],
+      notes: '',
+    });
     const text = minutesText({
       roomName: 'Sala',
       startedAt: new Date('2026-11-09T15:00:00Z'),
       endedAt: new Date('2026-11-09T16:30:00Z'),
       participants: [],
       minutes: null,
+      workspace: null,
     });
     expect(text).toContain('Ata — Sala');
     expect(text).toContain('90 min');

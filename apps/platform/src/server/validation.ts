@@ -185,6 +185,8 @@ export const createRoomInput = z.object({
   pollsPolicy: collabPolicy.default('everyone'),
   thinkingSound: z.boolean().default(true),
   agentActions: z.boolean().default(true),
+  /** Transcribe the whole meeting; live captions stay optional per viewer. */
+  autoTranscript: z.boolean().default(false),
   agentEnabled: z.boolean().default(false),
   agentId: z.string().uuid().nullable().optional(),
   agentIds: roomAgentIds.optional(),
@@ -203,6 +205,7 @@ export const updateRoomInput = z
     pollsPolicy: collabPolicy,
     thinkingSound: z.boolean(),
     agentActions: z.boolean(),
+    autoTranscript: z.boolean(),
     agentEnabled: z.boolean(),
     agentId: z.string().uuid().nullable(),
     agentIds: roomAgentIds,
@@ -368,6 +371,7 @@ export const meetingControlsInput = z
     pollsPolicy: collabPolicy,
     thinkingSound: z.boolean(),
     agentActions: z.boolean(),
+    autoTranscript: z.boolean(),
   })
   .partial()
   .strict()
@@ -442,7 +446,7 @@ export const AGENT_MODERATION_TOOLS = ['remove', 'mute', 'lobby', 'camera', 'rec
 /** What the agent may look at, and "present": writing its own topics on the whiteboard. */
 export const AGENT_PERCEPTION = ['board', 'polls', 'screen', 'present'] as const;
 /** What an agent does for the meeting: minutes, "what did I miss?", a private copilot, metrics. */
-export const AGENT_INSIGHTS = ['minutes', 'catchup', 'copilot', 'metrics'] as const;
+export const AGENT_INSIGHTS = ['minutes', 'catchup', 'copilot', 'metrics', 'workspace'] as const;
 /** Who may use the copilot and see the metrics. */
 export const INSIGHTS_ACCESS = ['moderators', 'managers'] as const;
 
@@ -778,6 +782,23 @@ const reportPerson = z.object({
 });
 
 /** What the voice agent sends when it leaves a meeting. */
+const workspaceTask = z.object({
+  task: z.string().max(400),
+  owner: z.string().max(120).default(''),
+  due: z.string().max(120).default(''),
+});
+
+export const meetingWorkspaceInput = z
+  .object({
+    title: z.string().max(160).default(''),
+    plan: z.array(z.string().max(400)).max(40).default([]),
+    decisions: z.array(z.string().max(400)).max(40).default([]),
+    tasks: z.array(workspaceTask).max(40).default([]),
+    notes: z.string().max(4000).default(''),
+  })
+  .nullable()
+  .optional();
+
 export const meetingReportInput = z.object({
   room: z.string().min(3).max(200),
   startedAt: z.number().positive(),
@@ -797,6 +818,11 @@ export const meetingReportInput = z.object({
     )
     .max(20_000)
     .default([]),
+  workspace: meetingWorkspaceInput,
+});
+
+export const reportAskInput = z.object({
+  question: z.string().trim().min(1, 'Escreva a pergunta').max(1000),
 });
 
 export const knowledgeBaseInput = z.object({

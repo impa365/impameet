@@ -42,7 +42,8 @@ businesses.
   panels.
 - Green room with camera and microphone test, **background blur and virtual backgrounds**, and
   screen sharing.
-- Chat, reactions, hand raise, **live captions** and saved transcripts.
+- Chat, reactions, hand raise, **live captions** and **automatic meeting transcription**
+  (turned on in the room settings; the in-call button only shows or hides captions).
 - **MP4 recording** (LiveKit Egress), collaborative **whiteboard** (Excalidraw), **polls** and
   **breakout rooms**.
 - **Moderation**: the organizer promotes moderators during the meeting (mute, remove, meeting
@@ -76,6 +77,9 @@ businesses.
   following whoever spoke.
 - Listens to everyone or only to whoever calls it, goes quiet on request and **shares a
   screen** through its own browser, with an animated cursor.
+- **Works in the meeting**: also answers in chat, builds a **live work board** (plan,
+  decisions, tasks and notes) everyone can see, and afterwards delivers **minutes** with a
+  summary, next steps and the option to **ask about the meeting** in the dashboard.
 - No default provider, model or voice on the server: everything is chosen in the panel, and
   keys are encrypted.
 

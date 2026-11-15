@@ -45,6 +45,7 @@ interface Settings {
   pollsPolicy: CollabPolicy;
   thinkingSound: boolean;
   agentActions: boolean;
+  autoTranscript: boolean;
   studio: boolean;
   invites: string[];
   agentsAllowed: boolean;
@@ -257,6 +258,26 @@ export function RoomSettingsEditor(props: {
             <span>
               {t('dashboard.roomSettings.agentActions')}
               <small>{t('dashboard.roomSettings.agentActionsHint')}</small>
+            </span>
+          </label>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.autoTranscript}
+              onChange={(e) =>
+                void patch(
+                  { autoTranscript: e.target.checked },
+                  t(
+                    e.target.checked
+                      ? 'dashboard.roomSettings.autoTranscriptOn'
+                      : 'dashboard.roomSettings.autoTranscriptOff',
+                  ),
+                )
+              }
+            />
+            <span>
+              {t('dashboard.roomSettings.autoTranscript')}
+              <small>{t('dashboard.roomSettings.autoTranscriptHint')}</small>
             </span>
           </label>
         </fieldset>

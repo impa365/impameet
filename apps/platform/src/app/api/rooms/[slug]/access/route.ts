@@ -44,6 +44,7 @@ export async function GET(
       pollsPolicy: room.pollsPolicy,
       thinkingSound: room.thinkingSound,
       agentActions: room.agentActions,
+      autoTranscript: room.autoTranscript,
       studio: room.studio,
       invites,
       agentsAllowed: plan.agents,

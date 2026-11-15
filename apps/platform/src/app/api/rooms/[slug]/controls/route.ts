@@ -1,3 +1,4 @@
+import { syncAutoTranscript } from '@/server/captions/service';
 import { config } from '@/server/config';
 import { currentBreakouts } from '@/server/breakouts/service';
 import { db } from '@/server/db';
@@ -48,6 +49,7 @@ export async function GET(
       pollsPolicy: room.pollsPolicy,
       thinkingSound: room.thinkingSound,
       agentActions: room.agentActions,
+      autoTranscript: room.autoTranscript,
     });
   });
 }
@@ -78,11 +80,22 @@ export async function POST(
           .sendData(name, JSON.stringify(settings), AGENT_SETTINGS_TOPIC)
           .catch(() => undefined);
     }
+    if (patch.autoTranscript !== undefined) {
+      void syncAutoTranscript(
+        db(),
+        lk(),
+        config().agentName,
+        updated,
+        await currentUser(),
+        clientIp(req),
+      ).catch(() => undefined);
+    }
     return json({
       boardPolicy: updated.boardPolicy,
       pollsPolicy: updated.pollsPolicy,
       thinkingSound: updated.thinkingSound,
       agentActions: updated.agentActions,
+      autoTranscript: updated.autoTranscript,
     });
   });
 }

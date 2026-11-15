@@ -46,6 +46,7 @@ describe('meeting insights validation', () => {
     const shape = agentInput.shape;
     expect(shape.insights.parse(undefined)).toEqual([]);
     expect(shape.insights.parse(['minutes', 'minutes', 'metrics'])).toEqual(['minutes', 'metrics']);
+    expect(shape.insights.parse(['workspace'])).toEqual(['workspace']);
     expect(shape.insights.safeParse(['spy']).success).toBe(false);
     expect(shape.insightsAccess.parse(undefined)).toBe('moderators');
     expect(shape.insightsAccess.safeParse('everyone').success).toBe(false);

@@ -42,7 +42,8 @@ empresas.
   e painéis laterais.
 - Tela de entrada com teste de câmera e microfone, **desfoque e fundos virtuais** e
   compartilhamento de tela.
-- Chat, reações, levantar a mão, **legendas ao vivo** e transcrição salva.
+- Chat, reações, levantar a mão, **legendas ao vivo** e **transcrição automática da reunião**
+  (ligada na config da sala; o botão na call só mostra ou oculta as legendas).
 - **Gravação** em MP4 (LiveKit Egress), **quadro branco** colaborativo (Excalidraw),
   **enquetes** e **salas paralelas** (breakout rooms).
 - **Moderação**: o organizador promove moderadores durante a reunião (silenciar, remover,
@@ -76,6 +77,9 @@ empresas.
   falou.
 - Ouve todos ou só quem o chamar, fica em silêncio quando pedem e **compartilha a tela** com
   um navegador próprio, com cursor animado.
+- **Trabalha na reunião**: responde também no chat, monta um **quadro de trabalho ao vivo**
+  (plano, decisões, tarefas e notas) que todos veem, e no fim entrega **ata** com resumo,
+  próximos passos e a opção de **perguntar sobre a reunião** no painel.
 - Sem provedor, modelo ou voz padrão no servidor: tudo é escolhido no painel, e as chaves
   ficam criptografadas.
 

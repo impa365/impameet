@@ -20,6 +20,7 @@ export type PanelId =
   | 'host'
   | 'a11y'
   | 'copilot'
+  | 'workspace'
   | 'studio'
   | 'live';
 

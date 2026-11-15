@@ -104,12 +104,13 @@ const MODERATION = {
   record: ['admin.agents.modRecord', 'admin.agents.modRecordHelp'],
 } as const satisfies Record<ModerationTool, readonly [MessageKey, MessageKey]>;
 
-type Insight = 'minutes' | 'catchup' | 'copilot' | 'metrics';
+type Insight = 'minutes' | 'catchup' | 'copilot' | 'metrics' | 'workspace';
 const INSIGHTS = {
   minutes: ['admin.agents.insightMinutes', 'admin.agents.insightMinutesHelp'],
   catchup: ['admin.agents.insightCatchup', 'admin.agents.insightCatchupHelp'],
   copilot: ['admin.agents.insightCopilot', 'admin.agents.insightCopilotHelp'],
   metrics: ['admin.agents.insightMetrics', 'admin.agents.insightMetricsHelp'],
+  workspace: ['admin.agents.insightWorkspace', 'admin.agents.insightWorkspaceHelp'],
 } as const satisfies Record<Insight, readonly [MessageKey, MessageKey]>;
 
 type Perception = 'board' | 'polls' | 'screen' | 'present';

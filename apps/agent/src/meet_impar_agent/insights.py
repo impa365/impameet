@@ -32,7 +32,7 @@ COPILOT_TOPIC = "impa.copilot"
 INSIGHTS_ATTRIBUTE = "impa.insights"
 ACCESS_ATTRIBUTE = "impa.insights.access"
 ORG_ATTRIBUTE = "impa.org"
-INSIGHTS = ("minutes", "catchup", "copilot", "metrics")
+INSIGHTS = ("minutes", "catchup", "copilot", "metrics", "workspace")
 MAX_LINES = 20_000
 MAX_LINE_CHARS = 5000
 CONTEXT_CHARS = 24_000
@@ -87,6 +87,7 @@ class MeetingRecord:
     started_at: float = field(default_factory=time.time)
     people: dict[str, Person] = field(default_factory=dict)
     lines: list[dict[str, Any]] = field(default_factory=list)
+    workspace: dict[str, Any] | None = None
     _speaking: set[str] = field(default_factory=set)
     _since: float = 0.0
 
@@ -198,6 +199,7 @@ class MeetingRecord:
                 for p in self.people.values()
             ],
             "lines": self.lines if include_lines else [],
+            "workspace": self.workspace,
         }
 
 
@@ -353,6 +355,6 @@ class Copilot:
 
 
 def insights_attributes(enabled: tuple[str, ...], access: str) -> dict[str, str]:
-    """What the browsers read to show the copilot, metrics and "what did I miss?" buttons."""
-    live = [i for i in enabled if i in ("catchup", "copilot", "metrics")]
+    """What the browsers read to show the copilot, metrics, workspace and catch-up buttons."""
+    live = [i for i in enabled if i in ("catchup", "copilot", "metrics", "workspace")]
     return {INSIGHTS_ATTRIBUTE: ",".join(live), ACCESS_ATTRIBUTE: access} if live else {}

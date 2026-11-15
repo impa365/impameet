@@ -43,7 +43,9 @@ para empresas.
   controles y paneles laterales.
 - Pantalla de entrada con prueba de cámara y micrófono, **desenfoque y fondos virtuales**, y
   pantalla compartida.
-- Chat, reacciones, levantar la mano, **subtítulos en vivo** y transcripción guardada.
+- Chat, reacciones, levantar la mano, **subtítulos en vivo** y **transcripción automática de
+  la reunión** (se activa en la configuración de la sala; el botón en la llamada solo muestra
+  u oculta los subtítulos).
 - **Grabación** en MP4 (LiveKit Egress), **pizarra** colaborativa (Excalidraw), **encuestas** y
   **salas para grupos** (breakout rooms).
 - **Moderación**: el organizador nombra moderadores durante la reunión (silenciar, expulsar,
@@ -78,6 +80,9 @@ para empresas.
   habló.
 - Escucha a todos o solo a quien lo llame, se calla cuando se lo piden y **comparte pantalla**
   con su propio navegador, con cursor animado.
+- **Trabaja en la reunión**: también responde en el chat, arma un **cuadro de trabajo en vivo**
+  (plan, decisiones, tareas y notas) que todos ven, y al final entrega el **acta** con resumen,
+  próximos pasos y la opción de **preguntar sobre la reunión** en el panel.
 - Sin proveedor, modelo ni voz por defecto en el servidor: todo se elige en el panel, y las
   claves quedan cifradas.
 

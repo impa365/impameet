@@ -61,6 +61,7 @@ from .profile import (
 )
 from .screen import ScreenClient
 from .tools import ToolsClient, ToolSpec
+from .workspace import Workspace
 
 logger = logging.getLogger("meet_impar_agent")
 MUTED_ATTRIBUTE = "impa.muted"
@@ -247,6 +248,7 @@ def _build_agent(
             board=Board(policy=board_policy(ctx.job.metadata)),
             author=profile.name,
         )
+    workspace = Workspace(ctx.room) if "workspace" in profile.insights else None
     return VoiceAgent(
         profile,
         speaker=speaker_lookup(session),
@@ -257,6 +259,7 @@ def _build_agent(
         tools_client=tools_client,
         tool_specs=tool_specs,
         perception=perception,
+        workspace=workspace,
         actions=agent_actions(ctx.job.metadata),
         hearing=(
             (lambda who, text: record.heard(who.identity, who.name, who.role, text))
@@ -347,7 +350,7 @@ async def entrypoint(ctx: JobContext) -> None:
         {MODE_ATTRIBUTE: "voice", **insights_attributes(profile.insights, profile.insights_access)}
     )
     if record is not None:
-        follow_record(ctx.room, session, record, profile.name)
+        follow_record(ctx.room, session, record, profile.name, agent=agent)
         if set(profile.insights) & {"catchup", "copilot", "metrics"}:
             follow_copilot(
                 ctx.room,
@@ -363,11 +366,13 @@ async def entrypoint(ctx: JobContext) -> None:
         if (
             settings.platform
             and profile.agent_id
-            and {"minutes", "metrics"} & set(profile.insights)
+            and {"minutes", "metrics", "workspace"} & set(profile.insights)
         ):
             platform, agent_id = settings.platform, profile.agent_id
 
             async def _report() -> None:
+                if agent.workspace is not None and not agent.workspace.state.empty():
+                    record.workspace = agent.workspace.state.snapshot()
                 report = record.report(ctx.room.name, include_lines="minutes" in profile.insights)
                 await send_report(platform, agent_id, report)
 
@@ -454,13 +459,20 @@ def meeting_record(profile: AgentProfile) -> MeetingRecord | None:
     """Kept only when the admin turned an insight on; the conversation only when one needs it."""
     if not profile.insights:
         return None
-    return MeetingRecord(keep_lines=bool({"minutes", "catchup", "copilot"} & set(profile.insights)))
+    return MeetingRecord(
+        keep_lines=bool({"minutes", "catchup", "copilot"} & set(profile.insights))
+    )
 
 
 def follow_record(
-    room: rtc.Room, session: AgentSession[Any], record: MeetingRecord, agent_name: str
+    room: rtc.Room,
+    session: AgentSession[Any],
+    record: MeetingRecord,
+    agent_name: str,
+    *,
+    agent: VoiceAgent | None = None,
 ) -> None:
-    """Who joins and leaves, who is talking and what the agent itself says."""
+    """Who joins and leaves, who is talking and what the agent itself says (also mirrored to chat)."""
 
     def joined(p: rtc.RemoteParticipant) -> None:
         if p.kind != rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
@@ -474,8 +486,14 @@ def follow_record(
 
     def said(event: Any) -> None:
         item = getattr(event, "item", None)
-        if getattr(item, "role", None) == "assistant":
-            record.said(agent_name, getattr(item, "text_content", None) or "")
+        if getattr(item, "role", None) != "assistant":
+            return
+        text = (getattr(item, "text_content", None) or "").strip()
+        if not text:
+            return
+        record.said(agent_name, text)
+        if agent is not None:
+            spawn(agent.post_text(text[:2000]))
 
     session.on("conversation_item_added", said)
 

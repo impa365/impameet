@@ -263,7 +263,11 @@ async def test_the_private_answer_comes_from_the_agents_own_llm() -> None:
 
 
 def test_the_admin_choices_reach_the_agent_and_the_browsers() -> None:
-    assert clean_insights(["metrics", "x", "minutes"]) == ("minutes", "metrics")
+    assert clean_insights(["metrics", "x", "minutes", "workspace"]) == (
+        "minutes",
+        "metrics",
+        "workspace",
+    )
     assert clean_insights("minutes") == ()
     assert clean_access("managers") == "managers"
     assert clean_access("everyone") == "moderators"
@@ -271,8 +275,8 @@ def test_the_admin_choices_reach_the_agent_and_the_browsers() -> None:
     assert p is not None
     assert (p.insights, p.insights_access) == (("copilot",), "managers")
     assert insights_attributes(("minutes",), "moderators") == {}
-    assert insights_attributes(("minutes", "copilot", "metrics"), "managers") == {
-        "impa.insights": "copilot,metrics",
+    assert insights_attributes(("minutes", "copilot", "metrics", "workspace"), "managers") == {
+        "impa.insights": "copilot,metrics,workspace",
         "impa.insights.access": "managers",
     }
 

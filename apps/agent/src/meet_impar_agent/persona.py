@@ -23,6 +23,7 @@ from .profile import AgentProfile, MutePolicy
 from .providers import voice_options
 from .screen import SCREEN_INSTRUCTIONS, ScreenClient, Snapshot, screen_tools
 from .tools import ToolsClient, ToolSpec, external_tools, tools_note
+from .workspace import WORKSPACE_NOTE, Workspace, workspace_tools
 
 logger = logging.getLogger("meet_impar_agent.persona")
 
@@ -104,6 +105,7 @@ class VoiceAgent(Agent):
         tools_client: ToolsClient | None = None,
         tool_specs: tuple[ToolSpec, ...] = (),
         perception: Perception | None = None,
+        workspace: Workspace | None = None,
         actions: bool = True,
         hearing: Callable[[Talker, str], None] | None = None,
         knowledge: KnowledgeClient | None = None,
@@ -126,6 +128,7 @@ class VoiceAgent(Agent):
         self._authors: tuple[Talker, ...] = ()
         self._actions = actions
         self.perception = perception
+        self.workspace = workspace
         self._hearing = hearing
 
         tools: list[Any] = []
@@ -154,6 +157,9 @@ class VoiceAgent(Agent):
         if perception is not None and perception.allowed:
             tools += perception_tools(perception, self)
             parts.append(perception_note(perception.allowed))
+        if workspace is not None:
+            tools += workspace_tools(workspace, self)
+            parts.append(WORKSPACE_NOTE)
         # What the room gives the agent (screen, moderation, tools...) stays for the meeting;
         # what the admin writes (instructions, training, knowledge) can change during it.
         self._room_parts = parts

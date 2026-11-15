@@ -1,4 +1,5 @@
 import { syncLiveAgents } from '@/server/agents/live';
+import { syncAutoTranscript } from '@/server/captions/service';
 import { config } from '@/server/config';
 import { db } from '@/server/db';
 import { lk } from '@/server/livekit-client';
@@ -51,6 +52,11 @@ export async function PATCH(
         void lk()
           .sendData(name, JSON.stringify(settings), AGENT_SETTINGS_TOPIC)
           .catch(() => undefined);
+    }
+    if (patch.autoTranscript !== undefined) {
+      void syncAutoTranscript(db(), lk(), config().agentName, room, user, clientIp(req)).catch(
+        () => undefined,
+      );
     }
     return json({ room, live });
   });

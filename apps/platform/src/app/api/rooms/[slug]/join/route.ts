@@ -1,3 +1,4 @@
+import { ensureAutoCaptions } from '@/server/captions/service';
 import { config } from '@/server/config';
 import { db } from '@/server/db';
 import { notFound, tooManyRequests } from '@/server/errors';
@@ -40,6 +41,13 @@ export async function POST(
         .catch(() => undefined);
       return json({ lobby: ticket }, 202);
     }
-    return json(await grantJoin(db(), config(), room, { ...decision, displayName }));
+    const grant = await grantJoin(db(), config(), room, { ...decision, displayName });
+    // Room policy: start the captions worker so the meeting is saved even if nobody watches live captions.
+    if (room.autoTranscript) {
+      void ensureAutoCaptions(db(), lk(), config().agentName, room, user?.id ?? null, clientIp(req)).catch(
+        () => undefined,
+      );
+    }
+    return json(grant);
   });
 }

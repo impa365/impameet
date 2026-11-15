@@ -78,3 +78,61 @@ export async function stopCaptions(
     ip,
   });
 }
+
+/**
+ * Starts the captions worker because the room's auto-transcript policy is on. Idempotent:
+ * does nothing when the policy is off, the plan forbids it, there is no agent, or it already runs.
+ */
+export async function ensureAutoCaptions(
+  sql: Sql,
+  lk: LiveKitAdmin,
+  agentName: string,
+  room: Room,
+  actorId: string | null,
+  ip: string | null,
+): Promise<void> {
+  if (!room.autoTranscript) return;
+  if (!(await tenantLimits(sql, room.tenantId)).agents) return;
+  if (await captionsOn(lk, room)) return;
+  const [agent] = await roomAgents(sql, room);
+  if (!agent) return;
+  const startedBy = actorId ?? room.ownerId;
+  if (!startedBy) return;
+  await sql`
+    insert into caption_sessions (room_id, started_by) values (${room.id}, ${startedBy})
+    on conflict (room_id) do update set started_by = excluded.started_by, started_at = now()`;
+  await lk.dispatchAgent(
+    livekitRoomName(room.tenantId, room.slug),
+    agentName,
+    JSON.stringify({ mode: CAPTIONS_MODE, agentId: agent.id }),
+  );
+  await audit(sql, {
+    tenantId: room.tenantId,
+    actorId: startedBy,
+    action: 'captions.started',
+    target: room.slug,
+    meta: { auto: true },
+    ip,
+  });
+}
+
+/** Applies the room's auto-transcript policy to the live captions worker (start or stop). */
+export async function syncAutoTranscript(
+  sql: Sql,
+  lk: LiveKitAdmin,
+  agentName: string,
+  room: Room,
+  user: SessionUser | null,
+  ip: string | null,
+): Promise<void> {
+  if (room.autoTranscript) {
+    await ensureAutoCaptions(sql, lk, agentName, room, user?.id ?? null, ip);
+    return;
+  }
+  if (!(await captionsOn(lk, room))) return;
+  try {
+    await stopCaptions(sql, lk, room, user, ip);
+  } catch {
+    // Already off, or the caller cannot stop — the next leave still saves what was said.
+  }
+}

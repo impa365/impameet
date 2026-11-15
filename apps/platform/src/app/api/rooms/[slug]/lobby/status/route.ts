@@ -1,9 +1,11 @@
 import { randomBytes } from 'node:crypto';
+import { ensureAutoCaptions } from '@/server/captions/service';
 import { config } from '@/server/config';
 import { db } from '@/server/db';
 import { notFound, tooManyRequests } from '@/server/errors';
 import { assertSameOrigin, clientIp, handle, json, readJson } from '@/server/http';
 import { limits } from '@/server/limits';
+import { lk } from '@/server/livekit-client';
 import { entryStatus } from '@/server/lobby/service';
 import { currentTenant } from '@/server/request';
 import { grantJoin } from '@/server/rooms/join';
@@ -39,6 +41,16 @@ export async function POST(
       // Admins and managers moderate and skip the waiting room: whoever waited is a member.
       orgRole: entry.userId ? 'member' : undefined,
     });
+    if (room.autoTranscript) {
+      void ensureAutoCaptions(
+        db(),
+        lk(),
+        config().agentName,
+        room,
+        entry.userId,
+        clientIp(req),
+      ).catch(() => undefined);
+    }
     return json({ status: 'approved', ...grant });
   });
 }

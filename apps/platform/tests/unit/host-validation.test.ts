@@ -89,6 +89,7 @@ describe('validation', () => {
       pollsPolicy: 'everyone',
       thinkingSound: true,
       agentActions: true,
+      autoTranscript: false,
       agentEnabled: false,
       studio: false,
     });

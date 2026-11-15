@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { useLocale, useT } from '@/i18n/client';
-import { api } from './api';
+import { ApiError, api } from './api';
 import { messageOf, useLoad } from './admin/useLoad';
 import { EmptyState, Loading } from './ui/EmptyState';
 
@@ -11,6 +11,14 @@ interface Person {
   name: string;
   talkSeconds: number;
   turns: number;
+}
+
+interface Workspace {
+  title: string;
+  plan: string[];
+  decisions: string[];
+  tasks: { task: string; owner: string; due: string }[];
+  notes: string;
 }
 
 interface Report {
@@ -25,10 +33,14 @@ interface Report {
     decisions: string[];
     tasks: { task: string; owner: string; due: string }[];
     topics: string[];
+    nextSteps: string;
   } | null;
+  workspace: Workspace | null;
   status: 'pending' | 'ready' | 'failed';
   error: string | null;
   delivered: { email?: number; webhook?: string };
+  lineCount: number;
+  transcriptId: string | null;
 }
 
 function clock(seconds: number): string {
@@ -42,6 +54,10 @@ export function ReportsPanel() {
   const locale = useLocale();
   const { data, error, setError, reload } = useLoad<{ reports: Report[] }>('/api/reports', 30000);
   const [open, setOpen] = useState<string | null>(null);
+  const [question, setQuestion] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [answer, setAnswer] = useState<{ id: string; text: string } | null>(null);
+
   if (!data) return error ? <div className="error">{error}</div> : <Loading />;
   if (data.reports.length === 0) {
     return (
@@ -69,6 +85,26 @@ export function ReportsPanel() {
     }
   }
 
+  async function ask(e: FormEvent, id: string) {
+    e.preventDefault();
+    const q = question.trim();
+    if (!q) return;
+    setAsking(true);
+    setError('');
+    try {
+      const res = await api<{ answer: string }>(`/api/reports/${id}/ask`, {
+        method: 'POST',
+        body: { question: q },
+      });
+      setAnswer({ id, text: res.answer });
+      setQuestion('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('dashboard.reports.askFailed'));
+    } finally {
+      setAsking(false);
+    }
+  }
+
   return (
     <section className="card">
       <h2 className="card-title">{t('dashboard.reports.title')}</h2>
@@ -83,6 +119,7 @@ export function ReportsPanel() {
           );
           const people = [...r.participants].sort((a, b) => b.talkSeconds - a.talkSeconds);
           const total = people.reduce((n, p) => n + p.talkSeconds, 0) || 1;
+          const hasTranscript = r.lineCount > 0 || Boolean(r.transcriptId);
           return (
             <li key={r.id} className="report">
               <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -103,13 +140,21 @@ export function ReportsPanel() {
                   <button
                     className="btn secondary small"
                     aria-expanded={open === r.id}
-                    onClick={() => setOpen(open === r.id ? null : r.id)}
+                    onClick={() => {
+                      setOpen(open === r.id ? null : r.id);
+                      setAnswer(null);
+                    }}
                   >
                     {open === r.id ? t('dashboard.reports.hide') : t('dashboard.reports.show')}
                   </button>
                   <a className="btn small" href={`/api/reports/${r.id}?format=text`} download>
                     {t('dashboard.reports.download')}
                   </a>
+                  {hasTranscript && (
+                    <a className="btn small" href={`/api/reports/${r.id}?format=transcript`} download>
+                      {t('dashboard.reports.downloadTranscript')}
+                    </a>
+                  )}
                   <button className="btn danger small" onClick={() => remove(r.id)}>
                     {t('common.delete')}
                   </button>
@@ -118,6 +163,16 @@ export function ReportsPanel() {
               {open === r.id && (
                 <div className="report-body">
                   {r.minutes?.summary && <p>{r.minutes.summary}</p>}
+                  {!!r.minutes?.topics?.length && (
+                    <>
+                      <h4>{t('dashboard.reports.topics')}</h4>
+                      <ul>
+                        {r.minutes.topics.map((topic) => (
+                          <li key={topic}>{topic}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                   {!!r.minutes?.decisions.length && (
                     <>
                       <h4>{t('dashboard.reports.decisions')}</h4>
@@ -142,6 +197,46 @@ export function ReportsPanel() {
                       </ul>
                     </>
                   )}
+                  {r.minutes?.nextSteps ? (
+                    <>
+                      <h4>{t('dashboard.reports.nextSteps')}</h4>
+                      <p>{r.minutes.nextSteps}</p>
+                    </>
+                  ) : null}
+                  {r.workspace && (
+                    <>
+                      <h4>{t('dashboard.reports.workspace')}</h4>
+                      {r.workspace.title ? <p>
+                        <strong>{r.workspace.title}</strong>
+                      </p> : null}
+                      {!!r.workspace.plan.length && (
+                        <ol>
+                          {r.workspace.plan.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ol>
+                      )}
+                      {!!r.workspace.decisions.length && (
+                        <ul>
+                          {r.workspace.decisions.map((d) => (
+                            <li key={d}>{d}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {!!r.workspace.tasks.length && (
+                        <ul>
+                          {r.workspace.tasks.map((task) => (
+                            <li key={task.task}>
+                              {task.task}
+                              {task.owner && <strong> · {task.owner}</strong>}
+                              {task.due && <span className="muted"> · {task.due}</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {r.workspace.notes ? <p>{r.workspace.notes}</p> : null}
+                    </>
+                  )}
                   <h4>{t('dashboard.reports.participation')}</h4>
                   <table className="grid">
                     <thead>
@@ -163,6 +258,28 @@ export function ReportsPanel() {
                       ))}
                     </tbody>
                   </table>
+                  <form className="group-form" onSubmit={(e) => void ask(e, r.id)}>
+                    <label htmlFor={`ask-${r.id}`}>
+                      <strong>{t('dashboard.reports.askLabel')}</strong>
+                    </label>
+                    <div className="row">
+                      <input
+                        id={`ask-${r.id}`}
+                        value={open === r.id ? question : ''}
+                        onChange={(e) => setQuestion(e.target.value)}
+                        placeholder={t('dashboard.reports.askPlaceholder')}
+                        disabled={asking}
+                      />
+                      <button className="btn small" disabled={asking || !question.trim()}>
+                        {asking ? t('dashboard.reports.asking') : t('dashboard.reports.ask')}
+                      </button>
+                    </div>
+                  </form>
+                  {answer?.id === r.id && (
+                    <p className="report-answer" role="status">
+                      {answer.text}
+                    </p>
+                  )}
                   {r.delivered.email !== undefined && (
                     <p className="muted small-print">
                       {t('dashboard.reports.emailed', { count: r.delivered.email })}

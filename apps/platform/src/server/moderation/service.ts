@@ -107,6 +107,7 @@ export interface MeetingControls {
   pollsPolicy?: 'everyone' | 'moderators';
   thinkingSound?: boolean;
   agentActions?: boolean;
+  autoTranscript?: boolean;
 }
 
 /**
@@ -126,7 +127,8 @@ export async function setMeetingControls(
       board_policy = coalesce(${patch.boardPolicy ?? null}::text, board_policy),
       polls_policy = coalesce(${patch.pollsPolicy ?? null}::text, polls_policy),
       thinking_sound = coalesce(${patch.thinkingSound ?? null}::boolean, thinking_sound),
-      agent_actions = coalesce(${patch.agentActions ?? null}::boolean, agent_actions)
+      agent_actions = coalesce(${patch.agentActions ?? null}::boolean, agent_actions),
+      auto_transcript = coalesce(${patch.autoTranscript ?? null}::boolean, auto_transcript)
     where id = ${room.id}`;
   await audit(sql, {
     tenantId: room.tenantId,

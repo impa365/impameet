@@ -21,6 +21,7 @@ const TITLES: Record<PanelId, MessageKey> = {
   host: 'room.panels.host',
   a11y: 'room.panels.a11y',
   copilot: 'room.panels.copilot',
+  workspace: 'room.panels.workspace',
   studio: 'studio.panel.title',
   live: 'live.panel',
 };
