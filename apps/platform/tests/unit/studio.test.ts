@@ -118,11 +118,11 @@ describe('studio stage', () => {
 
     state = cutPreviewToProgram(state);
     expect(programScene(state).sources).toHaveLength(3);
-    expect(programScene(state).sources.map((s) => s.type).sort()).toEqual([
-      'browser',
-      'clock',
-      'text',
-    ]);
+    expect(
+      programScene(state)
+        .sources.map((s) => s.type)
+        .sort(),
+    ).toEqual(['browser', 'clock', 'text']);
 
     state = updateSourceInPreview(state, lower.id, { visible: false, text: 'Convidado' });
     expect(previewScene(state).sources.find((s) => s.id === lower.id)).toMatchObject({
@@ -162,9 +162,38 @@ describe('studio stage', () => {
           names: true,
           brand: EMPTY_STUDIO.scenes[0].brand,
           sources: [
-            { id: 's1', type: 'browser', name: 'ok', url: 'https://livepix.gg/', muted: true, visible: true, z: 1, opacity: 1, box: { x: 0, y: 0, w: 10, h: 10 } },
-            { id: 's2', type: 'browser', name: 'bad', url: 'ftp://x', muted: true, visible: true, z: 1, opacity: 1, box: { x: 0, y: 0, w: 10, h: 10 } },
-            { id: 's3', type: 'image', name: 'draft', url: 'https://', visible: true, z: 1, opacity: 1, box: { x: 0, y: 0, w: 10, h: 10 } },
+            {
+              id: 's1',
+              type: 'browser',
+              name: 'ok',
+              url: 'https://livepix.gg/',
+              muted: true,
+              visible: true,
+              z: 1,
+              opacity: 1,
+              box: { x: 0, y: 0, w: 10, h: 10 },
+            },
+            {
+              id: 's2',
+              type: 'browser',
+              name: 'bad',
+              url: 'ftp://x',
+              muted: true,
+              visible: true,
+              z: 1,
+              opacity: 1,
+              box: { x: 0, y: 0, w: 10, h: 10 },
+            },
+            {
+              id: 's3',
+              type: 'image',
+              name: 'draft',
+              url: 'https://',
+              visible: true,
+              z: 1,
+              opacity: 1,
+              box: { x: 0, y: 0, w: 10, h: 10 },
+            },
           ],
         },
       ],
@@ -225,13 +254,7 @@ describe('studio stage', () => {
   });
 
   it('exposes ready-made presets', () => {
-    expect(SOURCE_PRESETS.map((p) => p.id).sort()).toEqual([
-      'alert',
-      'clock',
-      'livepix',
-      'lower',
-      'qr',
-    ]);
+    expect(SOURCE_PRESETS.map((p) => p.id).sort()).toEqual(['alert', 'clock', 'livepix', 'lower', 'qr']);
     for (const p of SOURCE_PRESETS) {
       const src = p.build();
       expect(src.id).toBeTruthy();

@@ -107,21 +107,14 @@ export function StudioSourcesPanel(props: { control: StudioControl }) {
   );
 }
 
-function SourceEditor(props: {
-  source: StudioSource;
-  onChange: (patch: Partial<StudioSource>) => void;
-}) {
+function SourceEditor(props: { source: StudioSource; onChange: (patch: Partial<StudioSource>) => void }) {
   const t = useT();
   const { source, onChange } = props;
   return (
     <div className="studio-source-editor">
       <label>
         {t('studio.sources.name')}
-        <input
-          className="field"
-          value={source.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-        />
+        <input className="field" value={source.name} onChange={(e) => onChange({ name: e.target.value })} />
       </label>
       {source.type === 'browser' && (
         <>
@@ -289,9 +282,7 @@ function TextLook(props: {
         <select
           className="field"
           value={props.align}
-          onChange={(e) =>
-            onChange({ align: e.target.value as 'left' | 'center' | 'right' })
-          }
+          onChange={(e) => onChange({ align: e.target.value as 'left' | 'center' | 'right' })}
         >
           <option value="left">{t('studio.sources.alignLeft')}</option>
           <option value="center">{t('studio.sources.alignCenter')}</option>

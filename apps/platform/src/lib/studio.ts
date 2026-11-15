@@ -80,11 +80,7 @@ export interface StudioClockSource extends StudioSourceBase {
   size: number;
 }
 
-export type StudioSource =
-  | StudioBrowserSource
-  | StudioImageSource
-  | StudioTextSource
-  | StudioClockSource;
+export type StudioSource = StudioBrowserSource | StudioImageSource | StudioTextSource | StudioClockSource;
 
 /** Layout + people + overlays for one scene (what the canvas draws). */
 export interface StudioSceneBody {
@@ -319,8 +315,7 @@ function parseSource(raw: unknown): StudioSource | null {
     };
   }
   if (d.type === 'clock') {
-    const format =
-      d.format === 'seconds' || d.format === 'date' ? d.format : ('time' as const);
+    const format = d.format === 'seconds' || d.format === 'date' ? d.format : ('time' as const);
     const color = typeof d.color === 'string' && HEXA.test(d.color) ? d.color : '#ffffff';
     const background =
       typeof d.background === 'string' && HEXA.test(d.background) ? d.background : '#00000099';
@@ -367,16 +362,17 @@ function parseBrand(raw: unknown): StudioBrand {
 function parseStage(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return [
-    ...new Set(
-      raw.filter((s): s is string => typeof s === 'string' && s.length > 0 && s.length <= 200),
-    ),
+    ...new Set(raw.filter((s): s is string => typeof s === 'string' && s.length > 0 && s.length <= 200)),
   ].slice(0, MAX_ON_STAGE);
 }
 
 function parseSceneBody(d: Record<string, unknown>): StudioSceneBody {
   const banners = parseBanners(d.banners);
   const sources = Array.isArray(d.sources)
-    ? d.sources.map(parseSource).filter((s): s is StudioSource => !!s).slice(0, MAX_SOURCES)
+    ? d.sources
+        .map(parseSource)
+        .filter((s): s is StudioSource => !!s)
+        .slice(0, MAX_SOURCES)
     : [];
   return {
     layout: isLayout(d.layout) ? d.layout : DEFAULT_BODY.layout,
@@ -431,10 +427,8 @@ export function parseStudio(raw: unknown): StudioState {
       .slice(0, MAX_SCENES);
     if (scenes.length === 0) return structuredClone(EMPTY_STUDIO);
     const ids = new Set(scenes.map((s) => s.id));
-    const programId =
-      typeof d.programId === 'string' && ids.has(d.programId) ? d.programId : scenes[0].id;
-    const previewId =
-      typeof d.previewId === 'string' && ids.has(d.previewId) ? d.previewId : programId;
+    const programId = typeof d.programId === 'string' && ids.has(d.programId) ? d.programId : scenes[0].id;
+    const previewId = typeof d.previewId === 'string' && ids.has(d.previewId) ? d.previewId : programId;
     return {
       scenes,
       programId,
@@ -644,5 +638,7 @@ export function layoutShape(layout: StudioLayout): { max: number; screenFirst: b
 
 /** Sorted visible sources for painting (low z first). */
 export function sortedSources(scene: StudioSceneBody): StudioSource[] {
-  return [...scene.sources].filter((s) => s.visible).sort((a, b) => a.z - b.z || a.name.localeCompare(b.name));
+  return [...scene.sources]
+    .filter((s) => s.visible)
+    .sort((a, b) => a.z - b.z || a.name.localeCompare(b.name));
 }

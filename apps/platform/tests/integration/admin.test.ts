@@ -517,8 +517,18 @@ describe('studio', () => {
       programId: 'sc_program',
       previewId: 'sc_preview',
       scenes: [
-        expect.objectContaining({ id: 'sc_program', layout: 'leader', stage: ['g-ana', 'g-bob'], banner: 'b1' }),
-        expect.objectContaining({ id: 'sc_preview', layout: 'leader', stage: ['g-ana', 'g-bob'], banner: 'b1' }),
+        expect.objectContaining({
+          id: 'sc_program',
+          layout: 'leader',
+          stage: ['g-ana', 'g-bob'],
+          banner: 'b1',
+        }),
+        expect.objectContaining({
+          id: 'sc_preview',
+          layout: 'leader',
+          stage: ['g-ana', 'g-bob'],
+          banner: 'b1',
+        }),
       ],
     });
     expect(lk.calls).toEqual([

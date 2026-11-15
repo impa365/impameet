@@ -50,8 +50,7 @@ export default defineMessages(
     },
     sources: {
       title: 'Fontes e overlays',
-      intro:
-        'Como no OBS: cole a URL do Live Pix, alertas ou qualquer página https. Posicione em % da tela.',
+      intro: 'Como no OBS: cole a URL do Live Pix, alertas ou qualquer página https. Posicione em % da tela.',
       empty: 'Nenhuma fonte ainda. Use um preset acima.',
       browser: 'Página (browser)',
       image: 'Imagem',
