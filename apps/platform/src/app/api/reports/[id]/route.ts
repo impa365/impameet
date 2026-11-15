@@ -3,12 +3,7 @@ import { db } from '@/server/db';
 import { notFound } from '@/server/errors';
 import { readerUser, writerUser } from '@/server/guard';
 import { clientIp, handle, json } from '@/server/http';
-import {
-  deleteReport,
-  findReport,
-  minutesText,
-  reportTranscriptText,
-} from '@/server/insights/reports';
+import { deleteReport, findReport, minutesText, reportTranscriptText } from '@/server/insights/reports';
 
 export const dynamic = 'force-dynamic';
 

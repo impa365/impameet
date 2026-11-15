@@ -42,14 +42,9 @@ export async function POST(
       orgRole: entry.userId ? 'member' : undefined,
     });
     if (room.autoTranscript) {
-      void ensureAutoCaptions(
-        db(),
-        lk(),
-        config().agentName,
-        room,
-        entry.userId,
-        clientIp(req),
-      ).catch(() => undefined);
+      void ensureAutoCaptions(db(), lk(), config().agentName, room, entry.userId, clientIp(req)).catch(
+        () => undefined,
+      );
     }
     return json({ status: 'approved', ...grant });
   });

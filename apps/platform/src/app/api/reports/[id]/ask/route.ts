@@ -12,10 +12,7 @@ export const dynamic = 'force-dynamic';
 const reportId = z.string().uuid();
 
 /** Ask a question about a finished meeting (ata + workspace + transcript). */
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<Response> {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
   return handle(async () => {
     assertSameOrigin(req);
     const user = await writerUser(req);

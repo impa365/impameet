@@ -243,8 +243,7 @@ export function minutesText(
     out.push('Quadro de trabalho');
     if (r.workspace.title) out.push(r.workspace.title);
     if (r.workspace.plan.length) out.push(...r.workspace.plan.map((x) => `- ${x}`));
-    if (r.workspace.decisions.length)
-      out.push('Decisões', ...r.workspace.decisions.map((x) => `- ${x}`));
+    if (r.workspace.decisions.length) out.push('Decisões', ...r.workspace.decisions.map((x) => `- ${x}`));
     if (r.workspace.tasks.length)
       out.push(
         'Tarefas do quadro',
@@ -457,9 +456,7 @@ const ASK_PROMPT =
 /** Lines + workspace for asking about a past meeting (ACL via findReport). */
 export async function reportContext(sql: Sql, user: SessionUser, id: string) {
   const report = await findReport(sql, user, id);
-  const [row] = await sql<
-    { lines: MeetingReportInput['lines']; workspace: MeetingWorkspace | null }[]
-  >`
+  const [row] = await sql<{ lines: MeetingReportInput['lines']; workspace: MeetingWorkspace | null }[]>`
     select lines, workspace from meeting_reports where id = ${id}`;
   let lines = row?.lines ?? [];
   if (!lines.length && report.transcriptId) {
@@ -488,9 +485,7 @@ export async function askAboutReport(
 ): Promise<{ answer: string }> {
   const { sql } = deps;
   const { report, lines, workspace } = await reportContext(sql, user, id);
-  const [agent] = await sql<
-    { tenantId: string; llmIntegrationId: string | null; llmModel: string | null }[]
-  >`
+  const [agent] = await sql<{ tenantId: string; llmIntegrationId: string | null; llmModel: string | null }[]>`
     select m.tenant_id as "tenantId", a.llm_integration_id as "llmIntegrationId", a.llm_model as "llmModel"
     from meeting_reports m left join agents a on a.id = m.agent_id where m.id = ${id}`;
   if (!deps.key || !agent?.llmIntegrationId || !agent.llmModel) {

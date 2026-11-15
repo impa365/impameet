@@ -206,9 +206,11 @@ export function ReportsPanel() {
                   {r.workspace && (
                     <>
                       <h4>{t('dashboard.reports.workspace')}</h4>
-                      {r.workspace.title ? <p>
-                        <strong>{r.workspace.title}</strong>
-                      </p> : null}
+                      {r.workspace.title ? (
+                        <p>
+                          <strong>{r.workspace.title}</strong>
+                        </p>
+                      ) : null}
                       {!!r.workspace.plan.length && (
                         <ol>
                           {r.workspace.plan.map((item) => (

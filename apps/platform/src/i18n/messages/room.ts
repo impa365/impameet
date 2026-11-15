@@ -506,8 +506,7 @@ export default defineMessages(
         off: 'Hide captions',
         on: 'Show captions',
         start: 'Show captions',
-        unavailable:
-          'Captions unavailable: automatic transcription must be on in the room settings',
+        unavailable: 'Captions unavailable: automatic transcription must be on in the room settings',
       },
       more: {
         stopRecording: 'Stop recording',
@@ -997,7 +996,7 @@ export default defineMessages(
         host: 'Controles del organizador',
         a11y: 'Accesibilidad',
         copilot: 'Copiloto IA',
-      workspace: 'Trabalho da IA',
+        workspace: 'Trabalho da IA',
       },
       info: {
         inBreakout: 'Estás en la sala para grupos {n}.',
