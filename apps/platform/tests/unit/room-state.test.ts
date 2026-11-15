@@ -4,8 +4,14 @@ import { EMPTY_STUDIO } from '@/lib/studio';
 
 describe('room state', () => {
   it('reads what the platform tells the room', () => {
+    const studio = {
+      ...EMPTY_STUDIO,
+      scenes: EMPTY_STUDIO.scenes.map((s) =>
+        s.id === EMPTY_STUDIO.programId ? { ...s, layout: 'solo' as const, stage: ['g-a'] } : s,
+      ),
+    };
     const state = {
-      studio: { ...EMPTY_STUDIO, layout: 'solo', stage: ['g-a'] },
+      studio,
       recording: true,
       live: { since: '2026-11-13T22:00:00.000Z', to: ['YouTube · Canal', 'Twitch'] },
     };
