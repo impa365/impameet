@@ -276,9 +276,9 @@ def _build_agent(
 
 def _report_rejected(settings: Settings, metadata: str | None, room_name: str) -> None:
     if settings.platform and (aid := agent_id_from_metadata(metadata)):
-        HealthReporter(
-            platform=settings.platform, agent_id=aid, room_name=room_name
-        ).rejected("config_missing")
+        HealthReporter(platform=settings.platform, agent_id=aid, room_name=room_name).rejected(
+            "config_missing"
+        )
 
 
 def _voice_session(profile: AgentProfile, vad: Any) -> AgentSession[None]:
