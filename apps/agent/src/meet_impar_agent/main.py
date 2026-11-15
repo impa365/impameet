@@ -459,9 +459,7 @@ def meeting_record(profile: AgentProfile) -> MeetingRecord | None:
     """Kept only when the admin turned an insight on; the conversation only when one needs it."""
     if not profile.insights:
         return None
-    return MeetingRecord(
-        keep_lines=bool({"minutes", "catchup", "copilot"} & set(profile.insights))
-    )
+    return MeetingRecord(keep_lines=bool({"minutes", "catchup", "copilot"} & set(profile.insights)))
 
 
 def follow_record(

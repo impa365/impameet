@@ -79,9 +79,7 @@ class WorkspaceState:
         }
 
     def empty(self) -> bool:
-        return not (
-            self.title or self.plan or self.decisions or self.tasks or self.notes.strip()
-        )
+        return not (self.title or self.plan or self.decisions or self.tasks or self.notes.strip())
 
     def apply(
         self,
