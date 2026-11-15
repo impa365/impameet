@@ -466,17 +466,30 @@ describe('studio', () => {
     livekitApiSecret: 'a-very-long-livekit-secret-for-tests-0123456789',
     agentName: 'kaiser',
   };
-  const stage = (input: Record<string, unknown>) =>
-    studioStateInput.parse({
-      layout: 'grid',
-      stage: [],
-      screen: null,
-      banners: [],
-      banner: null,
-      names: true,
-      brand: { color: '#112233', background: '#000000', logo: null },
-      ...input,
+  const sceneBody = (input: Record<string, unknown> = {}) => ({
+    layout: 'grid' as const,
+    stage: [] as string[],
+    screen: null as string | null,
+    banners: [] as { id: string; text: string; style: 'bar' | 'ticker' }[],
+    banner: null as string | null,
+    names: true,
+    brand: { color: '#112233', background: '#000000', logo: null as string | null },
+    sources: [] as unknown[],
+    ...input,
+  });
+  const stage = (input: Record<string, unknown> = {}) => {
+    if (Array.isArray(input.scenes)) return studioStateInput.parse(input);
+    const body = sceneBody(input);
+    return studioStateInput.parse({
+      scenes: [
+        { id: 'sc_program', name: 'Ao vivo', ...body },
+        { id: 'sc_preview', name: 'Montagem', ...body },
+      ],
+      programId: 'sc_program',
+      previewId: 'sc_preview',
+      transition: 'cut',
     });
+  };
 
   it('keeps the stage on the room, pushes it to the live room and opens the next session with it', async () => {
     const { tenant, user: admin } = await org('show');
@@ -500,7 +513,14 @@ describe('studio', () => {
       }),
       '10.0.0.1',
     );
-    expect(saved).toMatchObject({ layout: 'leader', stage: ['g-ana', 'g-bob'], banner: 'b1' });
+    expect(saved).toMatchObject({
+      programId: 'sc_program',
+      previewId: 'sc_preview',
+      scenes: [
+        expect.objectContaining({ id: 'sc_program', layout: 'leader', stage: ['g-ana', 'g-bob'], banner: 'b1' }),
+        expect.objectContaining({ id: 'sc_preview', layout: 'leader', stage: ['g-ana', 'g-bob'], banner: 'b1' }),
+      ],
+    });
     expect(lk.calls).toEqual([
       `metadata ${lkRoom} ${JSON.stringify({ studio: saved, recording: false, live: null })}`,
     ]);
@@ -527,7 +547,10 @@ describe('studio', () => {
     expect(grant.studio).toBe(true);
     const claims = await new TokenVerifier(cfg.livekitApiKey, cfg.livekitApiSecret).verify(grant.token);
     expect(JSON.parse(claims.roomConfig?.metadata ?? '{}')).toMatchObject({
-      studio: { layout: 'pip', stage: ['g-ana'] },
+      studio: {
+        programId: 'sc_program',
+        scenes: [expect.objectContaining({ id: 'sc_program', layout: 'pip', stage: ['g-ana'] })],
+      },
       recording: false,
       live: null,
     });
@@ -565,11 +588,41 @@ describe('studio', () => {
       { brand: { color: 'red', background: '#000000', logo: null } },
       { brand: { color: '#000000', background: '#000000', logo: 'http://logo.test/a.png' } },
       { extra: true },
+      {
+        sources: [
+          {
+            id: 's1',
+            type: 'browser',
+            name: 'bad',
+            url: 'http://evil.test',
+            muted: true,
+            visible: true,
+            z: 1,
+            opacity: 1,
+            box: { x: 0, y: 0, w: 10, h: 10 },
+          },
+        ],
+      },
     ];
     for (const input of bad) expect(() => stage(input)).toThrow();
-    expect(
-      stage({ brand: { color: '#000000', background: '#ffffff', logo: 'https://x.test/l.png' } }).brand.logo,
-    ).toBe('https://x.test/l.png');
+    const ok = stage({
+      brand: { color: '#000000', background: '#ffffff', logo: 'https://x.test/l.png' },
+      sources: [
+        {
+          id: 's1',
+          type: 'browser',
+          name: 'Live Pix',
+          url: 'https://livepix.gg/',
+          muted: true,
+          visible: true,
+          z: 1,
+          opacity: 1,
+          box: { x: 60, y: 10, w: 30, h: 40 },
+        },
+      ],
+    });
+    expect(ok.scenes[0].brand.logo).toBe('https://x.test/l.png');
+    expect(ok.scenes[0].sources).toHaveLength(1);
   });
 });
 

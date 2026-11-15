@@ -9,23 +9,25 @@ import {
 } from '@livekit/components-react';
 import { ConnectionState, Track } from 'livekit-client';
 import { useEffect, useRef } from 'react';
+import { programScene } from '@/lib/studio';
 import { StudioCanvas, useStudioState, useStudioTracks } from './StudioCanvas';
 
 /** Egress starts recording when the page says so, and the stage needs a moment to show. */
 const SETTLE_MS = 1500;
 
 function Stage() {
-  const state = useStudioState();
+  const studio = useStudioState();
+  const program = programScene(studio);
   const tracks = useStudioTracks();
   const connection = useConnectionState();
   const started = useRef(false);
-  // Only the stage is heard: people backstage stay out of the recording.
+  // Only Program is heard: people only in Preview stay out of the recording.
   const audio = useTracks([Track.Source.Microphone, Track.Source.ScreenShareAudio]).filter(
     (t) =>
       isTrackReference(t) &&
       (t.source === Track.Source.Microphone
-        ? state.stage.includes(t.participant.identity)
-        : state.screen === t.participant.identity),
+        ? program.stage.includes(t.participant.identity)
+        : program.screen === t.participant.identity),
   );
 
   useEffect(() => {
@@ -40,7 +42,7 @@ function Stage() {
 
   return (
     <>
-      <StudioCanvas state={state} tracks={tracks} fill />
+      <StudioCanvas state={program} tracks={tracks} fill />
       {audio.filter(isTrackReference).map((t) => (
         <AudioTrack key={t.publication.trackSid} trackRef={t} />
       ))}

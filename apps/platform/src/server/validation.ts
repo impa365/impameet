@@ -322,47 +322,131 @@ export const liveStartInput = z
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida');
 
-/** The studio stage the producer sets (see lib/studio.ts). */
+const studioBox = z.object({
+  x: z.number().min(0).max(100),
+  y: z.number().min(0).max(100),
+  w: z.number().min(2).max(100),
+  h: z.number().min(2).max(100),
+});
+
+const studioSourceBase = {
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
+  name: z.string().trim().min(1).max(60),
+  visible: z.boolean(),
+  z: z.number().min(0).max(100),
+  opacity: z.number().min(0).max(1),
+  box: studioBox,
+};
+
+const studioSource = z.discriminatedUnion('type', [
+  z
+    .object({
+      ...studioSourceBase,
+      type: z.literal('browser'),
+      url: z
+        .string()
+        .trim()
+        .max(2000)
+        .refine((v) => v.startsWith('https://'), 'Use um endereço https://'),
+      muted: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      ...studioSourceBase,
+      type: z.literal('image'),
+      url: z
+        .string()
+        .trim()
+        .max(2000)
+        .refine((v) => v.startsWith('https://'), 'Use um endereço https://'),
+    })
+    .strict(),
+  z
+    .object({
+      ...studioSourceBase,
+      type: z.literal('text'),
+      text: z.string().trim().min(1).max(500),
+      color: z.string().regex(/^#[0-9a-fA-F]{6,8}$/),
+      background: z.string().regex(/^#[0-9a-fA-F]{6,8}$/),
+      align: z.enum(['left', 'center', 'right']),
+      size: z.number().min(12).max(96),
+    })
+    .strict(),
+  z
+    .object({
+      ...studioSourceBase,
+      type: z.literal('clock'),
+      format: z.enum(['time', 'seconds', 'date']),
+      color: z.string().regex(/^#[0-9a-fA-F]{6,8}$/),
+      background: z.string().regex(/^#[0-9a-fA-F]{6,8}$/),
+      align: z.enum(['left', 'center', 'right']),
+      size: z.number().min(12).max(96),
+    })
+    .strict(),
+]);
+
+const studioSceneBody = z.object({
+  layout: z.enum(['solo', 'grid', 'leader', 'screen', 'pip']),
+  stage: z
+    .array(z.string().min(1).max(200))
+    .max(9, 'Até 9 pessoas no palco')
+    .transform((s) => [...new Set(s)]),
+  screen: z.string().min(1).max(200).nullable(),
+  banners: z
+    .array(
+      z
+        .object({
+          id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
+          text: z
+            .string()
+            .trim()
+            .min(1, 'Escreva o texto do banner')
+            .max(200, 'Banner muito longo (máx. 200)'),
+          style: z.enum(['bar', 'ticker']),
+        })
+        .strict(),
+    )
+    .max(20, 'Até 20 banners'),
+  banner: z.string().max(40).nullable(),
+  names: z.boolean(),
+  brand: z
+    .object({
+      color: hexColor,
+      background: hexColor,
+      logo: z
+        .string()
+        .trim()
+        .max(500)
+        .refine((v) => v.startsWith('https://'), 'Use um endereço https:// para o logo')
+        .nullable(),
+    })
+    .strict(),
+  sources: z.array(studioSource).max(16).default([]),
+});
+
+/** The studio stage the producer sets (scenes + program/preview; see lib/studio.ts). */
 export const studioStateInput = z
   .object({
-    layout: z.enum(['solo', 'grid', 'leader', 'screen', 'pip']),
-    stage: z
-      .array(z.string().min(1).max(200))
-      .max(9, 'Até 9 pessoas no palco')
-      .transform((s) => [...new Set(s)]),
-    screen: z.string().min(1).max(200).nullable(),
-    banners: z
+    scenes: z
       .array(
-        z
-          .object({
+        studioSceneBody
+          .extend({
             id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
-            text: z
-              .string()
-              .trim()
-              .min(1, 'Escreva o texto do banner')
-              .max(200, 'Banner muito longo (máx. 200)'),
-            style: z.enum(['bar', 'ticker']),
+            name: z.string().trim().min(1).max(40),
           })
-          .strict(),
+          .strict()
+          .refine((s) => s.banner === null || s.banners.some((b) => b.id === s.banner), 'Banner inexistente'),
       )
-      .max(20, 'Até 20 banners'),
-    banner: z.string().max(40).nullable(),
-    names: z.boolean(),
-    brand: z
-      .object({
-        color: hexColor,
-        background: hexColor,
-        logo: z
-          .string()
-          .trim()
-          .max(500)
-          .refine((v) => v.startsWith('https://'), 'Use um endereço https:// para o logo')
-          .nullable(),
-      })
-      .strict(),
+      .min(1)
+      .max(12),
+    programId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
+    previewId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
+    transition: z.enum(['cut', 'fade']).default('cut'),
   })
   .strict()
-  .refine((s) => s.banner === null || s.banners.some((b) => b.id === s.banner), 'Banner inexistente');
+  .refine((s) => s.scenes.some((c) => c.id === s.programId), 'Cena ao vivo inválida')
+  .refine((s) => s.scenes.some((c) => c.id === s.previewId), 'Cena de montagem inválida');
 
 /** What any moderator of the meeting may change while it runs (the rest stays the organizer's). */
 export const meetingControlsInput = z

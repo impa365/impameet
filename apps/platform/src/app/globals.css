@@ -5822,6 +5822,246 @@ a.shell-user[aria-current='page'] {
 
 /* Studio: the stage that goes live, the producer's controls, the recorder's page. */
 
+.studio-director {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .studio-director {
+    grid-template-columns: 1fr;
+  }
+}
+
+.studio-monitor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.studio-monitor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.studio-pill {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.studio-pill.live {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.studio-pill.draft {
+  background: color-mix(in srgb, var(--brand, #2563eb) 25%, transparent);
+  color: var(--text, #e2e8f0);
+}
+
+.studio-scenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.studio-scene-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #334155);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.studio-scene-btn small {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.studio-scene-btn.on {
+  border-color: var(--brand, #2563eb);
+  background: color-mix(in srgb, var(--brand, #2563eb) 18%, transparent);
+}
+
+.studio-scene-btn.program:not(.on) {
+  border-color: #b91c1c;
+}
+
+.studio-scene-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.studio-transition {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #334155);
+  background: transparent;
+  color: inherit;
+}
+
+.studio-canvas[data-fade] {
+  animation: studio-fade-in 0.45s ease;
+}
+
+@keyframes studio-fade-in {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.studio-source {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+.studio-source iframe,
+.studio-source img {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: contain;
+  background: transparent;
+}
+
+.studio-source.text {
+  display: flex;
+  align-items: center;
+  padding: 0.4em 0.6em;
+  container-type: inline-size;
+  pointer-events: none;
+}
+
+.studio-source-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: color-mix(in srgb, #000 45%, transparent);
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+}
+
+.studio-sources-panel {
+  margin-bottom: 1.25rem;
+}
+
+.studio-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+
+.studio-source-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.studio-source-list > li.open {
+  background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.studio-source-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.studio-source.clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.studio-source-pick {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 0;
+}
+
+.studio-source-pick small {
+  color: var(--muted);
+}
+
+.studio-source-toggle {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.studio-source-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 8px 28px;
+}
+
+.studio-box-fields {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  border: 1px solid var(--border, #334155);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 0;
+}
+
+.studio-box-fields legend {
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.studio-box-fields input {
+  width: 100%;
+}
+
 .studio-main {
   position: absolute;
   inset: 0;

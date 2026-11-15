@@ -7,7 +7,7 @@ import type { RoomModerator } from '../moderation/service';
 import { publishRoomState } from '../room-state';
 import type { Room } from '../rooms/service';
 import type { studioStateInput } from '../validation';
-import { type StudioState, parseStudio } from '@/lib/studio';
+import { type StudioState, ensureDirectorPair, parseStudio, programScene } from '@/lib/studio';
 
 /** The room's stage as last set (an empty one before anybody produced it). */
 export async function studioState(sql: Sql, room: Pick<Room, 'id'>): Promise<StudioState> {
@@ -33,11 +33,13 @@ export async function saveStudio(
   if (!room.studio) throw badRequest('Esta sala não é um estúdio');
   if (!who) throw forbidden('Só quem produz o estúdio pode mudar o palco');
   const before = await studioState(sql, room);
-  const state = parseStudio(input);
+  const state = ensureDirectorPair(parseStudio(input));
   await sql`update rooms set studio_state = ${sql.json(state as never)} where id = ${room.id}`;
   await publishRoomState(sql, lk, room);
-  const joined = state.stage.filter((s) => !before.stage.includes(s));
-  const left = before.stage.filter((s) => !state.stage.includes(s));
+  const beforeStage = programScene(before).stage;
+  const afterStage = programScene(state).stage;
+  const joined = afterStage.filter((s) => !beforeStage.includes(s));
+  const left = beforeStage.filter((s) => !afterStage.includes(s));
   if (joined.length || left.length) {
     await audit(sql, {
       tenantId: room.tenantId,

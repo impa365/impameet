@@ -19,13 +19,32 @@ import {
   MAX_ON_STAGE,
   STUDIO_LAYOUTS,
   type StudioBanner,
+  type StudioBrand,
   type StudioLayout,
+  type StudioScene,
+  type StudioSource,
   type StudioState,
+  addScene,
+  addSourceToPreview,
+  copyProgramToPreview,
+  cutPreviewToProgram,
+  deleteScene,
+  duplicateScene,
+  ensureDirectorPair,
   parseStudio,
+  previewScene,
+  programScene,
+  removeSourceFromPreview,
+  renameScene,
+  setPreviewScene,
+  setTransition,
+  updatePreview,
+  updateSourceInPreview,
 } from '@/lib/studio';
 import { ApiError, api } from '../api';
 import { Icon } from '../ui/Icon';
 import { StudioCanvas, useStudioState, useStudioTracks } from './StudioCanvas';
+import { StudioSourcesPanel } from './StudioSources';
 
 const LAYOUT_LABEL: Record<StudioLayout, MessageKey> = {
   solo: 'studio.layout.solo',
@@ -40,12 +59,27 @@ const ECHO_MS = 4000;
 
 export interface StudioControl {
   state: StudioState;
-  change: (edit: (s: StudioState) => StudioState) => void;
+  program: StudioScene;
+  preview: StudioScene;
+  /** Edit the Preview (draft) only — does not change what is on air until goLive. */
+  changePreview: (edit: (scene: StudioScene) => StudioScene) => void;
+  /** Copy Preview → Program (cut/fade to air). */
+  goLive: () => void;
+  loadPreview: (sceneId: string) => void;
+  newScene: () => void;
+  rename: (sceneId: string, name: string) => void;
+  removeScene: (sceneId: string) => void;
+  duplicate: (sceneId: string) => void;
+  pullProgram: () => void;
+  setTransitionMode: (mode: 'cut' | 'fade') => void;
+  addSource: (source: StudioSource) => void;
+  patchSource: (id: string, patch: Partial<StudioSource>) => void;
+  removeSource: (id: string) => void;
 }
 
 /**
- * The producer's handle on the stage: changes show at once and are sent to the server, which
- * pushes them to everyone through the room's metadata.
+ * The producer's handle: Preview edits are drafted locally then saved; Program is what guests
+ * and the recorder see. goLive cuts Preview into Program.
  */
 export function useStudioControl(
   slug: string,
@@ -56,7 +90,7 @@ export function useStudioControl(
   const room = useRoomContext();
   const live = useStudioState();
   const [draft, setDraft] = useState<StudioState | null>(null);
-  const state = draft ?? live;
+  const state = ensureDirectorPair(draft ?? live);
   const stateRef = useRef(state);
   stateRef.current = state;
   const errorRef = useRef(onError);
@@ -70,15 +104,18 @@ export function useStudioControl(
     return () => clearTimeout(timer);
   }, [draft, live]);
 
-  const change = useCallback(
-    (edit: (s: StudioState) => StudioState) => {
+  const save = useCallback(
+    (nextRaw: StudioState) => {
       const here = new Set([room.localParticipant.identity, ...room.remoteParticipants.keys()]);
-      const edited = edit(stateRef.current);
-      const next = parseStudio({
-        ...edited,
-        stage: edited.stage.filter((id) => here.has(id)),
-        screen: edited.screen && here.has(edited.screen) ? edited.screen : null,
+      const cleaned = parseStudio({
+        ...nextRaw,
+        scenes: nextRaw.scenes.map((sc) => ({
+          ...sc,
+          stage: sc.stage.filter((id) => here.has(id)),
+          screen: sc.screen && here.has(sc.screen) ? sc.screen : null,
+        })),
       });
+      const next = ensureDirectorPair(cleaned);
       stateRef.current = next;
       setDraft(next);
       api(`/api/rooms/${encodeURIComponent(slug)}/studio`, {
@@ -93,7 +130,98 @@ export function useStudioControl(
     [room, slug, token, fallback],
   );
 
-  return { state, change };
+  const changePreview = useCallback(
+    (edit: (scene: StudioScene) => StudioScene) => {
+      save(updatePreview(stateRef.current, edit));
+    },
+    [save],
+  );
+
+  const goLive = useCallback(() => {
+    save(cutPreviewToProgram(stateRef.current));
+  }, [save]);
+
+  const loadPreview = useCallback(
+    (sceneId: string) => {
+      save(setPreviewScene(stateRef.current, sceneId));
+    },
+    [save],
+  );
+
+  const newScene = useCallback(() => {
+    save(addScene(stateRef.current));
+  }, [save]);
+
+  const rename = useCallback(
+    (sceneId: string, name: string) => {
+      save(renameScene(stateRef.current, sceneId, name));
+    },
+    [save],
+  );
+
+  const removeScene = useCallback(
+    (sceneId: string) => {
+      save(deleteScene(stateRef.current, sceneId));
+    },
+    [save],
+  );
+
+  const duplicate = useCallback(
+    (sceneId: string) => {
+      save(duplicateScene(stateRef.current, sceneId));
+    },
+    [save],
+  );
+
+  const pullProgram = useCallback(() => {
+    save(copyProgramToPreview(stateRef.current));
+  }, [save]);
+
+  const setTransitionMode = useCallback(
+    (mode: 'cut' | 'fade') => {
+      save(setTransition(stateRef.current, mode));
+    },
+    [save],
+  );
+
+  const addSource = useCallback(
+    (source: StudioSource) => {
+      save(addSourceToPreview(stateRef.current, source));
+    },
+    [save],
+  );
+
+  const patchSource = useCallback(
+    (id: string, patch: Partial<StudioSource>) => {
+      save(updateSourceInPreview(stateRef.current, id, patch));
+    },
+    [save],
+  );
+
+  const removeSource = useCallback(
+    (id: string) => {
+      save(removeSourceFromPreview(stateRef.current, id));
+    },
+    [save],
+  );
+
+  return {
+    state,
+    program: programScene(state),
+    preview: previewScene(state),
+    changePreview,
+    goLive,
+    loadPreview,
+    newScene,
+    rename,
+    removeScene,
+    duplicate,
+    pullProgram,
+    setTransitionMode,
+    addSource,
+    patchSource,
+    removeSource,
+  };
 }
 
 function Thumb(props: { trackRef: TrackReferenceOrPlaceholder | undefined; name: string }) {
@@ -109,7 +237,7 @@ function Thumb(props: { trackRef: TrackReferenceOrPlaceholder | undefined; name:
   );
 }
 
-/** The producer's view: the stage as it goes out, its layouts, and everyone waiting backstage. */
+/** The producer's desk: Program (on air) + Preview (draft), then backstage for the draft. */
 function Producer(props: {
   control: StudioControl;
   onPanel: () => void;
@@ -118,7 +246,20 @@ function Producer(props: {
   onError: (message: string) => void;
 }) {
   const t = useT();
-  const { state, change } = props.control;
+  const {
+    state,
+    program,
+    preview,
+    changePreview,
+    goLive,
+    loadPreview,
+    newScene,
+    rename,
+    removeScene,
+    duplicate,
+    pullProgram,
+    setTransitionMode,
+  } = props.control;
   const tracks = useStudioTracks();
   const people = useParticipants().filter((p) => p.attributes?.[CAPTIONER_ATTRIBUTE] !== 'captions');
   const sharing = new Set(
@@ -126,20 +267,58 @@ function Producer(props: {
       .filter((r) => r.source === Track.Source.ScreenShare && isTrackReference(r))
       .map((r) => r.participant.identity),
   );
+  const bodyKey = (s: StudioScene) =>
+    JSON.stringify({
+      layout: s.layout,
+      stage: s.stage,
+      screen: s.screen,
+      banners: s.banners,
+      banner: s.banner,
+      names: s.names,
+      brand: s.brand,
+      sources: s.sources,
+    });
+  const dirty = bodyKey(program) !== bodyKey(preview);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement) {
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) {
+          return;
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (dirty) goLive();
+        return;
+      }
+      if (!(e.ctrlKey || e.metaKey) && !e.altKey && /^[1-9]$/.test(e.key)) {
+        const idx = Number(e.key) - 1;
+        const sc = state.scenes[idx];
+        if (sc) {
+          e.preventDefault();
+          loadPreview(sc.id);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dirty, goLive, loadPreview, state.scenes]);
 
   function toggleStage(identity: string) {
-    if (!state.stage.includes(identity) && state.stage.length >= MAX_ON_STAGE) {
+    if (!preview.stage.includes(identity) && preview.stage.length >= MAX_ON_STAGE) {
       props.onError(t('studio.stageFull', { max: MAX_ON_STAGE }));
       return;
     }
-    change((s) => ({
+    changePreview((s) => ({
       ...s,
       stage: s.stage.includes(identity) ? s.stage.filter((x) => x !== identity) : [...s.stage, identity],
     }));
   }
 
   function toggleScreen(identity: string) {
-    change((s) =>
+    changePreview((s) =>
       s.screen === identity
         ? { ...s, screen: null, layout: s.layout === 'screen' || s.layout === 'pip' ? 'grid' : s.layout }
         : { ...s, screen: identity, layout: s.layout === 'pip' ? 'pip' : 'screen' },
@@ -148,9 +327,110 @@ function Producer(props: {
 
   return (
     <div className="studio-main producer">
-      <div className="studio-preview">
-        <StudioCanvas state={state} tracks={tracks} emptyText={t('studio.emptyStage')} />
+      <div className="studio-director" aria-label={t('studio.director')}>
+        <section className="studio-monitor">
+          <header className="studio-monitor-head">
+            <span className="studio-pill live">{t('studio.program')}</span>
+            <small className="muted">{program.name}</small>
+          </header>
+          <div className="studio-preview">
+            <StudioCanvas
+              state={program}
+              tracks={tracks}
+              emptyText={t('studio.emptyProgram')}
+              fadeKey={state.transition === 'fade' ? bodyKey(program) : undefined}
+            />
+          </div>
+        </section>
+        <section className="studio-monitor">
+          <header className="studio-monitor-head">
+            <span className="studio-pill draft">{t('studio.preview')}</span>
+            <small className="muted">{preview.name}</small>
+            <select
+              className="studio-transition"
+              aria-label={t('studio.transition')}
+              value={state.transition}
+              onChange={(e) => setTransitionMode(e.target.value as 'cut' | 'fade')}
+            >
+              <option value="cut">{t('studio.transitionCut')}</option>
+              <option value="fade">{t('studio.transitionFade')}</option>
+            </select>
+            <button
+              type="button"
+              className="btn text small"
+              onClick={() => pullProgram()}
+              title={t('studio.pullProgramHelp')}
+            >
+              <Icon name="content_copy" size={16} />
+              {t('studio.pullProgram')}
+            </button>
+            <button
+              type="button"
+              className="btn small"
+              disabled={!dirty}
+              onClick={() => goLive()}
+              title={t('studio.goLiveHelp')}
+            >
+              <Icon name="play_arrow" size={18} />
+              {t('studio.goLive')}
+            </button>
+          </header>
+          <div className="studio-preview">
+            <StudioCanvas state={preview} tracks={tracks} emptyText={t('studio.emptyStage')} />
+          </div>
+        </section>
       </div>
+
+      <div className="studio-scenes" role="toolbar" aria-label={t('studio.scenes')}>
+        {state.scenes.map((sc) => (
+          <span key={sc.id} className="studio-scene-chip">
+            <button
+              type="button"
+              className={
+                sc.id === preview.id
+                  ? 'studio-scene-btn on'
+                  : sc.id === program.id
+                    ? 'studio-scene-btn program'
+                    : 'studio-scene-btn'
+              }
+              onClick={() => loadPreview(sc.id)}
+              onDoubleClick={() => {
+                const name = window.prompt(t('studio.renameScene'), sc.name);
+                if (name) rename(sc.id, name);
+              }}
+              aria-pressed={sc.id === preview.id}
+              title={t('studio.sceneHint')}
+            >
+              {sc.name}
+              {sc.id === program.id && <small>{t('studio.onAirShort')}</small>}
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={t('studio.duplicateScene')}
+              title={t('studio.duplicateScene')}
+              onClick={() => duplicate(sc.id)}
+            >
+              <Icon name="content_copy" size={14} />
+            </button>
+            {sc.id !== program.id && state.scenes.length > 2 && (
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={t('studio.deleteScene')}
+                onClick={() => removeScene(sc.id)}
+              >
+                <Icon name="close" size={14} />
+              </button>
+            )}
+          </span>
+        ))}
+        <button type="button" className="btn text small" onClick={() => newScene()}>
+          <Icon name="add" size={16} />
+          {t('studio.addScene')}
+        </button>
+      </div>
+
       <div className="studio-toolbar" role="toolbar" aria-label={t('studio.layoutTitle')}>
         <div className="studio-layouts" role="radiogroup" aria-label={t('studio.layoutTitle')}>
           {STUDIO_LAYOUTS.map((l) => (
@@ -158,9 +438,9 @@ function Producer(props: {
               key={l}
               type="button"
               role="radio"
-              aria-checked={state.layout === l}
-              className={state.layout === l ? 'studio-layout-btn on' : 'studio-layout-btn'}
-              onClick={() => change((s) => ({ ...s, layout: l }))}
+              aria-checked={preview.layout === l}
+              className={preview.layout === l ? 'studio-layout-btn on' : 'studio-layout-btn'}
+              onClick={() => changePreview((s) => ({ ...s, layout: l }))}
             >
               <span className={`studio-layout-icon ${l}`} aria-hidden>
                 <i />
@@ -191,7 +471,7 @@ function Producer(props: {
         <ul>
           {people.map((p) => {
             const name = displayName(p, t('room.aiAssistant'));
-            const onStage = state.stage.includes(p.identity);
+            const onStage = preview.stage.includes(p.identity);
             const camera = tracks.find(
               (r) => r.participant.identity === p.identity && r.source === Track.Source.Camera,
             );
@@ -215,11 +495,11 @@ function Producer(props: {
                     <button
                       type="button"
                       className="btn text small"
-                      aria-pressed={state.screen === p.identity}
+                      aria-pressed={preview.screen === p.identity}
                       onClick={() => toggleScreen(p.identity)}
                     >
                       <Icon name="present_to_all" size={16} />
-                      {state.screen === p.identity ? t('studio.hideScreen') : t('studio.showScreen')}
+                      {preview.screen === p.identity ? t('studio.hideScreen') : t('studio.showScreen')}
                     </button>
                   )}
                 </span>
@@ -232,17 +512,18 @@ function Producer(props: {
   );
 }
 
-/** Someone invited to the show: they see what goes out and whether they are in it. */
+/** Someone invited to the show: they see Program (on air) only. */
 function Guest() {
   const t = useT();
   const room = useRoomContext();
-  const state = useStudioState();
+  const studio = useStudioState();
+  const program = programScene(studio);
   const tracks = useStudioTracks();
-  const onStage = state.stage.includes(room.localParticipant.identity);
+  const onStage = program.stage.includes(room.localParticipant.identity);
   return (
     <div className="studio-main">
       <div className="studio-preview">
-        <StudioCanvas state={state} tracks={tracks} emptyText={t('studio.emptyStageGuest')} />
+        <StudioCanvas state={program} tracks={tracks} emptyText={t('studio.emptyStageGuest')} />
       </div>
       <p className={onStage ? 'studio-status live' : 'studio-status'} role="status">
         <Icon name={onStage ? 'live_tv' : 'schedule'} size={18} />
@@ -275,27 +556,29 @@ export function StudioMain(props: {
 
 const newId = () => crypto.randomUUID().replaceAll('-', '').slice(0, 12);
 
-/** Side panel: banners, name tags and the show's look. */
+/** Side panel: banners, name tags and look for the Preview (draft) scene. */
 export function StudioPanel(props: { control: StudioControl }) {
   const t = useT();
-  const { state, change } = props.control;
+  const { preview, changePreview } = props.control;
   const [text, setText] = useState('');
   const [style, setStyle] = useState<StudioBanner['style']>('bar');
-  const [brand, setBrand] = useState(state.brand);
-  const brandKey = JSON.stringify(state.brand);
-  useEffect(() => setBrand(JSON.parse(brandKey) as StudioState['brand']), [brandKey]);
+  const [brand, setBrand] = useState(preview.brand);
+  const brandKey = JSON.stringify(preview.brand);
+  useEffect(() => setBrand(JSON.parse(brandKey) as StudioBrand), [brandKey]);
 
   function addBanner(e: FormEvent) {
     e.preventDefault();
     const value = text.trim();
-    if (!value || state.banners.length >= MAX_BANNERS) return;
+    if (!value || preview.banners.length >= MAX_BANNERS) return;
     const id = newId();
-    change((s) => ({ ...s, banners: [...s.banners, { id, text: value, style }], banner: id }));
+    changePreview((s) => ({ ...s, banners: [...s.banners, { id, text: value, style }], banner: id }));
     setText('');
   }
 
   return (
     <div className="meet-panel-body studio-panel">
+      <p className="muted small-print">{t('studio.panelPreviewHint')}</p>
+      <StudioSourcesPanel control={props.control} />
       <h4>{t('studio.banners')}</h4>
       <form className="studio-banner-form" onSubmit={addBanner}>
         <textarea
@@ -315,25 +598,25 @@ export function StudioPanel(props: { control: StudioControl }) {
             <option value="bar">{t('studio.bannerBar')}</option>
             <option value="ticker">{t('studio.bannerTicker')}</option>
           </select>
-          <button className="btn small" disabled={!text.trim() || state.banners.length >= MAX_BANNERS}>
+          <button className="btn small" disabled={!text.trim() || preview.banners.length >= MAX_BANNERS}>
             <Icon name="add" size={16} />
             {t('studio.addBanner')}
           </button>
         </div>
       </form>
-      {state.banners.length === 0 ? (
+      {preview.banners.length === 0 ? (
         <p className="muted">{t('studio.noBanners')}</p>
       ) : (
         <ul className="studio-banner-list">
-          {state.banners.map((b) => {
-            const shown = state.banner === b.id;
+          {preview.banners.map((b) => {
+            const shown = preview.banner === b.id;
             return (
               <li key={b.id} className={shown ? 'shown' : undefined}>
                 <button
                   type="button"
                   className="studio-banner-pick"
                   aria-pressed={shown}
-                  onClick={() => change((s) => ({ ...s, banner: shown ? null : b.id }))}
+                  onClick={() => changePreview((s) => ({ ...s, banner: shown ? null : b.id }))}
                 >
                   <span>{b.text}</span>
                   <small>
@@ -346,7 +629,7 @@ export function StudioPanel(props: { control: StudioControl }) {
                   className="icon-btn"
                   aria-label={t('studio.deleteBanner')}
                   onClick={() =>
-                    change((s) => ({
+                    changePreview((s) => ({
                       ...s,
                       banners: s.banners.filter((x) => x.id !== b.id),
                       banner: s.banner === b.id ? null : s.banner,
@@ -365,8 +648,8 @@ export function StudioPanel(props: { control: StudioControl }) {
       <label className="switch">
         <input
           type="checkbox"
-          checked={state.names}
-          onChange={(e) => change((s) => ({ ...s, names: e.target.checked }))}
+          checked={preview.names}
+          onChange={(e) => changePreview((s) => ({ ...s, names: e.target.checked }))}
         />
         <span>{t('studio.showNames')}</span>
       </label>
@@ -376,7 +659,7 @@ export function StudioPanel(props: { control: StudioControl }) {
           e.preventDefault();
           const logo = brand.logo?.trim() || null;
           if (logo && !logo.startsWith('https://')) return;
-          change((s) => ({ ...s, brand: { ...brand, logo } }));
+          changePreview((s) => ({ ...s, brand: { ...brand, logo } }));
         }}
       >
         <label>

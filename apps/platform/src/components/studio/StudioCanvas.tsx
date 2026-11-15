@@ -7,12 +7,22 @@ import {
   useTracks,
 } from '@livekit/components-react';
 import { type Participant, RoomEvent, Track } from 'livekit-client';
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { displayName } from '@/lib/a11y';
-import { EMPTY_STUDIO, type StudioState, layoutShape } from '@/lib/studio';
+import { useLocale } from '@/i18n/client';
+import {
+  EMPTY_STUDIO,
+  type StudioClockSource,
+  type StudioSceneBody,
+  type StudioSource,
+  type StudioState,
+  formatClock,
+  layoutShape,
+  sortedSources,
+} from '@/lib/studio';
 import { useRoomState } from '../meet/useRoomState';
 
-/** The stage as the producer last set it, live from the room's metadata. */
+/** Full studio state (scenes + program/preview) from room metadata. */
 export function useStudioState(): StudioState {
   return useRoomState().studio ?? EMPTY_STUDIO;
 }
@@ -82,12 +92,100 @@ const gridColumns = (n: number) => (n <= 1 ? 1 : n <= 4 ? 2 : 3);
  * What goes live: the people the producer put on stage, laid out, with name tags, the brand
  * (background, colour, logo) and the banner on screen. Everyone backstage stays out of it.
  */
+function ClockLayer({ source, box }: { source: StudioClockSource; box: CSSProperties }) {
+  const locale = useLocale();
+  const loc = locale === 'en' ? 'en-US' : locale === 'es' ? 'es-ES' : 'pt-BR';
+  const [label, setLabel] = useState(() => formatClock(source.format, new Date(), loc));
+  useEffect(() => {
+    const tick = () => setLabel(formatClock(source.format, new Date(), loc));
+    tick();
+    const ms = source.format === 'date' ? 30_000 : 1000;
+    const id = window.setInterval(tick, ms);
+    return () => window.clearInterval(id);
+  }, [source.format, loc]);
+  return (
+    <div
+      className="studio-source text clock"
+      style={{
+        ...box,
+        color: source.color,
+        background: source.background,
+        textAlign: source.align,
+        fontSize: `clamp(12px, ${source.size * 0.12}cqw, ${source.size}px)`,
+      }}
+    >
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function SourceLayer({ source }: { source: StudioSource }) {
+  const box = {
+    left: `${source.box.x}%`,
+    top: `${source.box.y}%`,
+    width: `${source.box.w}%`,
+    height: `${source.box.h}%`,
+    opacity: source.opacity,
+    zIndex: 20 + source.z,
+  } as CSSProperties;
+  if (source.type === 'browser') {
+    const ready = source.url.startsWith('https://') && source.url.length > 8;
+    return (
+      <div className="studio-source browser" style={box}>
+        {ready ? (
+          <iframe
+            title={source.name}
+            src={source.url}
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            allow={source.muted ? undefined : 'autoplay; encrypted-media'}
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <span className="studio-source-placeholder">{source.name}</span>
+        )}
+      </div>
+    );
+  }
+  if (source.type === 'image') {
+    const ready = source.url.startsWith('https://') && source.url.length > 8;
+    return (
+      <div className="studio-source image" style={box}>
+        {ready ? (
+          // eslint-disable-next-line @next/next/no-img-element -- producer-chosen https image
+          <img src={source.url} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          <span className="studio-source-placeholder">{source.name}</span>
+        )}
+      </div>
+    );
+  }
+  if (source.type === 'clock') {
+    return <ClockLayer source={source} box={box} />;
+  }
+  return (
+    <div
+      className="studio-source text"
+      style={{
+        ...box,
+        color: source.color,
+        background: source.background,
+        textAlign: source.align,
+        fontSize: `clamp(12px, ${source.size * 0.12}cqw, ${source.size}px)`,
+      }}
+    >
+      <span>{source.text}</span>
+    </div>
+  );
+}
+
 export function StudioCanvas(props: {
-  state: StudioState;
+  state: StudioSceneBody;
   tracks: TrackReferenceOrPlaceholder[];
   /** The recorder's page fills the whole window; elsewhere it keeps 16:9. */
   fill?: boolean;
   emptyText?: string;
+  /** Soft fade when Program updates after a fade transition. */
+  fadeKey?: string;
 }) {
   const { state, tracks } = props;
   const shape = layoutShape(state.layout);
@@ -171,9 +269,19 @@ export function StudioCanvas(props: {
       );
   }
 
+  const layers = sortedSources(state);
+
   return (
-    <div className={props.fill ? 'studio-canvas fill' : 'studio-canvas'} style={style}>
+    <div
+      key={props.fadeKey}
+      className={props.fill ? 'studio-canvas fill' : 'studio-canvas'}
+      style={style}
+      data-fade={props.fadeKey ? '' : undefined}
+    >
       {body}
+      {layers.map((src) => (
+        <SourceLayer key={src.id} source={src} />
+      ))}
       {state.brand.logo && (
         // eslint-disable-next-line @next/next/no-img-element -- any https logo the producer chose
         <img className="studio-logo" src={state.brand.logo} alt="" referrerPolicy="no-referrer" />
