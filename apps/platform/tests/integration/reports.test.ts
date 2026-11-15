@@ -198,6 +198,7 @@ describe('meeting reports and minutes', () => {
       topics: ['Preço'],
       decisions: ['Plano Pro a R$ 99'],
       tasks: [{ task: 'Enviar proposta', owner: 'Bia', due: 'sexta' }],
+      nextSteps: '',
     });
     expect(report.participants.map((p) => [p.name, p.userId])).toEqual([
       ['Admin', admin.id],
