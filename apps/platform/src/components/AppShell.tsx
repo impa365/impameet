@@ -116,7 +116,11 @@ export async function AppShell(props: {
               <Avatar name={user.name} size={32} />
               <span>
                 {user.name}
-                <small>{t(`common.roles.${user.role}`)}</small>
+                <small>
+                  {user.role === 'admin' || user.role === 'manager' || user.role === 'member'
+                    ? t(`common.roles.${user.role}` as 'common.roles.admin')
+                    : user.role}
+                </small>
               </span>
             </Link>
             <LogoutButton />
