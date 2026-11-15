@@ -252,13 +252,14 @@ def test_agent_gets_screen_tools_only_when_the_service_is_configured(
     ctx.room.name = "t1.sala"
     session = MagicMock()
     plain = main._build_agent(ctx, load_settings(env), profile(mute_policy="disabled"), session)
-    assert [t.info.name for t in plain.tools] == ["passar_a_vez"]
+    assert [t.info.name for t in plain.tools] == ["passar_a_vez", "enviar_no_chat"]
     ctx.add_shutdown_callback.assert_not_called()
 
     with_screen = load_settings(env | {"SCREEN_URL": "http://screen:8090", "SCREEN_TOKEN": "tk"})
     agent = main._build_agent(ctx, with_screen, profile(instructions="Seja breve."), session)
     assert {t.info.name for t in agent.tools} == {
         "passar_a_vez",
+        "enviar_no_chat",
         "mostrar_pagina",
         "mostrar_topicos",
         "ver_tela",

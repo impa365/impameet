@@ -178,7 +178,7 @@ class TestMute:
 
     def test_disabled_policy_has_no_mute_tools(self) -> None:
         agent = self.agent("disabled")
-        assert agent.tools == []
+        assert [t.info.name for t in agent.tools] == ["enviar_no_chat"]
         assert "silenciar_voz" not in agent.instructions
 
 
