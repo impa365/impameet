@@ -32,7 +32,7 @@ export default async function SuperadminPage({
       active={`superadmin:${tab}`}
       title={t(PLATFORM_TABS[tab].label)}
     >
-      <SuperadminPanel tab={tab} org={org} selfTenantId={user.tenantId} />
+      <SuperadminPanel tab={tab} org={org} selfTenantId={user.tenantId} selfId={user.id} />
     </AppShell>
   );
 }

@@ -4,15 +4,21 @@ import type { SessionUser } from '../auth/session';
 import type { Sql } from '../db';
 import { forbidden } from '../errors';
 import type { LiveKitAdmin, LiveParticipant } from '../livekit-admin';
+import { sessionHas } from '../rbac/check';
+import { requirePermission } from '../rbac/service';
 import type { Branding } from '../tenants/repo';
 import type { brandingInput } from '../validation';
 
+/** Prefer requirePermission at each call site; kept for older admin-only helpers. */
 export function assertAdmin(user: SessionUser): void {
-  if (user.role !== 'admin') throw forbidden('Só administradores podem fazer isso');
+  if (sessionHas(user, 'roles.manage') || sessionHas(user, 'branding.manage') || user.role === 'admin') {
+    return;
+  }
+  throw forbidden('Só administradores podem fazer isso');
 }
 
 export function assertStaff(user: SessionUser): void {
-  if (user.role !== 'admin' && user.role !== 'manager') throw forbidden();
+  if (!sessionHas(user, 'panel.access')) throw forbidden();
 }
 
 export async function updateBranding(
@@ -21,7 +27,7 @@ export async function updateBranding(
   input: z.infer<typeof brandingInput>,
   ip: string | null,
 ): Promise<Branding> {
-  assertAdmin(actor);
+  await requirePermission(sql, actor, 'branding.manage');
   const [row] = await sql<Branding[]>`
     insert into tenant_branding (tenant_id, product_name, primary_color, logo_url, default_locale, updated_at)
     values (${actor.tenantId}, ${input.productName}, ${input.primaryColor}, ${input.logoUrl},
@@ -45,7 +51,7 @@ export interface AuditRow {
 }
 
 export async function listAudit(sql: Sql, actor: SessionUser, limit = 200): Promise<AuditRow[]> {
-  assertAdmin(actor);
+  await requirePermission(sql, actor, 'audit.view');
   return sql<AuditRow[]>`
     select a.id::text, a.action, a.target, u.name as "actorName", a.ip, a.created_at as "createdAt"
     from audit_log a left join users u on u.id = a.actor_id

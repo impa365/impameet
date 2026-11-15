@@ -1,11 +1,13 @@
 import type { Sql } from '../db';
+import type { OrgPermission } from '../rbac/permissions';
 import { hashToken, newToken } from '../security/tokens';
 
 export const SESSION_COOKIE = 'impa_session';
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const TOUCH_INTERVAL_MS = 10 * 60 * 1000;
 
-export type UserRole = 'admin' | 'manager' | 'member';
+/** Built-in keys plus any custom org role key (a-z / underscore). */
+export type UserRole = string;
 
 export interface SessionUser {
   id: string;
@@ -13,7 +15,10 @@ export interface SessionUser {
   email: string;
   name: string;
   role: UserRole;
+  /** Denormalized from platform_superadmins (exclusive table is source of truth). */
   isSuperadmin: boolean;
+  /** Org-role permissions loaded with the session (never includes platform.*). */
+  permissions?: OrgPermission[];
   /** The organization requires two-step verification and this user has no method yet. */
   mfaSetupRequired?: boolean;
 }
@@ -48,9 +53,10 @@ export async function findSessionUser(
 ): Promise<SessionUser | null> {
   if (!token || token.length > 100) return null;
   const idHash = hashToken(token);
-  const [row] = await sql<(SessionUser & { lastSeenAt: Date })[]>`
+  const [row] = await sql<(Omit<SessionUser, 'permissions'> & { lastSeenAt: Date })[]>`
     select u.id, u.tenant_id as "tenantId", u.email, u.name, u.role,
-           u.is_superadmin as "isSuperadmin", s.last_seen_at as "lastSeenAt",
+           exists (select 1 from platform_superadmins sa where sa.user_id = u.id) as "isSuperadmin",
+           s.last_seen_at as "lastSeenAt",
            (t.require_mfa and not exists (
               select 1 from user_mfa m where m.user_id = u.id
                 and (m.totp_enabled_at is not null or m.email_enabled_at is not null))
@@ -62,8 +68,14 @@ export async function findSessionUser(
   if (Date.now() - row.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
     await sql`update sessions set last_seen_at = now() where id_hash = ${idHash}`;
   }
+  const permRows = await sql<{ code: OrgPermission }[]>`
+    select rp.permission_code as code
+    from org_roles r
+    join org_role_permissions rp on rp.role_id = r.id
+    where r.tenant_id = ${row.tenantId} and r.key = ${row.role}
+      and rp.permission_code not like 'platform.%'`;
   const { lastSeenAt: _ignored, ...user } = row;
-  return user;
+  return { ...user, permissions: permRows.map((p) => p.code) };
 }
 
 export interface SessionInfo {

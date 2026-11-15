@@ -6,6 +6,7 @@ export type AdminTab =
   | 'knowledge'
   | 'integrations'
   | 'users'
+  | 'roles'
   | 'live'
   | 'branding'
   | 'domains'
@@ -20,6 +21,7 @@ export const ADMIN_TABS: Record<AdminTab, { label: MessageKey; icon: IconName }>
   knowledge: { label: 'shell.nav.tabs.knowledge', icon: 'menu_book' },
   integrations: { label: 'shell.nav.tabs.integrations', icon: 'hub' },
   users: { label: 'shell.nav.tabs.users', icon: 'group' },
+  roles: { label: 'shell.nav.tabs.roles', icon: 'shield_person' },
   live: { label: 'shell.nav.tabs.live', icon: 'sensors' },
   branding: { label: 'shell.nav.tabs.branding', icon: 'palette' },
   domains: { label: 'shell.nav.tabs.domains', icon: 'language' },
@@ -30,13 +32,37 @@ export const ADMIN_TABS: Record<AdminTab, { label: MessageKey; icon: IconName }>
   audit: { label: 'shell.nav.tabs.audit', icon: 'history' },
 };
 
-export function adminTabsFor(role: 'admin' | 'manager' | 'member'): AdminTab[] {
+const TAB_PERM: Record<AdminTab, string> = {
+  agents: 'agents.manage',
+  knowledge: 'knowledge.manage',
+  integrations: 'integrations.manage',
+  users: 'users.view',
+  roles: 'roles.manage',
+  live: 'live.manage',
+  branding: 'branding.manage',
+  domains: 'domains.manage',
+  email: 'email.manage',
+  storage: 'storage.manage',
+  streaming: 'streaming.manage',
+  security: 'security.manage',
+  audit: 'audit.view',
+};
+
+/** Tabs unlocked by the session's org permissions (platform.* never appear here). */
+export function adminTabsForPermissions(permissions: readonly string[]): AdminTab[] {
+  if (!permissions.includes('panel.access')) return [];
+  return (Object.keys(TAB_PERM) as AdminTab[]).filter((tab) => permissions.includes(TAB_PERM[tab]));
+}
+
+/** @deprecated Prefer adminTabsForPermissions. */
+export function adminTabsFor(role: string): AdminTab[] {
   if (role === 'admin')
     return [
       'agents',
       'knowledge',
       'integrations',
       'users',
+      'roles',
       'live',
       'branding',
       'domains',
@@ -50,17 +76,23 @@ export function adminTabsFor(role: 'admin' | 'manager' | 'member'): AdminTab[] {
   return [];
 }
 
-export function pickAdminTab(role: 'admin' | 'manager', requested: string | undefined): AdminTab {
-  const tabs = adminTabsFor(role);
-  return tabs.find((t) => t === requested) ?? tabs[0];
+export function pickAdminTab(
+  roleOrPerms: string | readonly string[],
+  requested: string | undefined,
+): AdminTab {
+  const tabs = Array.isArray(roleOrPerms)
+    ? adminTabsForPermissions(roleOrPerms)
+    : adminTabsFor(roleOrPerms as string);
+  return tabs.find((t) => t === requested) ?? tabs[0] ?? 'users';
 }
 
 /** The platform's own pages (super admins): above every organization. */
-export type PlatformTab = 'overview' | 'organizations' | 'email' | 'google';
+export type PlatformTab = 'overview' | 'organizations' | 'superadmins' | 'email' | 'google';
 
 export const PLATFORM_TABS: Record<PlatformTab, { label: MessageKey; icon: IconName }> = {
   overview: { label: 'shell.nav.platformTabs.overview', icon: 'dashboard' },
   organizations: { label: 'shell.nav.platformTabs.organizations', icon: 'apartment' },
+  superadmins: { label: 'shell.nav.platformTabs.superadmins', icon: 'shield_person' },
   email: { label: 'shell.nav.platformTabs.email', icon: 'mail' },
   google: { label: 'shell.nav.platformTabs.google', icon: 'hub' },
 };

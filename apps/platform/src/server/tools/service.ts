@@ -7,6 +7,7 @@ import { AppError, badRequest, conflict, forbidden, notFound, tooManyRequests } 
 import type { LiveKitAdmin } from '../livekit-admin';
 import { agentInRoom, assertAgentActions, identityUserId } from '../moderation/agent';
 import { RateLimiter } from '../security/rate-limit';
+import { sessionHas } from '../rbac/check';
 import { openSecret, sealSecret } from '../security/secrets';
 import {
   MAX_TOOLS_PER_AGENT,
@@ -88,7 +89,9 @@ const MCP_LIST_TTL_MS = 60_000;
 const mcpListCache = new Map<string, { at: number; tools: McpTool[] }>();
 
 function assertAdmin(user: SessionUser): void {
-  if (user.role !== 'admin') throw forbidden('Só administradores configuram agentes de IA');
+  if (!sessionHas(user, 'agents.manage')) {
+    throw forbidden('Só quem tem permissão configura agentes de IA');
+  }
 }
 
 function publicView(t: StoredTool): AgentTool {

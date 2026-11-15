@@ -387,9 +387,28 @@ export const lobbyStatusInput = z.object({
   secret: z.string().min(20).max(100),
 });
 
-const role = z.enum(['admin', 'manager', 'member']);
+/** Built-in or custom org role key (never LiveKit guest/moderator/participant). */
+const role = z
+  .string()
+  .regex(/^[a-z][a-z0-9_]{0,31}$/, 'Papel inválido')
+  .refine((k) => !['guest', 'moderator', 'participant'].includes(k), 'Papel inválido');
 
 export const createUserInput = z.object({ name: displayName, email, password, role });
+
+export const orgRoleCreateInput = z.object({
+  key: role,
+  name: z.string().trim().min(1).max(60),
+  description: z.string().trim().max(200).optional(),
+  permissions: z.array(z.string().min(3).max(80)).max(50),
+});
+
+export const orgRolePermissionsInput = z.object({
+  permissions: z.array(z.string().min(3).max(80)).max(50),
+});
+
+export const superadminGrantInput = z.object({
+  userId: z.string().uuid(),
+});
 
 export const updateUserInput = z
   .object({

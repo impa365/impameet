@@ -154,6 +154,8 @@ Para tornar um usuário **super admin** (gerencia todas as organizações):
 ```bash
 docker exec "$(docker ps -q -f name=impameet_platform | head -1)" \
   node scripts/superadmin.mjs voce@seudominio.com
+  # (bootstrap: o primeiro cadastro da instalação já vira super admin; depois use
+  # Plataforma → Super admins, ou este script de emergência)
 ```
 
 ## 5. Opcionais

@@ -6,6 +6,7 @@ import { badRequest, conflict, forbidden, notFound } from '../errors';
 import { SPEECH_CATALOG, type SpeechProvider, isSpeechProvider } from '@/lib/providers';
 import { assertTenantIntegration, integrationSecret, speechIntegrationKind } from '../integrations/service';
 import { assertTenantBases, setAgentBases } from '../knowledge/service';
+import { sessionHas } from '../rbac/check';
 import type { agentInput } from '../validation';
 
 export type AgentInput = z.infer<typeof agentInput>;
@@ -95,7 +96,9 @@ const READY = (sql: Sql, a = 'agents') =>
      select 1 from integrations i where i.id = ${a}.tts_integration_id and i.kind = 'fish')))`);
 
 function assertAdmin(user: SessionUser): void {
-  if (user.role !== 'admin') throw forbidden('Só administradores configuram agentes de IA');
+  if (!sessionHas(user, 'agents.manage')) {
+    throw forbidden('Só quem tem permissão configura agentes de IA');
+  }
 }
 
 function isUniqueViolation(err: unknown): boolean {

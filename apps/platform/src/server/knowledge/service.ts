@@ -7,6 +7,7 @@ import { AppError, badRequest, conflict, forbidden, notFound, tooManyRequests } 
 import type { Complete } from '../insights/llm';
 import { integrationSecret } from '../integrations/service';
 import { agentInRoom } from '../moderation/agent';
+import { sessionHas } from '../rbac/check';
 import { RateLimiter } from '../security/rate-limit';
 import type { NetPolicy } from '../tools/net';
 import type {
@@ -145,7 +146,9 @@ const LOG_ITEMS = 80;
 const searches = new RateLimiter(60, 60_000);
 
 function assertAdmin(user: SessionUser): void {
-  if (user.role !== 'admin') throw forbidden('Só administradores gerenciam a base de conhecimento');
+  if (!sessionHas(user, 'knowledge.manage')) {
+    throw forbidden('Só quem tem permissão gerencia a base de conhecimento');
+  }
 }
 
 function needStore(deps: KnowledgeDeps): VectorStore {

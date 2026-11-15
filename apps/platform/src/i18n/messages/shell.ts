@@ -13,6 +13,7 @@ export default defineMessages(
       platformTabs: {
         overview: 'Visão geral',
         organizations: 'Organizações',
+        superadmins: 'Super admins',
         email: 'E-mail da plataforma',
         google: 'Google (Drive e YouTube)',
       },
@@ -29,6 +30,7 @@ export default defineMessages(
         knowledge: 'Base de conhecimento',
         integrations: 'Integrações',
         users: 'Usuários',
+        roles: 'Papéis e permissões',
         live: 'Salas ao vivo',
         branding: 'Marca',
         domains: 'Domínio próprio',
@@ -99,6 +101,7 @@ export default defineMessages(
         platformTabs: {
           overview: 'Overview',
           organizations: 'Organizations',
+          superadmins: 'Super admins',
           email: 'Platform e-mail',
           google: 'Google (Drive and YouTube)',
         },
@@ -115,6 +118,7 @@ export default defineMessages(
           knowledge: 'Knowledge base',
           integrations: 'Integrations',
           users: 'Users',
+          roles: 'Roles and permissions',
           live: 'Live rooms',
           branding: 'Branding',
           domains: 'Custom domain',
@@ -184,6 +188,7 @@ export default defineMessages(
         platformTabs: {
           overview: 'Resumen',
           organizations: 'Organizaciones',
+          superadmins: 'Super admins',
           email: 'Correo de la plataforma',
           google: 'Google (Drive y YouTube)',
         },
@@ -200,6 +205,7 @@ export default defineMessages(
           knowledge: 'Base de conocimiento',
           integrations: 'Integraciones',
           users: 'Usuarios',
+          roles: 'Roles y permisos',
           live: 'Salas en vivo',
           branding: 'Marca',
           domains: 'Dominio propio',

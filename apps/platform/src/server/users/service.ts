@@ -3,6 +3,8 @@ import { audit } from '../audit';
 import type { SessionUser, UserRole } from '../auth/session';
 import type { Sql } from '../db';
 import { badRequest, conflict, forbidden, notFound } from '../errors';
+import { sessionHas } from '../rbac/check';
+import { assignableRoleKeys, requirePermission } from '../rbac/service';
 import { hashPassword } from '../security/password';
 import type { createUserInput, updateUserInput } from '../validation';
 
@@ -24,21 +26,28 @@ const USER_COLUMNS = (sql: Sql) => sql`
             and (m.totp_enabled_at is not null or m.email_enabled_at is not null))
    or exists (select 1 from webauthn_credentials w where w.user_id = users.id)) as mfa`;
 
-/** Admins manage everyone; managers manage plain users only. */
+/**
+ * Who may edit whom: assign_admin can touch any org role; otherwise only non-admin
+ * targets, and managers (legacy) only members unless users.manage covers more via role key.
+ */
 export function canManageUser(actor: SessionUser, targetRole: UserRole): boolean {
-  if (actor.role === 'admin') return true;
-  return actor.role === 'manager' && targetRole === 'member';
-}
-
-function assertStaff(actor: SessionUser): void {
-  if (actor.role !== 'admin' && actor.role !== 'manager') throw forbidden();
+  if (sessionHas(actor, 'users.assign_admin')) return true;
+  if (!sessionHas(actor, 'users.manage')) return false;
+  if (targetRole === 'admin') return false;
+  if (actor.role === 'manager') return targetRole === 'member';
+  return true;
 }
 
 export async function listUsers(sql: Sql, actor: SessionUser): Promise<ManagedUser[]> {
-  assertStaff(actor);
+  await requirePermission(sql, actor, 'users.view');
   return sql<ManagedUser[]>`
     select ${USER_COLUMNS(sql)} from users where tenant_id = ${actor.tenantId}
     order by created_at limit 2000`;
+}
+
+export async function listAssignableRoles(sql: Sql, actor: SessionUser): Promise<string[]> {
+  await requirePermission(sql, actor, 'users.manage');
+  return assignableRoleKeys(sql, actor);
 }
 
 export async function createUser(
@@ -47,8 +56,13 @@ export async function createUser(
   input: z.infer<typeof createUserInput>,
   ip: string | null,
 ): Promise<ManagedUser> {
-  assertStaff(actor);
+  await requirePermission(sql, actor, 'users.manage');
+  const allowed = await assignableRoleKeys(sql, actor);
+  if (!allowed.includes(input.role)) throw forbidden('Você não pode atribuir este papel');
   if (!canManageUser(actor, input.role)) throw forbidden('Gestores só cadastram usuários comuns');
+  const [roleOk] = await sql<{ ok: boolean }[]>`
+    select true as ok from org_roles where tenant_id = ${actor.tenantId} and key = ${input.role}`;
+  if (!roleOk) throw badRequest('Papel inválido');
   try {
     const [user] = await sql<ManagedUser[]>`
       insert into users (tenant_id, email, name, password_hash, role)
@@ -76,7 +90,7 @@ export async function updateUser(
   patch: z.infer<typeof updateUserInput>,
   ip: string | null,
 ): Promise<ManagedUser> {
-  assertStaff(actor);
+  await requirePermission(sql, actor, 'users.manage');
   return sql.begin(async (tx) => {
     const [target] = await tx<ManagedUser[]>`
       select ${USER_COLUMNS(tx as unknown as Sql)} from users
@@ -84,6 +98,10 @@ export async function updateUser(
     if (!target) throw notFound('Usuário não encontrado');
     if (!canManageUser(actor, target.role) || (patch.role && !canManageUser(actor, patch.role)))
       throw forbidden();
+    if (patch.role) {
+      const allowed = await assignableRoleKeys(tx as unknown as Sql, actor);
+      if (!allowed.includes(patch.role)) throw forbidden('Você não pode atribuir este papel');
+    }
     if (target.id === actor.id && (patch.role || patch.status)) {
       throw badRequest('Você não pode mudar o próprio papel nem se desativar');
     }

@@ -5,6 +5,7 @@ import type { Sql } from '../db';
 import { AppError, badRequest, forbidden, tooManyRequests } from '../errors';
 import { RateLimiter } from '../security/rate-limit';
 import type { Resolver } from '../security/public-url';
+import { sessionHas } from '../rbac/check';
 import { openSecret, sealSecret } from '../security/secrets';
 import type { platformSmtpInput, tenantSmtpInput } from '../validation';
 import {
@@ -128,7 +129,9 @@ function needKey(deps: MailDeps): Buffer {
 }
 
 function assertAdmin(user: SessionUser) {
-  if (user.role !== 'admin') throw forbidden('Só administradores configuram o e-mail');
+  if (!sessionHas(user, 'email.manage')) {
+    throw forbidden('Só quem tem permissão configura o e-mail');
+  }
 }
 
 function assertSuperadmin(user: SessionUser) {

@@ -270,11 +270,14 @@ export async function afterPassword(
 }
 
 async function challengeUser(sql: Sql, c: ChallengeRow, tenantId: string): Promise<SessionUser> {
-  const [user] = await sql<SessionUser[]>`
-    select id, tenant_id as "tenantId", email, name, role, is_superadmin as "isSuperadmin"
+  const [user] = await sql<Omit<SessionUser, 'permissions'>[]>`
+    select id, tenant_id as "tenantId", email, name, role,
+           exists (select 1 from platform_superadmins sa where sa.user_id = users.id) as "isSuperadmin"
     from users where id = ${c.userId} and tenant_id = ${tenantId} and status = 'active'`;
   if (!user) throw unauthorized('A verificação expirou. Entre de novo.');
-  return user;
+  const { loadOrgPermissions } = await import('../rbac/service');
+  const permissions = await loadOrgPermissions(sql, user.tenantId, user.role);
+  return { ...user, permissions };
 }
 
 const limited = (userId: string) => {
@@ -778,7 +781,8 @@ export async function securityOverview(
 // --- Organization policy ----------------------------------------------------------------
 
 export async function setRequireMfa(sql: Sql, actor: SessionUser, required: boolean, ip: string | null) {
-  if (actor.role !== 'admin') throw forbidden();
+  const { requirePermission } = await import('../rbac/service');
+  await requirePermission(sql, actor, 'security.manage');
   if (required && !hasFactor(await factors(sql, actor.id)))
     throw badRequest('Ligue a verificação em duas etapas na sua conta antes de exigir de todos');
   await sql`update tenants set require_mfa = ${required} where id = ${actor.tenantId}`;
@@ -793,12 +797,16 @@ export async function setRequireMfa(sql: Sql, actor: SessionUser, required: bool
 
 /** An admin clears someone's factors (lost phone): they sign in with the password again. */
 export async function resetUserMfa(deps: MfaDeps, actor: SessionUser, userId: string, ip: string | null) {
-  if (actor.role !== 'admin') throw forbidden();
+  const { requirePermission, loadOrgPermissions } = await import('../rbac/service');
+  await requirePermission(deps.sql, actor, 'security.manage');
   if (userId === actor.id) throw badRequest('Para a sua conta, use a página Minha conta');
-  const [target] = await deps.sql<SessionUser[]>`
-    select id, tenant_id as "tenantId", email, name, role, is_superadmin as "isSuperadmin"
+  const [target] = await deps.sql<Omit<SessionUser, 'permissions'>[]>`
+    select id, tenant_id as "tenantId", email, name, role,
+           exists (select 1 from platform_superadmins sa where sa.user_id = users.id) as "isSuperadmin"
     from users where id = ${userId} and tenant_id = ${actor.tenantId}`;
   if (!target) throw notFound('Usuário não encontrado');
+  const permissions = await loadOrgPermissions(deps.sql, target.tenantId, target.role);
+  const targetUser: SessionUser = { ...target, permissions };
   await deps.sql.begin(async (tx) => {
     await tx`delete from webauthn_credentials where user_id = ${userId}`;
     await tx`delete from user_mfa where user_id = ${userId}`;
@@ -809,10 +817,10 @@ export async function resetUserMfa(deps: MfaDeps, actor: SessionUser, userId: st
     tenantId: actor.tenantId,
     actorId: actor.id,
     action: 'mfa.reset_by_admin',
-    target: target.email,
+    target: targetUser.email,
     ip,
   });
-  await notify(deps, target, 'A verificação em duas etapas da sua conta foi reiniciada', [
+  await notify(deps, targetUser, 'A verificação em duas etapas da sua conta foi reiniciada', [
     `${actor.name} (administrador) tirou os métodos de verificação da sua conta e encerrou suas sessões.`,
     'No próximo acesso, entre com a sua senha e configure a verificação de novo.',
   ]);

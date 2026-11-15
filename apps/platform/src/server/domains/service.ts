@@ -4,6 +4,7 @@ import type { SessionUser } from '../auth/session';
 import type { Sql } from '../db';
 import { badRequest, conflict, forbidden, notFound } from '../errors';
 import { tenantLimits } from '../plans';
+import { sessionHas } from '../rbac/check';
 
 export const VERIFY_PREFIX = '_impa-meet';
 export const VERIFY_VALUE_PREFIX = 'impa-meet-verification=';
@@ -18,7 +19,9 @@ export interface CustomDomain {
 export type TxtResolver = (name: string) => Promise<string[][]>;
 
 function assertAdmin(user: SessionUser): void {
-  if (user.role !== 'admin') throw forbidden('Só administradores podem gerenciar domínios');
+  if (!sessionHas(user, 'domains.manage')) {
+    throw forbidden('Só quem tem permissão pode gerenciar domínios');
+  }
 }
 
 export function verificationRecord(domain: Pick<CustomDomain, 'hostname' | 'verificationToken'>) {

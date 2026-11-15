@@ -131,8 +131,10 @@ async function assertTenantAgent(sql: Sql, tenantId: string, agentId: string | n
   if (!(await findTenantAgent(sql, tenantId, agentId))) throw notFound('Agente de IA não encontrado');
 }
 
-/** Admins and managers run every room of their organization. */
-export function canManageAllRooms(user: Pick<SessionUser, 'role'>): boolean {
+/** Anyone with rooms.manage_all (default: admin + manager) runs every room. */
+export function canManageAllRooms(user: Pick<SessionUser, 'role' | 'permissions'>): boolean {
+  if (user.permissions?.includes('rooms.manage_all')) return true;
+  if (user.permissions?.length) return false;
   return user.role === 'admin' || user.role === 'manager';
 }
 

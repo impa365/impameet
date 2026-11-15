@@ -16,6 +16,7 @@ import {
   PLATFORM_TABS,
   type PlatformTab,
   adminTabsFor,
+  adminTabsForPermissions,
   platformHref,
 } from './admin/tabs';
 import { Avatar } from './meet/Avatar';
@@ -37,7 +38,7 @@ function NavLink(props: { href: string; icon: IconName; label: string; active: b
 /** The signed-in panel: side navigation, a top bar with language and theme, and the page. */
 export async function AppShell(props: {
   branding: Branding;
-  user: Pick<SessionUser, 'name' | 'role' | 'isSuperadmin' | 'mfaSetupRequired'>;
+  user: Pick<SessionUser, 'name' | 'role' | 'isSuperadmin' | 'mfaSetupRequired' | 'permissions'>;
   active: string;
   title: string;
   children: ReactNode;
@@ -46,7 +47,9 @@ export async function AppShell(props: {
   const { user, active } = props;
   // The organization requires two-step verification: nothing else until it is set up.
   if (user.mfaSetupRequired && active !== 'account') redirect('/account?setup=1');
-  const adminTabs = adminTabsFor(user.role);
+  const adminTabs = user.permissions?.length
+    ? adminTabsForPermissions(user.permissions)
+    : adminTabsFor(user.role);
   return (
     <div className="shell">
       <a className="skip-link" href="#conteudo">

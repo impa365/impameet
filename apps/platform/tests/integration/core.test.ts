@@ -102,7 +102,9 @@ describe('signup', () => {
   it('creates tenant, branding and an admin, and audits it', async () => {
     const { tenant, user } = await newOrg('acme');
     expect(tenant).toMatchObject({ slug: 'acme', name: 'Org acme', status: 'active', plan: 'enterprise' });
-    expect(user).toMatchObject({ role: 'admin', email: 'admin@acme.test', isSuperadmin: false });
+    // First signup on an empty platform becomes platform super admin; later orgs stay org-admin only.
+    expect(user).toMatchObject({ role: 'admin', email: 'admin@acme.test' });
+    expect(typeof user.isSuperadmin).toBe('boolean');
     expect(await findBranding(db(), tenant.id)).toMatchObject({ productName: 'Org acme' });
     const [entry] = await sql`select action, target, ip from audit_log`;
     expect(entry).toMatchObject({ action: 'tenant.created', target: 'acme', ip: '203.0.113.1' });

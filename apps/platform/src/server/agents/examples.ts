@@ -3,6 +3,7 @@ import { audit } from '../audit';
 import type { SessionUser } from '../auth/session';
 import type { Sql } from '../db';
 import { badRequest, forbidden, notFound } from '../errors';
+import { sessionHas } from '../rbac/check';
 import type { agentExampleInput } from '../validation';
 
 export type AgentExampleInput = z.infer<typeof agentExampleInput>;
@@ -19,7 +20,9 @@ export interface AgentExample {
 export const MAX_EXAMPLES = 50;
 
 function assertAdmin(user: SessionUser): void {
-  if (user.role !== 'admin') throw forbidden('Só administradores configuram agentes de IA');
+  if (!sessionHas(user, 'agents.manage')) {
+    throw forbidden('Só quem tem permissão configura agentes de IA');
+  }
 }
 
 async function assertAgent(sql: Sql, tenantId: string, agentId: string) {

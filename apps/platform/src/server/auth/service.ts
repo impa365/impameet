@@ -4,7 +4,9 @@ import { audit } from '../audit';
 import type { Sql } from '../db';
 import { conflict, unauthorized } from '../errors';
 import type { Plan } from '../plans';
+import { loadOrgPermissions, seedTenantRoles } from '../rbac/service';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from '../security/password';
+import { maybeBootstrapSuperadmin } from '../superadmin/grants';
 import type { Tenant } from '../tenants/repo';
 import type { loginInput, signupInput } from '../validation';
 import type { SessionUser, UserRole } from './session';
@@ -31,10 +33,15 @@ export async function signup(
       await tx`
         insert into tenant_branding (tenant_id, product_name)
         values (${tenant.id}, ${input.organization.slice(0, 60)})`;
+      await seedTenantRoles(tx as unknown as Sql, tenant.id);
       const [user] = await tx<SessionUser[]>`
         insert into users (tenant_id, email, name, password_hash, role)
         values (${tenant.id}, ${input.email}, ${input.name}, ${passwordHash}, 'admin')
         returning id, tenant_id as "tenantId", email, name, role, is_superadmin as "isSuperadmin"`;
+      // First person on an empty platform becomes the only bootstrap super admin.
+      const became = await maybeBootstrapSuperadmin(tx as unknown as Sql, user.id);
+      if (became) user.isSuperadmin = true;
+      user.permissions = await loadOrgPermissions(tx as unknown as Sql, tenant.id, user.role);
       await createDefaultAgent(tx as unknown as Sql, tenant.id);
       await audit(tx as unknown as Sql, {
         tenantId: tenant.id,
@@ -42,6 +49,7 @@ export async function signup(
         action: 'tenant.created',
         target: tenant.slug,
         ip,
+        meta: became ? { platformSuperadmin: true } : undefined,
       });
       return { tenant, user };
     });
@@ -79,7 +87,8 @@ export async function login(
   }
 
   const { passwordHash: _hash, status: _status, ...user } = row;
-  return { ...user, role: user.role as UserRole };
+  const permissions = await loadOrgPermissions(sql, user.tenantId, user.role);
+  return { ...user, role: user.role as UserRole, permissions };
 }
 
 /** The moment a session really starts (after the second step, when there is one). */

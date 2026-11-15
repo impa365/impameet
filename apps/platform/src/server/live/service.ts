@@ -10,6 +10,7 @@ import { livekitRoomName } from '../livekit';
 import { canModerate } from '../moderation/service';
 import { tenantLimits } from '../plans';
 import type { StreamEgress } from '../recordings/egress';
+import { sessionHas } from '../rbac/check';
 import { publishRoomState, publishRoomStateById } from '../room-state';
 import type { Room } from '../rooms/service';
 import { RateLimiter } from '../security/rate-limit';
@@ -66,7 +67,9 @@ export type Destination = Omit<DestinationRow, 'tenantId' | 'sealed'>;
 const visible = ({ tenantId: _t, sealed: _s, ...rest }: DestinationRow): Destination => rest;
 
 function assertAdmin(user: SessionUser) {
-  if (user.role !== 'admin') throw forbidden('Só administradores configuram os destinos das transmissões');
+  if (!sessionHas(user, 'streaming.manage')) {
+    throw forbidden('Só quem tem permissão configura os destinos das transmissões');
+  }
 }
 
 async function destinations(sql: Sql, tenantId: string): Promise<DestinationRow[]> {

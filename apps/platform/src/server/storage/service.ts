@@ -7,6 +7,7 @@ import { AppError, badRequest, forbidden, notFound, tooManyRequests } from '../e
 import { recordingPath, removeRecording } from '../recordings/files';
 import { RateLimiter } from '../security/rate-limit';
 import { type Resolver, assertPublicHttpsUrl, systemResolver } from '../security/public-url';
+import { sessionHas } from '../rbac/check';
 import { openSecret, sealSecret, secretHint } from '../security/secrets';
 import type { driveStartInput, keepLocalInput, platformGoogleInput, s3StorageInput } from '../validation';
 import {
@@ -63,7 +64,9 @@ export function needKey(deps: Pick<StorageDeps, 'key'>): Buffer {
 }
 
 function assertAdmin(user: SessionUser) {
-  if (user.role !== 'admin') throw forbidden('Só administradores configuram o armazenamento das gravações');
+  if (!sessionHas(user, 'storage.manage')) {
+    throw forbidden('Só quem tem permissão configura o armazenamento das gravações');
+  }
 }
 
 function assertSuperadmin(user: SessionUser) {

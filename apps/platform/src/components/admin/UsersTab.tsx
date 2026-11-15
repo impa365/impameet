@@ -7,33 +7,41 @@ import { Icon } from '../ui/Icon';
 import { api } from '../api';
 import { messageOf, useLoad } from './useLoad';
 
-type Role = 'admin' | 'manager' | 'member';
-
 interface User {
   id: string;
   email: string;
   name: string;
-  role: Role;
+  role: string;
   status: 'active' | 'disabled';
   lastLoginAt: string | null;
   mfa: boolean;
 }
 
-const ROLE_LABEL = {
+const BUILTIN_LABEL: Record<string, MessageKey> = {
   admin: 'common.roles.admin',
   manager: 'common.roles.manager',
   member: 'common.roles.member',
-} as const satisfies Record<Role, MessageKey>;
+};
 
-export function UsersTab({ role, selfId }: { role: 'admin' | 'manager'; selfId: string }) {
+function roleLabel(t: ReturnType<typeof useT>, key: string): string {
+  const msg = BUILTIN_LABEL[key];
+  return msg ? t(msg) : key;
+}
+
+export function UsersTab({ role, selfId }: { role: string; selfId: string }) {
   const t = useT();
   const locale = useLocale();
-  const { data, error, setError, reload } = useLoad<{ users: User[] }>('/api/admin/users');
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'member' as Role });
+  const { data, error, setError, reload } = useLoad<{ users: User[]; roles: string[] }>('/api/admin/users');
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'member' });
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
-  const roles: Role[] = role === 'admin' ? ['member', 'manager', 'admin'] : ['member'];
-  const canEdit = (u: User) => u.id !== selfId && (role === 'admin' || u.role === 'member');
+  const roles = data?.roles?.length
+    ? data.roles
+    : role === 'admin'
+      ? ['member', 'manager', 'admin']
+      : ['member'];
+  const canEdit = (u: User) =>
+    u.id !== selfId && (role === 'admin' || u.role === 'member' || roles.includes(u.role));
 
   async function create(e: FormEvent) {
     e.preventDefault();
@@ -123,10 +131,10 @@ export function UsersTab({ role, selfId }: { role: 'admin' | 'manager'; selfId: 
             </label>
             <label>
               {t('admin.users.role')}
-              <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
+              <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                 {roles.map((r) => (
                   <option key={r} value={r}>
-                    {t(ROLE_LABEL[r])}
+                    {roleLabel(t, r)}
                   </option>
                 ))}
               </select>
@@ -179,17 +187,14 @@ export function UsersTab({ role, selfId }: { role: 'admin' | 'manager'; selfId: 
                       aria-label={t('admin.users.roleOf', { name: u.name })}
                       onChange={(e) => patch(u.id, { role: e.target.value })}
                     >
-                      {(role === 'admin'
-                        ? (['member', 'manager', 'admin'] as Role[])
-                        : (['member'] as Role[])
-                      ).map((r) => (
+                      {roles.map((r) => (
                         <option key={r} value={r}>
-                          {t(ROLE_LABEL[r])}
+                          {roleLabel(t, r)}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    t(ROLE_LABEL[u.role])
+                    roleLabel(t, u.role)
                   )}
                 </td>
                 <td>

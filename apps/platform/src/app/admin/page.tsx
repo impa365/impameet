@@ -15,13 +15,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   if (!ctx) redirect('/');
   const user = await currentUser();
   if (!user) redirect('/login');
-  if (user.role === 'member') redirect('/dashboard');
+  if (!user.permissions?.includes('panel.access') && user.role === 'member') redirect('/dashboard');
+  if (!user.permissions?.includes('panel.access') && !['admin', 'manager'].includes(user.role)) {
+    redirect('/dashboard');
+  }
   const t = await getT();
-  const tab = pickAdminTab(user.role, (await searchParams).tab);
+  const tab = pickAdminTab(user.permissions?.length ? user.permissions : user.role, (await searchParams).tab);
 
   return (
     <AppShell branding={ctx.branding} user={user} active={`admin:${tab}`} title={t(ADMIN_TABS[tab].label)}>
-      <AdminPanel tab={tab} role={user.role} selfId={user.id} branding={ctx.branding} />
+      <AdminPanel tab={tab} role={user.role} permissions={user.permissions ?? []} selfId={user.id} branding={ctx.branding} />
     </AppShell>
   );
 }

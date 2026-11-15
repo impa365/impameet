@@ -12,13 +12,15 @@ import { DomainsTab } from './DomainsTab';
 import { IntegrationsTab } from './IntegrationsTab';
 import { KnowledgeTab } from './KnowledgeTab';
 import { LiveTab } from './LiveTab';
+import { RolesTab } from './RolesTab';
 import type { AdminTab } from './tabs';
 import { UsersTab } from './UsersTab';
 
 /** One administration section; the shell's side navigation picks which. */
 export function AdminPanel(props: {
   tab: AdminTab;
-  role: 'admin' | 'manager';
+  role: string;
+  permissions: readonly string[];
   selfId: string;
   branding: Branding;
 }) {
@@ -29,6 +31,7 @@ export function AdminPanel(props: {
       {tab === 'knowledge' && <KnowledgeTab />}
       {tab === 'integrations' && <IntegrationsTab />}
       {tab === 'users' && <UsersTab role={props.role} selfId={props.selfId} />}
+      {tab === 'roles' && <RolesTab />}
       {tab === 'live' && <LiveTab />}
       {tab === 'branding' && <BrandingTab initial={props.branding} />}
       {tab === 'domains' && <DomainsTab />}

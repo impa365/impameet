@@ -5,6 +5,7 @@ import type { SessionUser } from '../auth/session';
 import type { Sql } from '../db';
 import { badRequest, conflict, forbidden, notFound } from '../errors';
 import { type Resolver, assertPublicHttpsUrl, systemResolver } from '../security/public-url';
+import { sessionHas } from '../rbac/check';
 import { openSecret, sealSecret, secretHint } from '../security/secrets';
 import type { integrationInput, modelDiscoveryInput } from '../validation';
 import { isRerankModel, modelCategory } from '@/lib/models';
@@ -69,7 +70,9 @@ const COLUMNS = (sql: Sql) => sql`
 const aad = (tenantId: string, id: string) => `integration:${tenantId}:${id}`;
 
 function assertAdmin(user: SessionUser): void {
-  if (user.role !== 'admin') throw forbidden('Só administradores gerenciam integrações');
+  if (!sessionHas(user, 'integrations.manage')) {
+    throw forbidden('Só quem tem permissão gerencia integrações');
+  }
 }
 
 const isUniqueViolation = (err: unknown) => (err as { code?: string }).code === '23505';
