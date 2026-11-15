@@ -559,7 +559,11 @@ describe('studio', () => {
     expect(JSON.parse(claims.roomConfig?.metadata ?? '{}')).toMatchObject({
       studio: {
         programId: 'sc_program',
-        scenes: [expect.objectContaining({ id: 'sc_program', layout: 'pip', stage: ['g-ana'] })],
+        previewId: 'sc_preview',
+        scenes: [
+          expect.objectContaining({ id: 'sc_program', layout: 'pip', stage: ['g-ana'] }),
+          expect.objectContaining({ id: 'sc_preview', layout: 'pip', stage: ['g-ana'] }),
+        ],
       },
       recording: false,
       live: null,
