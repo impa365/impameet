@@ -224,7 +224,14 @@ export async function updateAgentTool(
   const current = await findStored(sql, actor.tenantId, agentId, id);
   if (current.kind !== input.kind) throw badRequest('Não é possível mudar o tipo da ferramenta');
   await checkInput(deps, input);
-  const headers = mergeHeaders(savedHeaders(deps, current), input.headers);
+  // If the admin supplies every header value, do not needlessly decrypt the old
+  // value. This also lets an admin replace a legacy/corrupt sealed value.
+  const headers =
+    input.headers === null
+      ? null
+      : input.headers.every((header) => Boolean(header.value))
+        ? mergeHeaders({}, input.headers)
+        : mergeHeaders(savedHeaders(deps, current), input.headers);
   const sealed =
     headers === null
       ? current.headersSealed
@@ -372,8 +379,13 @@ export async function workerTools(deps: ToolDeps, agentId: string, lkRoom: strin
       continue;
     }
     if (t.mcpTools.length === 0) continue;
-    const offered = await serverTools(deps, t).catch(() => {
-      console.warn('mcp server unavailable', { tool: t.name });
+    const offered = await serverTools(deps, t).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn('mcp server unavailable', {
+        tool: t.name,
+        stage: 'discovery',
+        error: message.slice(0, 500),
+      });
       return [] as McpTool[];
     });
     for (const s of offered) {

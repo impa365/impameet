@@ -28,6 +28,7 @@ export interface McpTool {
 type Send = (req: OutboundRequest, policy: NetPolicy) => Promise<OutboundResponse>;
 
 const PROTOCOL = '2025-06-18';
+const FALLBACK_PROTOCOLS = ['2025-03-26', '2024-11-05'] as const;
 const MAX_REPLY_BYTES = 1024 * 1024;
 const MAX_PAGES = 5;
 
@@ -35,6 +36,32 @@ interface RpcMessage {
   id?: unknown;
   result?: unknown;
   error?: { message?: unknown };
+}
+
+function repairJsonControls(text: string): string {
+  let inString = false;
+  let escaped = false;
+  let out = '';
+  for (const char of text) {
+    if (escaped) { out += char; escaped = false; continue; }
+    if (char === '\\') { out += char; escaped = true; continue; }
+    if (char === '"') { inString = !inString; out += char; continue; }
+    if (inString && char.charCodeAt(0) < 0x20) {
+      out += `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
+    } else out += char;
+  }
+  return out;
+}
+
+function parseMessages(text: string): RpcMessage[] {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return (Array.isArray(parsed) ? parsed : [parsed]) as RpcMessage[];
+  } catch {
+    const repaired = repairJsonControls(text);
+    const parsed: unknown = JSON.parse(repaired);
+    return (Array.isArray(parsed) ? parsed : [parsed]) as RpcMessage[];
+  }
 }
 
 /** Complete events of a `text/event-stream` body, as parsed JSON messages. */
@@ -50,8 +77,8 @@ function streamedMessages(text: string): RpcMessage[] {
       .join('\n');
     if (!data) continue;
     try {
-      const parsed: unknown = JSON.parse(data);
-      out.push(...((Array.isArray(parsed) ? parsed : [parsed]) as RpcMessage[]));
+      const parsed: unknown = parseMessages(data);
+      out.push(...(parsed as RpcMessage[]));
     } catch {
       /* not JSON: ignore the event */
     }
@@ -65,10 +92,14 @@ function replyTo(res: OutboundResponse, id: number): RpcMessage {
     messages = streamedMessages(`${res.body}\n\n`);
   } else {
     try {
-      const parsed: unknown = JSON.parse(res.body);
-      messages = (Array.isArray(parsed) ? parsed : [parsed]) as RpcMessage[];
+      messages = parseMessages(res.body);
     } catch {
-      throw new ToolNetworkError('O servidor MCP respondeu algo que não é JSON-RPC');
+      const preview = res.body.slice(0, 240).replace(/[\\u0000-\\u001f\\u007f]/g, (char) =>
+        `\\\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`,
+      );
+      throw new ToolNetworkError(
+        `O servidor MCP respondeu algo que não é JSON-RPC (content-type=${res.headers['content-type'] ?? 'ausente'}; body=${preview})`,
+      );
     }
   }
   const reply = messages.find((m) => m && m.id === id);
@@ -116,7 +147,7 @@ export class McpSession {
       this.policy,
     );
     if (res.status === 401 || res.status === 403)
-      throw new ToolNetworkError('O servidor MCP recusou as credenciais');
+        throw new ToolNetworkError(`O servidor MCP recusou as credenciais (HTTP ${res.status})`);
     if (res.status < 200 || res.status >= 300)
       throw new ToolNetworkError(`O servidor MCP respondeu HTTP ${res.status}`);
     this.sessionId = res.headers['mcp-session-id'] ?? this.sessionId;
@@ -124,12 +155,24 @@ export class McpSession {
   }
 
   async open(): Promise<void> {
-    const result = (await this.request('initialize', {
-      protocolVersion: PROTOCOL,
-      capabilities: {},
-      clientInfo: { name: 'impa-meet', version: '1' },
-    })) as { protocolVersion?: unknown } | undefined;
-    this.protocol = typeof result?.protocolVersion === 'string' ? result.protocolVersion : PROTOCOL;
+    let result: { protocolVersion?: unknown } | undefined;
+    let lastError: unknown;
+    for (const protocol of [PROTOCOL, ...FALLBACK_PROTOCOLS]) {
+      try {
+        result = (await this.request('initialize', {
+          protocolVersion: protocol,
+          capabilities: {},
+          clientInfo: { name: 'impa-meet', version: '1' },
+        })) as { protocolVersion?: unknown } | undefined;
+        break;
+      } catch (error) {
+        lastError = error;
+        this.sessionId = null;
+        this.protocol = null;
+      }
+    }
+    if (!result) throw lastError;
+    this.protocol = typeof result.protocolVersion === 'string' ? result.protocolVersion : PROTOCOL;
     const res = await this.send(
       {
         url: this.server.url,

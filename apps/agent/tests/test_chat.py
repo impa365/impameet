@@ -145,6 +145,15 @@ async def test_enviar_no_chat_posts_only_when_not_muted(
     assert posted == []
 
 
+async def test_enviar_no_chat_rejects_missing_message_without_raising(
+    live: tuple[VoiceAgent, MagicMock, list[tuple[str, str]]],
+) -> None:
+    agent, _, _ = live
+    tool = next(t for t in agent.tools if t.info.name == "enviar_no_chat")
+    result = await tool()
+    assert "vazia" in result.lower()
+
+
 async def test_a_quiet_agent_only_answers_chat_that_names_it(
     live: tuple[VoiceAgent, MagicMock, list[tuple[str, str]]],
 ) -> None:
