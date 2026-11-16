@@ -224,7 +224,14 @@ export async function updateAgentTool(
   const current = await findStored(sql, actor.tenantId, agentId, id);
   if (current.kind !== input.kind) throw badRequest('Não é possível mudar o tipo da ferramenta');
   await checkInput(deps, input);
-  const headers = mergeHeaders(savedHeaders(deps, current), input.headers);
+  // If the admin supplies every header value, do not needlessly decrypt the old
+  // value. This also lets an admin replace a legacy/corrupt sealed value.
+  const headers =
+    input.headers === null
+      ? null
+      : input.headers.every((header) => Boolean(header.value))
+        ? mergeHeaders({}, input.headers)
+        : mergeHeaders(savedHeaders(deps, current), input.headers);
   const sealed =
     headers === null
       ? current.headersSealed

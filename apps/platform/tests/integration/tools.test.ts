@@ -512,6 +512,34 @@ describe('external tools for AI agents', () => {
     ).toMatch(/Valor inválido/);
   });
 
+  it('replaces a corrupt saved header when all new header values are supplied', async () => {
+    const { tool, admin, kaiser } = await setup();
+    const saved = await tool({
+      kind: 'mcp',
+      name: 'broken-mcp',
+      description: 'Servidor MCP',
+      url: `${base()}/mcp`,
+      headers: [{ name: 'Authorization', value: 'Bearer mcp-secret' }],
+    });
+    await sql`update agent_tools set headers_sealed = ${'enc:v1:corrupt'} where id = ${saved.id}`;
+
+    const replaced = await updateAgentTool(
+      deps(),
+      admin,
+      kaiser.id,
+      saved.id,
+      agentToolInput.parse({
+        kind: 'mcp',
+        name: 'broken-mcp',
+        description: 'Servidor MCP',
+        url: `${base()}/mcp`,
+        headers: [{ name: 'Authorization', value: 'Bearer mcp-secret' }],
+      }),
+      null,
+    );
+    expect(replaced.headerNames).toEqual(['Authorization']);
+    expect((await testAgentTool(deps(), admin, kaiser.id, saved.id, {})).ok).toBe(true);
+  });
   it('offers and runs only the MCP tools the admin picked', async () => {
     const { tool, run, people, admin, kaiser, lkRoom, lk } = await setup();
     const saved = await tool({
