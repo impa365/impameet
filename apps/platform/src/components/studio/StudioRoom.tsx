@@ -328,7 +328,13 @@ function Producer(props: {
   } = props.control;
   const tracks = useStudioTracks();
   const people = useParticipants().filter((p) => p.attributes?.[CAPTIONER_ATTRIBUTE] !== 'captions');
-  const desk = useDeskSplit();
+  const {
+    col: deskCol,
+    row: deskRow,
+    setCol: setDeskCol,
+    setRow: setDeskRow,
+    reset: resetDesk,
+  } = useDeskSplit();
   const deskRef = useRef<HTMLDivElement>(null);
   const directorRef = useRef<HTMLDivElement>(null);
   const sharing = new Set(
@@ -364,7 +370,7 @@ function Producer(props: {
       }
       if (e.key === 'Home' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        desk.reset();
+        resetDesk();
         return;
       }
       if (!(e.ctrlKey || e.metaKey) && !e.altKey && /^[1-9]$/.test(e.key)) {
@@ -378,7 +384,7 @@ function Producer(props: {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [dirty, goLive, loadPreview, state.scenes, desk.reset]);
+  }, [dirty, goLive, loadPreview, state.scenes, resetDesk]);
 
   function startColDrag(e: ReactPointerEvent<HTMLButtonElement>) {
     e.preventDefault();
@@ -389,7 +395,7 @@ function Producer(props: {
     e.currentTarget.setPointerCapture(pointerId);
     const onMove = (ev: PointerEvent) => {
       const pct = ((ev.clientX - rect.left) / rect.width) * 100;
-      desk.setCol(clampSplit(pct, DESK_COL_MIN));
+      setDeskCol(clampSplit(pct, DESK_COL_MIN));
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
@@ -406,7 +412,7 @@ function Producer(props: {
     const rect = el.getBoundingClientRect();
     const onMove = (ev: PointerEvent) => {
       const pct = ((ev.clientY - rect.top) / rect.height) * 100;
-      desk.setRow(clampSplit(pct, DESK_ROW_MIN));
+      setDeskRow(clampSplit(pct, DESK_ROW_MIN));
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
@@ -441,8 +447,8 @@ function Producer(props: {
       className={props.onAir ? 'studio-main producer on-air' : 'studio-main producer'}
       style={
         {
-          '--desk-col': `${desk.col}%`,
-          '--desk-row': `${desk.row}%`,
+          '--desk-col': `${deskCol}%`,
+          '--desk-row': `${deskRow}%`,
         } as CSSProperties
       }
     >
@@ -476,7 +482,7 @@ function Producer(props: {
             aria-label={t('studio.resizeCol')}
             title={t('studio.resizeCol')}
             onPointerDown={startColDrag}
-            onDoubleClick={() => desk.setCol(DESK_COL_DEFAULT)}
+            onDoubleClick={() => setDeskCol(DESK_COL_DEFAULT)}
           />
           <section className="studio-monitor preview">
             <header className="studio-monitor-head">
@@ -524,7 +530,7 @@ function Producer(props: {
         aria-label={t('studio.resizeRow')}
         title={`${t('studio.resizeRow')} · ${t('studio.resetDesk')} (Home)`}
         onPointerDown={startRowDrag}
-        onDoubleClick={() => desk.reset()}
+        onDoubleClick={() => resetDesk()}
       />
 
       <div className="studio-desk-bottom">
