@@ -123,12 +123,17 @@ function mcp(req: http.IncomingMessage, res: http.ServerResponse, body: string) 
     return res.end();
   }
   if (msg.method === 'initialize') {
+    const protocol = req.headers['mcp-protocol-version'];
+    if (protocol !== '2025-03-26') {
+      res.writeHead(400, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { message: 'unsupported protocol' } }));
+    }
     res.writeHead(200, { 'content-type': 'application/json', 'mcp-session-id': 'sess-1' });
     return res.end(
       JSON.stringify({
         jsonrpc: '2.0',
         id: msg.id,
-        result: { protocolVersion: '2025-06-18', capabilities: {} },
+        result: { protocolVersion: '2025-03-26', capabilities: {} },
       }),
     );
   }
