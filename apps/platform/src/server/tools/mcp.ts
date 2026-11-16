@@ -117,7 +117,7 @@ export class McpSession {
       this.policy,
     );
     if (res.status === 401 || res.status === 403)
-      throw new ToolNetworkError('O servidor MCP recusou as credenciais');
+        throw new ToolNetworkError(`O servidor MCP recusou as credenciais (HTTP ${res.status})`);
     if (res.status < 200 || res.status >= 300)
       throw new ToolNetworkError(`O servidor MCP respondeu HTTP ${res.status}`);
     this.sessionId = res.headers['mcp-session-id'] ?? this.sessionId;

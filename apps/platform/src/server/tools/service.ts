@@ -372,8 +372,13 @@ export async function workerTools(deps: ToolDeps, agentId: string, lkRoom: strin
       continue;
     }
     if (t.mcpTools.length === 0) continue;
-    const offered = await serverTools(deps, t).catch(() => {
-      console.warn('mcp server unavailable', { tool: t.name });
+    const offered = await serverTools(deps, t).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn('mcp server unavailable', {
+        tool: t.name,
+        stage: 'discovery',
+        error: message.slice(0, 500),
+      });
       return [] as McpTool[];
     });
     for (const s of offered) {
