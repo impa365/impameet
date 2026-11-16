@@ -28,6 +28,7 @@ export interface McpTool {
 type Send = (req: OutboundRequest, policy: NetPolicy) => Promise<OutboundResponse>;
 
 const PROTOCOL = '2025-06-18';
+const FALLBACK_PROTOCOLS = ['2025-03-26', '2024-11-05'] as const;
 const MAX_REPLY_BYTES = 1024 * 1024;
 const MAX_PAGES = 5;
 
@@ -124,12 +125,24 @@ export class McpSession {
   }
 
   async open(): Promise<void> {
-    const result = (await this.request('initialize', {
-      protocolVersion: PROTOCOL,
-      capabilities: {},
-      clientInfo: { name: 'impa-meet', version: '1' },
-    })) as { protocolVersion?: unknown } | undefined;
-    this.protocol = typeof result?.protocolVersion === 'string' ? result.protocolVersion : PROTOCOL;
+    let result: { protocolVersion?: unknown } | undefined;
+    let lastError: unknown;
+    for (const protocol of [PROTOCOL, ...FALLBACK_PROTOCOLS]) {
+      try {
+        result = (await this.request('initialize', {
+          protocolVersion: protocol,
+          capabilities: {},
+          clientInfo: { name: 'impa-meet', version: '1' },
+        })) as { protocolVersion?: unknown } | undefined;
+        break;
+      } catch (error) {
+        lastError = error;
+        this.sessionId = null;
+        this.protocol = null;
+      }
+    }
+    if (!result) throw lastError;
+    this.protocol = typeof result.protocolVersion === 'string' ? result.protocolVersion : PROTOCOL;
     const res = await this.send(
       {
         url: this.server.url,
