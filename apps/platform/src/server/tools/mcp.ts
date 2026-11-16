@@ -44,10 +44,10 @@ function repairJsonControls(text: string): string {
   let out = '';
   for (const char of text) {
     if (escaped) { out += char; escaped = false; continue; }
-    if (char === '\\\\') { out += char; escaped = true; continue; }
-    if (char === '\"') { inString = !inString; out += char; continue; }
+    if (char === '\\') { out += char; escaped = true; continue; }
+    if (char === '"') { inString = !inString; out += char; continue; }
     if (inString && char.charCodeAt(0) < 0x20) {
-      out += `\\\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
+      out += `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
     } else out += char;
   }
   return out;
