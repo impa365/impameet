@@ -492,7 +492,7 @@ class VoiceAgent(Agent):
 
     def _chat_tools(self) -> list[llm.FunctionTool[..., Any]]:
         @llm.function_tool(name="enviar_no_chat")
-        async def send_chat(mensagem: str) -> str:
+        async def send_chat(mensagem: str = "") -> str:
             """Envia um texto só no chat da reunião, sem falar em voz alta.
 
             Use quando pedirem para mandar link, código, lista ou qualquer recado escrito.
