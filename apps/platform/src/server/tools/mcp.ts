@@ -38,6 +38,32 @@ interface RpcMessage {
   error?: { message?: unknown };
 }
 
+function repairJsonControls(text: string): string {
+  let inString = false;
+  let escaped = false;
+  let out = '';
+  for (const char of text) {
+    if (escaped) { out += char; escaped = false; continue; }
+    if (char === '\\\\') { out += char; escaped = true; continue; }
+    if (char === '\"') { inString = !inString; out += char; continue; }
+    if (inString && char.charCodeAt(0) < 0x20) {
+      out += `\\\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
+    } else out += char;
+  }
+  return out;
+}
+
+function parseMessages(text: string): RpcMessage[] {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return (Array.isArray(parsed) ? parsed : [parsed]) as RpcMessage[];
+  } catch {
+    const repaired = repairJsonControls(text);
+    const parsed: unknown = JSON.parse(repaired);
+    return (Array.isArray(parsed) ? parsed : [parsed]) as RpcMessage[];
+  }
+}
+
 /** Complete events of a `text/event-stream` body, as parsed JSON messages. */
 function streamedMessages(text: string): RpcMessage[] {
   const out: RpcMessage[] = [];
@@ -51,8 +77,8 @@ function streamedMessages(text: string): RpcMessage[] {
       .join('\n');
     if (!data) continue;
     try {
-      const parsed: unknown = JSON.parse(data);
-      out.push(...((Array.isArray(parsed) ? parsed : [parsed]) as RpcMessage[]));
+      const parsed: unknown = parseMessages(data);
+      out.push(...(parsed as RpcMessage[]));
     } catch {
       /* not JSON: ignore the event */
     }
@@ -66,8 +92,7 @@ function replyTo(res: OutboundResponse, id: number): RpcMessage {
     messages = streamedMessages(`${res.body}\n\n`);
   } else {
     try {
-      const parsed: unknown = JSON.parse(res.body);
-      messages = (Array.isArray(parsed) ? parsed : [parsed]) as RpcMessage[];
+      messages = parseMessages(res.body);
     } catch {
       const preview = res.body.slice(0, 240).replace(/[\\u0000-\\u001f\\u007f]/g, (char) =>
         `\\\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`,
