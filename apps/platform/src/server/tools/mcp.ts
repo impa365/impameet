@@ -69,7 +69,12 @@ function replyTo(res: OutboundResponse, id: number): RpcMessage {
       const parsed: unknown = JSON.parse(res.body);
       messages = (Array.isArray(parsed) ? parsed : [parsed]) as RpcMessage[];
     } catch {
-      throw new ToolNetworkError('O servidor MCP respondeu algo que não é JSON-RPC');
+      const preview = res.body.slice(0, 240).replace(/[\\u0000-\\u001f\\u007f]/g, (char) =>
+        `\\\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`,
+      );
+      throw new ToolNetworkError(
+        `O servidor MCP respondeu algo que não é JSON-RPC (content-type=${res.headers['content-type'] ?? 'ausente'}; body=${preview})`,
+      );
     }
   }
   const reply = messages.find((m) => m && m.id === id);
