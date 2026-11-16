@@ -261,8 +261,12 @@ function readDeskSplit(): DeskSplit {
     const col = Number(parsed.col);
     const row = Number(parsed.row);
     return {
-      col: Number.isFinite(col) ? Math.min(100 - DESK_COL_MIN, Math.max(DESK_COL_MIN, col)) : DESK_COL_DEFAULT,
-      row: Number.isFinite(row) ? Math.min(100 - DESK_ROW_MIN, Math.max(DESK_ROW_MIN, row)) : DESK_ROW_DEFAULT,
+      col: Number.isFinite(col)
+        ? Math.min(100 - DESK_COL_MIN, Math.max(DESK_COL_MIN, col))
+        : DESK_COL_DEFAULT,
+      row: Number.isFinite(row)
+        ? Math.min(100 - DESK_ROW_MIN, Math.max(DESK_ROW_MIN, row))
+        : DESK_ROW_DEFAULT,
     };
   } catch {
     return { col: DESK_COL_DEFAULT, row: DESK_ROW_DEFAULT };
