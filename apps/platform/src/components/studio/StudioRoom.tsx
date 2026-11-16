@@ -8,7 +8,15 @@ import {
   useRoomContext,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useT } from '@/i18n/client';
 import type { MessageKey } from '@/i18n/keys';
 import { displayName } from '@/lib/a11y';
@@ -237,7 +245,61 @@ function Thumb(props: { trackRef: TrackReferenceOrPlaceholder | undefined; name:
   );
 }
 
-/** The producer's desk: Program (on air) + Preview (draft), then backstage for the draft. */
+const DESK_SPLIT_KEY = 'impa.studio.desk.split';
+const DESK_COL_DEFAULT = 50;
+const DESK_ROW_DEFAULT = 58;
+const DESK_COL_MIN = 28;
+const DESK_ROW_MIN = 32;
+
+type DeskSplit = { col: number; row: number };
+
+function readDeskSplit(): DeskSplit {
+  try {
+    const raw = localStorage.getItem(DESK_SPLIT_KEY);
+    if (!raw) return { col: DESK_COL_DEFAULT, row: DESK_ROW_DEFAULT };
+    const parsed = JSON.parse(raw) as Partial<DeskSplit>;
+    const col = Number(parsed.col);
+    const row = Number(parsed.row);
+    return {
+      col: Number.isFinite(col) ? Math.min(100 - DESK_COL_MIN, Math.max(DESK_COL_MIN, col)) : DESK_COL_DEFAULT,
+      row: Number.isFinite(row) ? Math.min(100 - DESK_ROW_MIN, Math.max(DESK_ROW_MIN, row)) : DESK_ROW_DEFAULT,
+    };
+  } catch {
+    return { col: DESK_COL_DEFAULT, row: DESK_ROW_DEFAULT };
+  }
+}
+
+function useDeskSplit(): DeskSplit & {
+  setCol: (n: number) => void;
+  setRow: (n: number) => void;
+  reset: () => void;
+} {
+  const [split, setSplit] = useState<DeskSplit>(readDeskSplit);
+  const persist = useCallback((updater: (prev: DeskSplit) => DeskSplit) => {
+    setSplit((prev) => {
+      const next = updater(prev);
+      try {
+        localStorage.setItem(DESK_SPLIT_KEY, JSON.stringify(next));
+      } catch {
+        /* private mode */
+      }
+      return next;
+    });
+  }, []);
+  const setCol = useCallback((col: number) => persist((s) => ({ ...s, col })), [persist]);
+  const setRow = useCallback((row: number) => persist((s) => ({ ...s, row })), [persist]);
+  const reset = useCallback(
+    () => persist(() => ({ col: DESK_COL_DEFAULT, row: DESK_ROW_DEFAULT })),
+    [persist],
+  );
+  return { ...split, setCol, setRow, reset };
+}
+
+function clampSplit(value: number, min: number): number {
+  return Math.min(100 - min, Math.max(min, value));
+}
+
+/** The producer's desk: Program + Preview (draft), then backstage for the draft. */
 function Producer(props: {
   control: StudioControl;
   onPanel: () => void;
@@ -262,6 +324,9 @@ function Producer(props: {
   } = props.control;
   const tracks = useStudioTracks();
   const people = useParticipants().filter((p) => p.attributes?.[CAPTIONER_ATTRIBUTE] !== 'captions');
+  const desk = useDeskSplit();
+  const deskRef = useRef<HTMLDivElement>(null);
+  const directorRef = useRef<HTMLDivElement>(null);
   const sharing = new Set(
     tracks
       .filter((r) => r.source === Track.Source.ScreenShare && isTrackReference(r))
@@ -293,6 +358,11 @@ function Producer(props: {
         if (dirty) goLive();
         return;
       }
+      if (e.key === 'Home' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        desk.reset();
+        return;
+      }
       if (!(e.ctrlKey || e.metaKey) && !e.altKey && /^[1-9]$/.test(e.key)) {
         const idx = Number(e.key) - 1;
         const sc = state.scenes[idx];
@@ -304,7 +374,43 @@ function Producer(props: {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [dirty, goLive, loadPreview, state.scenes]);
+  }, [dirty, goLive, loadPreview, state.scenes, desk.reset]);
+
+  function startColDrag(e: ReactPointerEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    const el = directorRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pointerId = e.pointerId;
+    e.currentTarget.setPointerCapture(pointerId);
+    const onMove = (ev: PointerEvent) => {
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+      desk.setCol(clampSplit(pct, DESK_COL_MIN));
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  function startRowDrag(e: ReactPointerEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    const el = deskRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const onMove = (ev: PointerEvent) => {
+      const pct = ((ev.clientY - rect.top) / rect.height) * 100;
+      desk.setRow(clampSplit(pct, DESK_ROW_MIN));
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
 
   function toggleStage(identity: string) {
     if (!preview.stage.includes(identity) && preview.stage.length >= MAX_ON_STAGE) {
@@ -326,188 +432,235 @@ function Producer(props: {
   }
 
   return (
-    <div className="studio-main producer">
-      <div className="studio-director" aria-label={t('studio.director')}>
-        <section className="studio-monitor">
-          <header className="studio-monitor-head">
-            <span className="studio-pill live">{t('studio.program')}</span>
-            <small className="muted">{program.name}</small>
-          </header>
-          <div className="studio-preview">
-            <StudioCanvas
-              state={program}
-              tracks={tracks}
-              emptyText={t('studio.emptyProgram')}
-              fadeKey={state.transition === 'fade' ? bodyKey(program) : undefined}
-            />
-          </div>
-        </section>
-        <section className="studio-monitor">
-          <header className="studio-monitor-head">
-            <span className="studio-pill draft">{t('studio.preview')}</span>
-            <small className="muted">{preview.name}</small>
-            <select
-              className="studio-transition"
-              aria-label={t('studio.transition')}
-              value={state.transition}
-              onChange={(e) => setTransitionMode(e.target.value as 'cut' | 'fade')}
-            >
-              <option value="cut">{t('studio.transitionCut')}</option>
-              <option value="fade">{t('studio.transitionFade')}</option>
-            </select>
-            <button
-              type="button"
-              className="btn text small"
-              onClick={() => pullProgram()}
-              title={t('studio.pullProgramHelp')}
-            >
-              <Icon name="content_copy" size={16} />
-              {t('studio.pullProgram')}
-            </button>
-            <button
-              type="button"
-              className="btn small"
-              disabled={!dirty}
-              onClick={() => goLive()}
-              title={t('studio.goLiveHelp')}
-            >
-              <Icon name="play_arrow" size={18} />
-              {t('studio.goLive')}
-            </button>
-          </header>
-          <div className="studio-preview">
-            <StudioCanvas state={preview} tracks={tracks} emptyText={t('studio.emptyStage')} />
-          </div>
-        </section>
-      </div>
-
-      <div className="studio-scenes" role="toolbar" aria-label={t('studio.scenes')}>
-        {state.scenes.map((sc) => (
-          <span key={sc.id} className="studio-scene-chip">
-            <button
-              type="button"
-              className={
-                sc.id === preview.id
-                  ? 'studio-scene-btn on'
-                  : sc.id === program.id
-                    ? 'studio-scene-btn program'
-                    : 'studio-scene-btn'
-              }
-              onClick={() => loadPreview(sc.id)}
-              onDoubleClick={() => {
-                const name = window.prompt(t('studio.renameScene'), sc.name);
-                if (name) rename(sc.id, name);
-              }}
-              aria-pressed={sc.id === preview.id}
-              title={t('studio.sceneHint')}
-            >
-              {sc.name}
-              {sc.id === program.id && <small>{t('studio.onAirShort')}</small>}
-            </button>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label={t('studio.duplicateScene')}
-              title={t('studio.duplicateScene')}
-              onClick={() => duplicate(sc.id)}
-            >
-              <Icon name="content_copy" size={14} />
-            </button>
-            {sc.id !== program.id && state.scenes.length > 2 && (
+    <div
+      ref={deskRef}
+      className={props.onAir ? 'studio-main producer on-air' : 'studio-main producer'}
+      style={
+        {
+          '--desk-col': `${desk.col}%`,
+          '--desk-row': `${desk.row}%`,
+        } as CSSProperties
+      }
+    >
+      <div className="studio-desk-top">
+        <div ref={directorRef} className="studio-director" aria-label={t('studio.director')}>
+          <section className={props.onAir ? 'studio-monitor program on-air' : 'studio-monitor program'}>
+            <header className="studio-monitor-head">
+              <span className={props.onAir ? 'studio-pill live' : 'studio-pill program'}>
+                {t('studio.program')}
+              </span>
+              {props.onAir && (
+                <span className="studio-on-air-tag" aria-live="polite">
+                  <span className="rec-dot" aria-hidden />
+                  {t('studio.onAirShort')}
+                </span>
+              )}
+              <small className="muted">{program.name}</small>
+            </header>
+            <div className="studio-preview">
+              <StudioCanvas
+                state={program}
+                tracks={tracks}
+                emptyText={t('studio.emptyProgram')}
+                fadeKey={state.transition === 'fade' ? bodyKey(program) : undefined}
+              />
+            </div>
+          </section>
+          <button
+            type="button"
+            className="studio-split studio-split-v"
+            aria-label={t('studio.resizeCol')}
+            title={t('studio.resizeCol')}
+            onPointerDown={startColDrag}
+            onDoubleClick={() => desk.setCol(DESK_COL_DEFAULT)}
+          />
+          <section className="studio-monitor preview">
+            <header className="studio-monitor-head">
+              <span className="studio-pill draft">{t('studio.preview')}</span>
+              <small className="muted">{preview.name}</small>
+              <select
+                className="studio-transition"
+                aria-label={t('studio.transition')}
+                value={state.transition}
+                onChange={(e) => setTransitionMode(e.target.value as 'cut' | 'fade')}
+              >
+                <option value="cut">{t('studio.transitionCut')}</option>
+                <option value="fade">{t('studio.transitionFade')}</option>
+              </select>
               <button
                 type="button"
-                className="icon-btn"
-                aria-label={t('studio.deleteScene')}
-                onClick={() => removeScene(sc.id)}
+                className="btn text small"
+                onClick={() => pullProgram()}
+                title={t('studio.pullProgramHelp')}
               >
-                <Icon name="close" size={14} />
+                <Icon name="content_copy" size={16} />
+                {t('studio.pullProgram')}
+              </button>
+              <button
+                type="button"
+                className="btn small studio-take"
+                disabled={!dirty}
+                onClick={() => goLive()}
+                title={t('studio.goLiveHelp')}
+              >
+                <Icon name="play_arrow" size={18} />
+                {t('studio.goLive')}
+              </button>
+            </header>
+            <div className="studio-preview">
+              <StudioCanvas state={preview} tracks={tracks} emptyText={t('studio.emptyStage')} />
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className="studio-split studio-split-h"
+        aria-label={t('studio.resizeRow')}
+        title={`${t('studio.resizeRow')} · ${t('studio.resetDesk')} (Home)`}
+        onPointerDown={startRowDrag}
+        onDoubleClick={() => desk.reset()}
+      />
+
+      <div className="studio-desk-bottom">
+        <div className="studio-scenes" role="toolbar" aria-label={t('studio.scenes')}>
+          {state.scenes.map((sc) => {
+            const isProgram = sc.id === program.id;
+            const isPreview = sc.id === preview.id;
+            return (
+              <span key={sc.id} className="studio-scene-chip">
+                <button
+                  type="button"
+                  className={[
+                    'studio-scene-btn',
+                    isPreview ? 'on' : '',
+                    isProgram ? 'program' : '',
+                    isProgram && props.onAir ? 'on-air' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => loadPreview(sc.id)}
+                  onDoubleClick={() => {
+                    const name = window.prompt(t('studio.renameScene'), sc.name);
+                    if (name) rename(sc.id, name);
+                  }}
+                  aria-pressed={isPreview}
+                  title={t('studio.sceneHint')}
+                >
+                  {sc.name}
+                  {isProgram && props.onAir && <small>{t('studio.onAirShort')}</small>}
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label={t('studio.duplicateScene')}
+                  title={t('studio.duplicateScene')}
+                  onClick={() => duplicate(sc.id)}
+                >
+                  <Icon name="content_copy" size={14} />
+                </button>
+                {sc.id !== program.id && state.scenes.length > 2 && (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={t('studio.deleteScene')}
+                    onClick={() => removeScene(sc.id)}
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                )}
+              </span>
+            );
+          })}
+          <button type="button" className="btn text small" onClick={() => newScene()}>
+            <Icon name="add" size={16} />
+            {t('studio.addScene')}
+          </button>
+        </div>
+
+        <div className="studio-toolbar" role="toolbar" aria-label={t('studio.layoutTitle')}>
+          <div className="studio-layouts" role="radiogroup" aria-label={t('studio.layoutTitle')}>
+            {STUDIO_LAYOUTS.map((l) => (
+              <button
+                key={l}
+                type="button"
+                role="radio"
+                aria-checked={preview.layout === l}
+                className={preview.layout === l ? 'studio-layout-btn on' : 'studio-layout-btn'}
+                onClick={() => changePreview((s) => ({ ...s, layout: l }))}
+              >
+                <span className={`studio-layout-icon ${l}`} aria-hidden>
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                {t(LAYOUT_LABEL[l])}
+              </button>
+            ))}
+          </div>
+          <span className="studio-actions">
+            <button type="button" className="btn tonal small" onClick={props.onPanel}>
+              <Icon name="title" size={18} />
+              {t('studio.bannersAndBrand')}
+            </button>
+            {props.onLive && (
+              <button
+                type="button"
+                className={props.onAir ? 'btn danger small studio-tx on-air' : 'btn tonal small studio-tx'}
+                onClick={props.onLive}
+              >
+                <Icon name="sensors" size={18} />
+                {props.onAir ? t('live.menuOnAir') : t('live.menu')}
               </button>
             )}
           </span>
-        ))}
-        <button type="button" className="btn text small" onClick={() => newScene()}>
-          <Icon name="add" size={16} />
-          {t('studio.addScene')}
-        </button>
-      </div>
-
-      <div className="studio-toolbar" role="toolbar" aria-label={t('studio.layoutTitle')}>
-        <div className="studio-layouts" role="radiogroup" aria-label={t('studio.layoutTitle')}>
-          {STUDIO_LAYOUTS.map((l) => (
-            <button
-              key={l}
-              type="button"
-              role="radio"
-              aria-checked={preview.layout === l}
-              className={preview.layout === l ? 'studio-layout-btn on' : 'studio-layout-btn'}
-              onClick={() => changePreview((s) => ({ ...s, layout: l }))}
-            >
-              <span className={`studio-layout-icon ${l}`} aria-hidden>
-                <i />
-                <i />
-                <i />
-              </span>
-              {t(LAYOUT_LABEL[l])}
-            </button>
-          ))}
         </div>
-        <span className="studio-actions">
-          <button type="button" className="btn tonal small" onClick={props.onPanel}>
-            <Icon name="title" size={18} />
-            {t('studio.bannersAndBrand')}
-          </button>
-          {props.onLive && (
-            <button type="button" className="btn danger small" onClick={props.onLive}>
-              <Icon name="sensors" size={18} />
-              {props.onAir ? t('live.menuOnAir') : t('live.menu')}
-            </button>
-          )}
-        </span>
-      </div>
-      <section className="studio-backstage" aria-label={t('studio.backstage')}>
-        <h4>
-          {t('studio.backstage')} <small className="muted">{t('studio.backstageHint')}</small>
-        </h4>
-        <ul>
-          {people.map((p) => {
-            const name = displayName(p, t('room.aiAssistant'));
-            const onStage = preview.stage.includes(p.identity);
-            const camera = tracks.find(
-              (r) => r.participant.identity === p.identity && r.source === Track.Source.Camera,
-            );
-            return (
-              <li key={p.identity} className={onStage ? 'on-stage' : undefined}>
-                <Thumb trackRef={camera} name={name} />
-                <span className="studio-person">
-                  <strong>{name}</strong>
-                  <small>{onStage ? t('studio.onStage') : t('studio.waiting')}</small>
-                </span>
-                <span className="studio-person-actions">
-                  <button
-                    type="button"
-                    className={onStage ? 'btn tonal small' : 'btn small'}
-                    onClick={() => toggleStage(p.identity)}
-                  >
-                    <Icon name={onStage ? 'arrow_downward' : 'arrow_upward'} size={16} />
-                    {onStage ? t('studio.removeFromStage') : t('studio.addToStage')}
-                  </button>
-                  {sharing.has(p.identity) && (
+        <section className="studio-backstage" aria-label={t('studio.backstage')}>
+          <h4>
+            {t('studio.backstage')} <small className="muted">{t('studio.backstageHint')}</small>
+          </h4>
+          <ul>
+            {people.map((p) => {
+              const name = displayName(p, t('room.aiAssistant'));
+              const onStage = preview.stage.includes(p.identity);
+              const camera = tracks.find(
+                (r) => r.participant.identity === p.identity && r.source === Track.Source.Camera,
+              );
+              return (
+                <li key={p.identity} className={onStage ? 'on-stage' : undefined}>
+                  <Thumb trackRef={camera} name={name} />
+                  <span className="studio-person">
+                    <strong>{name}</strong>
+                    <small>{onStage ? t('studio.onStage') : t('studio.waiting')}</small>
+                  </span>
+                  <span className="studio-person-actions">
                     <button
                       type="button"
-                      className="btn text small"
-                      aria-pressed={preview.screen === p.identity}
-                      onClick={() => toggleScreen(p.identity)}
+                      className={onStage ? 'btn tonal small' : 'btn small'}
+                      onClick={() => toggleStage(p.identity)}
                     >
-                      <Icon name="present_to_all" size={16} />
-                      {preview.screen === p.identity ? t('studio.hideScreen') : t('studio.showScreen')}
+                      <Icon name={onStage ? 'arrow_downward' : 'arrow_upward'} size={16} />
+                      {onStage ? t('studio.removeFromStage') : t('studio.addToStage')}
                     </button>
-                  )}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+                    {sharing.has(p.identity) && (
+                      <button
+                        type="button"
+                        className="btn text small"
+                        aria-pressed={preview.screen === p.identity}
+                        onClick={() => toggleScreen(p.identity)}
+                      >
+                        <Icon name="present_to_all" size={16} />
+                        {preview.screen === p.identity ? t('studio.hideScreen') : t('studio.showScreen')}
+                      </button>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </div>
     </div>
   );
 }

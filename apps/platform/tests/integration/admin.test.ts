@@ -482,7 +482,7 @@ describe('studio', () => {
     const body = sceneBody(input);
     return studioStateInput.parse({
       scenes: [
-        { id: 'sc_program', name: 'Ao vivo', ...body },
+        { id: 'sc_program', name: 'Programa', ...body },
         { id: 'sc_preview', name: 'Montagem', ...body },
       ],
       programId: 'sc_program',

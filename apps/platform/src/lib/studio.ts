@@ -141,7 +141,7 @@ export function makeScene(name: string, body: Partial<StudioSceneBody> = {}, id?
 }
 
 export const EMPTY_STUDIO: StudioState = (() => {
-  const program = makeScene('Ao vivo', {}, 'sc_program');
+  const program = makeScene('Programa', {}, 'sc_program');
   const preview = makeScene('Montagem', {}, 'sc_preview');
   return {
     scenes: [program, preview],
@@ -438,7 +438,7 @@ export function parseStudio(raw: unknown): StudioState {
   }
 
   const body = parseSceneBody(d);
-  const program = makeScene('Ao vivo', body, 'sc_program');
+  const program = makeScene('Programa', body, 'sc_program');
   const preview = makeScene('Montagem', cloneSceneBody(body), 'sc_preview');
   return {
     scenes: [program, preview],

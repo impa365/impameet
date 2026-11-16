@@ -141,7 +141,7 @@ describe('studio stage', () => {
       scenes: [
         {
           id: 'sc_program',
-          name: 'Ao vivo',
+          name: 'Programa',
           layout: 'grid',
           stage: [],
           screen: null,
