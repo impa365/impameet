@@ -14,6 +14,7 @@ import live from './live';
 import voice from './voice';
 import platform from './platform';
 import calendar from './calendar';
+import apiKeys from './apiKeys';
 
 const NAMESPACES = {
   common,
@@ -30,6 +31,7 @@ const NAMESPACES = {
   voice,
   platform,
   calendar,
+  apiKeys,
 };
 
 /** The Portuguese tree: the reference every translation is checked against. */

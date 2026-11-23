@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { AccountSecurity } from '@/components/account/AccountSecurity';
+import { ApiKeysCard } from '@/components/account/ApiKeysCard';
 import { CalendarCard } from '@/components/account/CalendarCard';
 import { getT } from '@/i18n/server';
 import { currentTenant, currentUser } from '@/server/request';
@@ -21,6 +22,7 @@ export default async function AccountPage() {
       {!user.mfaSetupRequired && (
         <div className="settings-body account account-calendar">
           <CalendarCard />
+          <ApiKeysCard />
         </div>
       )}
       <AccountSecurity setupRequired={Boolean(user.mfaSetupRequired)} />
