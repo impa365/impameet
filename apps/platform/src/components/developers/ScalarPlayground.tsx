@@ -2,7 +2,41 @@
 
 import { useEffect, useRef } from 'react';
 
-/** Scalar API Reference — same idea as ImpaGo playground, themed for IMPA Meet. */
+declare global {
+  interface Window {
+    Scalar?: {
+      createApiReference: (
+        target: string | HTMLElement,
+        config: Record<string, unknown>,
+      ) => { mount?: (el: string | HTMLElement) => void };
+    };
+  }
+}
+
+function loadScalarCdn(): Promise<void> {
+  if (window.Scalar?.createApiReference) return Promise.resolve();
+  const existing = document.getElementById('scalar-cdn') as HTMLScriptElement | null;
+  if (existing) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Scalar CDN failed')), {
+        once: true,
+      });
+      if (window.Scalar?.createApiReference) resolve();
+    });
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.id = 'scalar-cdn';
+    script.src = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Scalar CDN failed'));
+    document.head.appendChild(script);
+  });
+}
+
+/** Scalar playground — same CDN approach as ImpaGo, with the current JS API. */
 export function ScalarPlayground({ openApiUrl }: { openApiUrl: string }) {
   const host = useRef<HTMLDivElement>(null);
 
@@ -10,35 +44,32 @@ export function ScalarPlayground({ openApiUrl }: { openApiUrl: string }) {
     const el = host.current;
     if (!el || el.dataset.ready === '1') return;
     el.dataset.ready = '1';
+    let cancelled = false;
 
-    const boot = () => {
-      const config = {
-        theme: 'kepler',
-        layout: 'modern',
-        darkMode: true,
-        hideModels: false,
-        defaultOpenAllTags: true,
-        metaData: {
-          title: 'IMPA Meet API',
-        },
-      };
-      const ref = document.createElement('script');
-      ref.id = 'api-reference';
-      ref.setAttribute('data-url', openApiUrl);
-      ref.setAttribute('data-configuration', JSON.stringify(config));
-      el.appendChild(ref);
+    void (async () => {
+      try {
+        await loadScalarCdn();
+        if (cancelled || !host.current || !window.Scalar?.createApiReference) return;
+        host.current.replaceChildren();
+        window.Scalar.createApiReference(host.current, {
+          url: openApiUrl,
+          theme: 'kepler',
+          darkMode: true,
+          layout: 'modern',
+          hideModels: false,
+          defaultOpenAllTags: true,
+          metaData: { title: 'IMPA Meet API' },
+        });
+      } catch (err) {
+        if (!host.current) return;
+        host.current.textContent =
+          err instanceof Error ? err.message : 'Não foi possível carregar o playground.';
+      }
+    })();
+
+    return () => {
+      cancelled = true;
     };
-
-    if (document.getElementById('scalar-cdn')) {
-      boot();
-      return;
-    }
-    const script = document.createElement('script');
-    script.id = 'scalar-cdn';
-    script.src = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference';
-    script.async = true;
-    script.onload = boot;
-    document.head.appendChild(script);
   }, [openApiUrl]);
 
   return <div ref={host} className="dev-scalar" id="scalar-playground" />;

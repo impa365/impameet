@@ -1,186 +1,105 @@
 import type { Metadata } from 'next';
-import { Figtree, Syne } from 'next/font/google';
-import { headers } from 'next/headers';
-import type { CSSProperties } from 'react';
-import { ScalarPlayground } from '@/components/developers/ScalarPlayground';
 import { currentTenant } from '@/server/request';
 import { DEFAULT_BRANDING } from '@/server/tenants/repo';
-import './developers.css';
+import '@/components/developers/docs-shell.css';
 
 export const dynamic = 'force-dynamic';
-
-const display = Syne({
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
-  variable: '--dev-font-display',
-  display: 'swap',
-});
-
-const body = Figtree({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--dev-font-body',
-  display: 'swap',
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   const ctx = await currentTenant();
   const name = ctx?.branding.productName ?? DEFAULT_BRANDING.productName;
   return {
-    title: `Developers · ${name}`,
+    title: `${name} · Developers`,
     description: `API REST, MCP e playground OpenAPI do ${name}`,
     robots: { index: true },
   };
 }
 
-async function originFromRequest(): Promise<string> {
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host');
-  const proto = h.get('x-forwarded-proto') ?? 'https';
-  if (host) return `${proto}://${host}`;
-  return '';
-}
-
-export default async function DevelopersPage() {
+/** ImpaGo-style VitePress home for IMPA Meet developers. */
+export default async function DevelopersHomePage() {
   const ctx = await currentTenant();
   const brand = ctx?.branding.productName ?? DEFAULT_BRANDING.productName;
-  const origin = await originFromRequest();
-  const openApiUrl = `${origin}/openapi.json`;
-
-  const accent = ctx?.branding.primaryColor ?? DEFAULT_BRANDING.primaryColor;
-  const theme = {
-    '--dev-accent': accent,
-  } as CSSProperties;
 
   return (
-    <div className={`dev-root ${display.variable} ${body.variable}`} style={theme}>
-      <header className="dev-nav">
-        <a className="dev-brand" href="/developers">
-          <span className="dev-brand-mark" aria-hidden />
-          {brand}
-          <span style={{ color: 'var(--dev-muted)', fontWeight: 600 }}>Developers</span>
-        </a>
-        <nav className="dev-nav-links" aria-label="Seções">
-          <a href="#guia">Guia</a>
-          <a href="#mcp">MCP</a>
-          <a href="#playground">Playground</a>
-          <a href="/llms.txt" target="_blank" rel="noreferrer">
-            llms.txt
+    <div className="ig-root">
+      <header className="ig-nav">
+        <div className="ig-nav-inner">
+          <a className="ig-brand" href="/developers">
+            <span className="ig-logo" aria-hidden />
+            <span>{brand}</span>
           </a>
-          <a href="/openapi.json" target="_blank" rel="noreferrer">
-            OpenAPI
+          <nav className="ig-nav-links" aria-label="Principal">
+            <a href="/developers/guide/introduction">Guia</a>
+            <a href="/developers/api/overview">API</a>
+            <a href="/developers/guide/mcp">MCP</a>
+            <a href="/developers/api/playground">Playground</a>
+            <a href="/llms.txt" target="_blank" rel="noreferrer">
+              llms.txt
+            </a>
+          </nav>
+          <a className="ig-nav-cta" href="/account">
+            Criar chave
           </a>
-        </nav>
-        <a className="dev-nav-cta" href="/account">
-          Criar chave
-        </a>
+        </div>
       </header>
 
-      <section className="dev-hero">
-        <div className="dev-hero-copy">
-          <p className="dev-kicker">API · MCP · OpenAPI</p>
-          <h1>{brand}</h1>
-          <p className="dev-hero-lead">
-            Integre salas, reuniões, agentes e bases de conhecimento com uma API REST moderna, playground
-            estilo Scalar e índice <code>llms.txt</code> para agentes de IA.
+      <div className="ig-home">
+        <section className="ig-hero">
+          <h1 className="ig-hero-name">{brand}</h1>
+          <p className="ig-hero-text">Meet API open source</p>
+          <p className="ig-hero-tag">
+            Integre salas, reuniões, agentes e bases de conhecimento com uma API REST moderna, MCP nativo para
+            agentes de IA e índice <code>llms.txt</code>.
           </p>
-          <div className="dev-hero-actions">
-            <a className="dev-btn dev-btn-primary" href="#playground">
-              Abrir playground
+          <div className="ig-hero-actions">
+            <a className="ig-btn ig-btn-brand" href="/developers/guide/quickstart">
+              Início rápido
             </a>
-            <a className="dev-btn dev-btn-ghost" href="/llms.txt" target="_blank" rel="noreferrer">
-              Abrir llms.txt
+            <a className="ig-btn ig-btn-alt" href="/developers/api/overview">
+              Referência API
             </a>
           </div>
-        </div>
-        <div className="dev-hero-visual" aria-hidden />
-      </section>
+        </section>
 
-      <section className="dev-section" id="guia">
-        <div className="dev-section-inner">
-          <h2>Comece em três passos</h2>
-          <p className="dev-lead">
-            Chaves são pessoais: uma chave <code>impa_…</code> funciona em todas as organizações do seu
-            e-mail. O header <code>X-Impa-Org</code> escolhe qual.
-          </p>
-          <div className="dev-grid">
-            <article className="dev-tile">
-              <h3>1. Crie a chave</h3>
-              <p>
-                Em <a href="/account">Minha conta</a>, gere uma chave e copie o segredo uma única vez.
-              </p>
-            </article>
-            <article className="dev-tile">
-              <h3>2. Descubra a org</h3>
-              <p>
-                <code>GET /api/v1/me</code> devolve os UUIDs. Use um deles em <code>X-Impa-Org</code>.
-              </p>
-            </article>
-            <article className="dev-tile">
-              <h3>3. Chame a API</h3>
-              <p>
-                Bearer + org header. Ou conecte o MCP em <code>/api/mcp</code> com a mesma chave.
-              </p>
-            </article>
-          </div>
+        <section className="ig-features">
+          <article className="ig-feature">
+            <h3>Chaves pessoais</h3>
+            <p>
+              Uma chave <code>impa_…</code> por pessoa. Vale em todas as orgs do e-mail;{' '}
+              <code>X-Impa-Org</code> escolhe qual.
+            </p>
+          </article>
+          <article className="ig-feature">
+            <h3>MCP nativo</h3>
+            <p>
+              Conecte Cursor, Claude e agentes em <code>/api/mcp</code> com as mesmas chaves da REST.
+            </p>
+          </article>
+          <article className="ig-feature">
+            <h3>llms.txt</h3>
+            <p>
+              Índice curto em <code>/llms.txt</code> e guia completo em <code>/llms-full.txt</code> para
+              treinar agentes.
+            </p>
+          </article>
+          <article className="ig-feature">
+            <h3>Salas e studios</h3>
+            <p>Crie e gerencie rooms, agendas e transmissão ao vivo pela API.</p>
+          </article>
+          <article className="ig-feature">
+            <h3>Agentes de IA</h3>
+            <p>
+              Liste e configure assistentes com RBAC (<code>agents.manage</code>).
+            </p>
+          </article>
+          <article className="ig-feature">
+            <h3>Playground Scalar</h3>
+            <p>Teste endpoints interativamente com OpenAPI 3.1 — igual ao ImpaGo.</p>
+          </article>
+        </section>
+      </div>
 
-          <pre className="dev-code" style={{ marginTop: 24 }}>
-            {`curl -s -H "Authorization: Bearer impa_…" ${origin || ''}/api/v1/me
-
-curl -s \\
-  -H "Authorization: Bearer impa_…" \\
-  -H "X-Impa-Org: <tenant-uuid>" \\
-  ${origin || ''}/api/v1/rooms`}
-          </pre>
-        </div>
-      </section>
-
-      <section className="dev-section" id="mcp">
-        <div className="dev-section-inner">
-          <h2>MCP nativo</h2>
-          <p className="dev-lead">
-            Sem processo extra. Cursor, Claude e outros agentes falam JSON-RPC no mesmo host — espelhando
-            salas, reuniões, agentes e conhecimento.
-          </p>
-          <pre className="dev-code">{`{
-  "mcpServers": {
-    "impameet": {
-      "url": "${origin || 'https://seu-dominio'}/api/mcp",
-      "headers": {
-        "Authorization": "Bearer impa_…"
-      }
-    }
-  }
-}`}</pre>
-          <div className="dev-links" style={{ marginTop: 20 }}>
-            <a className="dev-chip" href="/llms.txt" target="_blank" rel="noreferrer">
-              /llms.txt
-            </a>
-            <a className="dev-chip" href="/llms-full.txt" target="_blank" rel="noreferrer">
-              /llms-full.txt
-            </a>
-            <a className="dev-chip" href="/openapi.json" target="_blank" rel="noreferrer">
-              /openapi.json
-            </a>
-            <a className="dev-chip" href="/api/mcp" target="_blank" rel="noreferrer">
-              /api/mcp
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section className="dev-section dev-playground" id="playground">
-        <div className="dev-section-inner" style={{ maxWidth: 1400 }}>
-          <h2>API Playground</h2>
-          <p className="dev-lead">
-            Explore e teste os endpoints com Scalar — cole a chave Bearer e o UUID da org no canto de
-            autenticação.
-          </p>
-          <ScalarPlayground openApiUrl={openApiUrl || '/openapi.json'} />
-        </div>
-      </section>
-
-      <footer className="dev-footer">{brand} Developers · OpenAPI 3.1 · MCP Streamable HTTP</footer>
+      <footer className="ig-footer">{brand} — documentação · OpenAPI 3.1 · MCP</footer>
     </div>
   );
 }
