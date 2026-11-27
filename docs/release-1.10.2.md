@@ -34,16 +34,14 @@ para desenvolvedores, com as correções de docs e de OpenAPI feitas na 1.10.1 e
 - **1.10.1:** docs Developers refeitas no padrão ImpaGo e playground Scalar funcionando.
 - **1.10.2:** origem pública correta no OpenAPI quando a plataforma está atrás de proxy.
 
-### Publicação
+### Imagens
 
-Antes de criar o release, publique as imagens a partir de uma máquina com Docker logado na
-conta `impa365`:
+A tag `v1.10.2` e este release no GitHub já estão publicados. Falta publicar as imagens no
+Docker Hub a partir de uma máquina com Docker logado na conta `impa365`:
 
 ```bash
 docker login -u impa365
 APPS="platform agent screen" bash deploy/scripts/release.sh 1.10.2
-git tag -a v1.10.2 -m "IMPA Meet 1.10.2"
-git push origin v1.10.2
 ```
 
 > As imagens `agent` e `screen` da 1.10.2 são as mesmas da 1.9.3 (a linha 1.10 mudou apenas a
@@ -89,16 +87,14 @@ documentation, including the docs and OpenAPI fixes from 1.10.1 and 1.10.2.
 - **1.10.1:** Developers docs rebuilt in the ImpaGo style and Scalar playground fixed.
 - **1.10.2:** correct public origin in OpenAPI when the platform runs behind a proxy.
 
-#### Publishing
+#### Images
 
-Before creating the release, publish the images from a machine with Docker logged in to the
-`impa365` account:
+The `v1.10.2` tag and this GitHub release are already published. The images still need to be
+published to Docker Hub from a machine with Docker logged in to the `impa365` account:
 
 ```bash
 docker login -u impa365
 APPS="platform agent screen" bash deploy/scripts/release.sh 1.10.2
-git tag -a v1.10.2 -m "IMPA Meet 1.10.2"
-git push origin v1.10.2
 ```
 
 > The 1.10.2 `agent` and `screen` images are the same as 1.9.3 (the 1.10 line only changed the
@@ -145,16 +141,14 @@ documentación para desarrolladores, con las correcciones de docs y OpenAPI de 1
 - **1.10.1:** docs Developers rehechas al estilo ImpaGo y playground Scalar funcionando.
 - **1.10.2:** origen público correcto en OpenAPI cuando la plataforma está detrás de un proxy.
 
-#### Publicación
+#### Imágenes
 
-Antes de crear el release, publica las imágenes desde una máquina con Docker conectado a la
-cuenta `impa365`:
+La etiqueta `v1.10.2` y este release de GitHub ya están publicados. Falta publicar las imágenes
+en Docker Hub desde una máquina con Docker conectado a la cuenta `impa365`:
 
 ```bash
 docker login -u impa365
 APPS="platform agent screen" bash deploy/scripts/release.sh 1.10.2
-git tag -a v1.10.2 -m "IMPA Meet 1.10.2"
-git push origin v1.10.2
 ```
 
 > Las imágenes `agent` y `screen` de 1.10.2 son las mismas de 1.9.3 (la línea 1.10 solo cambió la
