@@ -99,6 +99,14 @@ businesses.
 - Guided wizard to create rooms (meeting or studio).
 - Interface in **Portuguese, English and Spanish**, with light and dark themes.
 
+### API and integrations
+- **Public REST API** at `/api/v1` for rooms, meetings, agents and knowledge bases.
+- **MCP** at `/api/mcp` (Streamable HTTP), with the same keys and permissions as the API.
+- **Personal keys** `impa_…`: the key follows the person and works in every organization they
+  belong to, with `X-Impa-Org` and scopes that can only narrow the role.
+- **OpenAPI 3.1**, Scalar playground and docs at `/developers`; `llms.txt` and
+  `llms-full.txt` for AI agents.
+
 ### Accessibility
 - Screen readers (NVDA, JAWS, VoiceOver, TalkBack), keyboard shortcuts and audio cues.
 - **Voice-assisted entry**: the platform asks for the name, confirms it with a yes or no, tells
@@ -197,6 +205,7 @@ flowchart LR
     traefik --> platform["platform<br/>Next.js: rooms, admin, API"]
     traefik -- WSS --> livekit["livekit<br/>media server"]
     platform --> postgres[(PostgreSQL)]
+    platform -- RAG --> qdrant[(Qdrant)]
     platform -- API --> livekit
     agent["agent<br/>AI assistants (Python)"] -- WebRTC --> livekit
     agent -- profiles --> platform
@@ -214,6 +223,7 @@ flowchart LR
 | `platform` | [`apps/platform`](apps/platform) | Next.js 15, React 18, LiveKit Components, PostgreSQL |
 | `agent` | [`apps/agent`](apps/agent) | Python 3.12, LiveKit Agents, Fish Audio / Deepgram / ElevenLabs, OpenAI-compatible LLM |
 | `screen` | [`apps/screen`](apps/screen) | Python 3.12, Playwright (headless Chromium), LiveKit RTC |
+| `qdrant` | [`deploy/stack.yml`](deploy/stack.yml) | Qdrant, knowledge-base vectors (RAG) |
 | `livekit`, `egress`, `redis`, `postgres` | [`deploy/stack.yml`](deploy/stack.yml) | Official images, pinned versions |
 
 Ready-made images are on **Docker Hub**:
@@ -241,6 +251,9 @@ uv run ruff check src tests && uv run mypy && uv run bandit -q -r src
 
 Each `Dockerfile` has a `test` stage that runs the full suite inside the image:
 `docker build --target test apps/<app>`.
+
+The public API and MCP are documented in [docs/api-v1.md](docs/api-v1.md). With the stack
+running, the live reference is at `/developers` and the spec at `/openapi.json`.
 
 To publish a release to Docker Hub (with Docker Desktop signed in to the account), run
 `bash deploy/scripts/release.sh 1.2.0`. The script tests, scans and only publishes if

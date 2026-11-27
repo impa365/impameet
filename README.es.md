@@ -103,6 +103,14 @@ para empresas.
 - Asistente guiado para crear salas (reunión o estudio).
 - Interfaz en **portugués, inglés y español**, con tema claro y oscuro.
 
+### API e integraciones
+- **API REST pública** en `/api/v1` para salas, reuniones, agentes y bases de conocimiento.
+- **MCP** en `/api/mcp` (Streamable HTTP), con las mismas claves y permisos de la API.
+- **Claves personales** `impa_…`: la clave sigue a la persona y funciona en todas las
+  organizaciones a las que pertenece, con `X-Impa-Org` y alcances que solo restringen el rol.
+- **OpenAPI 3.1**, playground Scalar y documentación en `/developers`; `llms.txt` y
+  `llms-full.txt` para agentes de IA.
+
 ### Accesibilidad
 - Lectores de pantalla (NVDA, JAWS, VoiceOver, TalkBack), atajos de teclado y avisos sonoros.
 - **Entrada asistida por voz**: la plataforma pregunta el nombre, lo confirma con sí o no,
@@ -205,6 +213,7 @@ flowchart LR
     traefik --> platform["platform<br/>Next.js: salas, admin, API"]
     traefik -- WSS --> livekit["livekit<br/>servidor de medios"]
     platform --> postgres[(PostgreSQL)]
+    platform -- RAG --> qdrant[(Qdrant)]
     platform -- API --> livekit
     agent["agent<br/>asistentes de IA (Python)"] -- WebRTC --> livekit
     agent -- perfiles --> platform
@@ -222,6 +231,7 @@ flowchart LR
 | `platform` | [`apps/platform`](apps/platform) | Next.js 15, React 18, LiveKit Components, PostgreSQL |
 | `agent` | [`apps/agent`](apps/agent) | Python 3.12, LiveKit Agents, Fish Audio / Deepgram / ElevenLabs, LLM compatible con OpenAI |
 | `screen` | [`apps/screen`](apps/screen) | Python 3.12, Playwright (Chromium headless), LiveKit RTC |
+| `qdrant` | [`deploy/stack.yml`](deploy/stack.yml) | Qdrant, vectores de las bases de conocimiento (RAG) |
 | `livekit`, `egress`, `redis`, `postgres` | [`deploy/stack.yml`](deploy/stack.yml) | Imágenes oficiales, versiones fijadas |
 
 Las imágenes listas están en **Docker Hub**:
@@ -249,6 +259,9 @@ uv run ruff check src tests && uv run mypy && uv run bandit -q -r src
 
 Cada `Dockerfile` tiene una etapa `test` que ejecuta la batería completa dentro de la imagen:
 `docker build --target test apps/<app>`.
+
+La API pública y el MCP están documentados en [docs/api-v1.md](docs/api-v1.md). Con la stack
+en marcha, la referencia viva está en `/developers` y la especificación en `/openapi.json`.
 
 Para publicar una versión en Docker Hub (con Docker Desktop conectado a la cuenta), ejecuta
 `bash deploy/scripts/release.sh 1.2.0`. El script prueba, analiza y solo publica si todo pasa.

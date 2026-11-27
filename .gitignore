@@ -10,6 +10,8 @@
 /deploy/local/
 # Internal planning notes
 /ROADMAP-*.md
+# Imported AI-assistant conversations (may contain private context)
+/docs/context/
 # Editor and agent tooling
 /.cursor/
 /.claude/
